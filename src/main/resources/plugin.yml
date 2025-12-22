@@ -1,0 +1,4 @@
+name: The Mob
+version: '0.0.1'
+main: org.plugin.theMob.TheMob
+api-version: '1.21'

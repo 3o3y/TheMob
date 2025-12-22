@@ -1,0 +1,256 @@
+menu:
+  title: "Your Stats"
+  size: 54
+
+stats:
+
+  health:
+    name: "❤ Health"
+    slot: 0
+    value-path: "player.health"
+    level-path: "player.level.health"
+    next-path: "player.next.health"
+    icon: "HEART_OF_THE_SEA"
+
+  bonus_health:
+    name: "❤+ Health+"
+    slot: 10
+    value-path: "player.bonus_health"
+    level-path: "player.level.health"
+    next-path: "player.next.health"
+    icon: "GOLDEN_APPLE"
+
+  armor:
+    name: "⛨ Defense"
+    slot: 45
+    value-path: "player.armor"
+    level-path: "player.level.armor"
+    next-path: "player.next.armor"
+    icon: "SHIELD"
+
+  defense:
+    name: "⛨+ Defense+"
+    slot: 37
+    value-path: "player.defense"
+    level-path: "player.level.defense"
+    next-path: "player.next.defense"
+    icon: "NETHERITE_SCRAP"
+
+  extra_damage:
+    name: "⚔ Extra Dmg"
+    slot: 8
+    value-path: "player.extra_damage"
+    level-path: "player.level.extra_damage"
+    next-path: "player.next.extra_damage"
+    icon: "ANVIL"
+
+  damage:
+    name: "⚔ Damage"
+    slot: 5
+    value-path: "player.damage"
+    level-path: "player.level.damage"
+    next-path: "player.next.damage"
+    icon: "DIAMOND"
+
+  crit_chance:
+    name: "✨ Crit Chance"
+    slot: 43
+    value-path: "player.crit_chance"
+    level-path: "player.level.crit"
+    next-path: "player.next.crit"
+    icon: "AMETHYST_SHARD"
+
+  crit_multiplier:
+    name: "✨ Crit Multiplicator"
+    slot: 53
+    value-path: "player.crit_multiplier"
+    level-path: "player.level.crit_multiplier"
+    next-path: "player.next.crit_multiplier"
+    icon: "GLOWSTONE_DUST"
+
+  lifesteal:
+    name: "⚡ Lifesteal"
+    slot: 16
+    value-path: "player.lifesteal"
+    level-path: "player.level.lifesteal"
+    next-path: "player.next.lifesteal"
+    icon: "NETHER_WART"
+
+  movement_speed:
+    name: "🩸 Move Speed"
+    slot: 20
+    value-path: "player.movement_speed"
+    level-path: "player.level.movement_speed"
+    next-path: "player.next.movement_speed"
+    icon: "DIAMOND_BOOTS"
+
+  attack_speed:
+    name: "⚡ Attack Speed"
+    slot: 24
+    value-path: "player.attack_speed"
+    level-path: "player.level.attack_speed"
+    next-path: "player.next.attack_speed"
+    icon: "WIND_CHARGE"
+
+  luck:
+    name: "🍀 Luck"
+    slot: 29
+    value-path: "player.luck"
+    level-path: "player.level.luck"
+    next-path: "player.next.luck"
+    icon: "RABBIT_FOOT"
+
+  knockback_resistance:
+    name: "🛑 Knockback Res."
+    slot: 33
+    value-path: "player.knockback_resistance"
+    level-path: "player.level.knockback_resistance"
+    next-path: "player.next.knockback_resistance"
+    icon: "HEAVY_CORE"
+
+status_system:
+  health_tiers:
+    - 10
+    - 16
+    - 22
+    - 30
+    - 40
+    - 55
+    - 67
+    - 73
+    - 81
+    - 93
+
+  armor_tiers:
+    - 5
+    - 12
+    - 16
+    - 21
+    - 27
+    - 36
+    - 41
+    - 57
+    - 66
+    - 79
+
+  damage_tiers:
+    - 7
+    - 13
+    - 19
+    - 27
+    - 36
+    - 42
+    - 56
+    - 69
+    - 74
+    - 85
+
+  extra_damage_tiers:
+    - 5
+    - 10
+    - 15
+    - 25
+    - 36
+    - 47
+    - 58
+    - 69
+    - 80
+    - 90
+
+  crit_tiers:
+    - 7
+    - 14
+    - 21
+    - 28
+    - 35
+    - 42
+    - 49
+    - 56
+    - 63
+    - 70
+
+  crit_multiplier_tiers:
+    - 10
+    - 20
+    - 30
+    - 40
+    - 50
+    - 60
+    - 70
+    - 80
+    - 90
+    - 100
+
+
+  lifesteal_tiers:
+    - 5
+    - 10
+    - 15
+    - 20
+    - 25
+    - 30
+    - 35
+    - 40
+    - 45
+    - 50
+
+  defense_tiers:
+    - 3
+    - 8
+    - 15
+    - 24
+    - 32
+    - 40
+    - 50
+    - 59
+    - 64
+    - 71
+    - 80
+
+  movement_speed_tiers:
+    - 0.01
+    - 0.02
+    - 0.03
+    - 0.04
+    - 0.05
+    - 0.06
+    - 0.07
+    - 0.08
+    - 0.09
+    - 0.10
+
+  attack_speed_tiers:
+    - 0.5
+    - 1.0
+    - 1.5
+    - 2.0
+    - 2.5
+    - 3.0
+    - 3.5
+    - 4.0
+    - 4.5
+    - 5.0
+
+  knockback_resistance_tiers:
+    - 0.05
+    - 0.10
+    - 0.20
+    - 0.30
+    - 0.40
+    - 0.50
+    - 0.60
+    - 0.70
+    - 0.80
+    - 0.90
+
+  luck_tiers:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10

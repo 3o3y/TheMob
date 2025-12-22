@@ -1,0 +1,6 @@
+# ====================================================
+#   TheMob - Hauptkonfiguration
+# ====================================================
+# Bossbar wird mit der zombie_boss.yml umgeschrieben
+language: "de"          # Sprache: de / en / ... (für später)
+show-chat-messages: false   # Wenn false → keine Nachrichten im Chat senden

@@ -1,0 +1,8 @@
+# =============================================
+#  TheMob – GLOBAL CONFIGURATION
+# =============================================
+
+plugin:
+  debug: true
+#Comming in V2.0 language: "de"
+#Comming in V2.0 license-key: ey432...insert your key

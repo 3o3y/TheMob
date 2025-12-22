@@ -1,0 +1,607 @@
+mob-id: zombie_boss
+base-type: ZOMBIE
+# 🟢 PASSIVE MOBS (never attack players)
+# SHEEP # COW # PIG # CHICKEN # RABBIT # HORSE # DONKEY # MULE # LLAMA
+# GOAT # CAMEL # SNIFFER # TURTLE # BEE # AXOLOTL # FROG # TADPOLE # PARROT
+# CAT # OCELOT # SQUID # GLOW_SQUID
+
+# 🟡 NEUTRAL MOBS (become aggressive when provoked)
+# ENDERMAN # WOLF # IRON_GOLEM # SNOW_GOLEM # PANDA # DOLPHIN # PIGLIN
+# TRADER_LLAMA # ZOMBIFIED_PIGLIN
+
+# 🔴 HOSTILE MOBS (always aggressive)
+# ZOMBIE # HUSK # DROWNED # ZOMBIE_VILLAGER # SKELETON # STRAY # WITHER_SKELETON
+# CREEPER # SPIDER # CAVE_SPIDER # SLIME # MAGMA_CUBE # WITCH # VEX # EVOKER
+# VINDICATOR # PILLAGER # RAVAGER # GUARDIAN # ELDER_GUARDIAN # BLAZE # GHAST
+# PHANTOM # SILVERFISH # SHULKER # WARDEN
+
+# 🟣 BOSS MOBS
+# WITHER # ENDER_DRAGON
+
+# 🔵 WATER MOBS
+# COD # SALMON # PUFFERFISH # TROPICAL_FISH # SQUID # GLOW_SQUID # GUARDIAN
+# ELDER_GUARDIAN
+
+# ⚙️ OTHER / NPC / UTILITY
+# VILLAGER # WANDERING_TRADER # ARMOR_STAND # ALLAY
+# =====================================================================
+# Example:
+# base-type: ZOMBIE   # choose one mob type from the lists above
+name: "&2&lZombie King"
+display-health: true            # Show health bar / health display
+# BASE STATS
+stats:
+  health:
+    max: 75.0                   # Maximum health (1 heart = 2.0)
+    current: 75.0               # Health value when the mob spawns
+  movement-speed: 0.23          # Base movement speed (vanilla zombie ≈ 0.23)
+  attack:
+    damage: 6.0                 # Base melee attack damage
+    speed: 4.0                  # Attack speed (higher = faster attacks)
+    knockback: 0.0              # Extra knockback applied on hit
+  defense:
+    armor: 0.0                  # Flat armor value (reduces incoming damage)
+    armor-toughness: 0.0        # Reduces effectiveness of high-damage hits
+    knockback-resistance: 0.0   # 0.0 = normal knockback, 1.0 = immune
+  follow-range: 32.0            # Detection range in blocks
+  luck: 0.0                     # Influences loot tables and random outcomes
+  flying-speed: 0.4             # Movement speed while flying (only applies to flying mobs)
+  scale: 1.0                    # Entity size multiplier (1.0 = default size)
+  step-height: 0.6              # Max block height the mob can step up without jumping
+  gravity: true                 # true = affected by gravity, false = floating entity
+# ABILITIES
+abilities:
+  jump-boost:
+    enabled: true               # Enables Jump Boost potion effect
+    amplifier: 1                # Potion level (1 = Jump Boost II)
+    permanent: true             # true = applied indefinitely
+  fire-immunity: false          # Grants Fire Resistance (lava & fire immunity)
+  water-breathing: false        # Allows breathing underwater
+  invisibility: false           # Makes the entity invisible
+  glowing: false                # Makes the entity glow (outline visible through walls)
+  no-ai: false                  # Disables all AI behavior (static mob)
+  silent: false                 # Disables all sounds from the entity
+  invulnerable: false           # Entity cannot take any damage
+  gravity: true                 # Overrides gravity setting
+  knockback-resistant: true     # Sets knockback resistance to 100%
+  can-pickup-items: false       # Allows the mob to pick up dropped items
+  persistent: true              # Prevents despawning when far from players
+  immune:
+    fire: false                 # Immune to fire and lava
+    fall: false                 # Immune to fall damage
+    drowning: false             # Immune to drowning
+    lightning: false            # Immune to lightning strikes
+    projectile: false           # Immune to arrows and other projectiles
+  effects:
+    speed:
+      amplifier: 0              # Speed potion level (0 = disabled)
+      permanent: false          # true = never expires
+    strength:
+      amplifier: 0              # Strength potion level
+      permanent: false
+    resistance:
+      amplifier: 0              # Damage Resistance potion level
+      permanent: false
+    regeneration:
+      amplifier: 0              # Regeneration potion level
+      permanent: false
+# BOSS PHASES
+phases:
+  phase1:
+    hp-range: "100-75"                # Active while boss health is between 100% and 75%
+    title: "Phase 1 – Royal Calm"     # Title shown when this phase starts
+    # ===== BASE BUFFS (ATTRIBUTE MODIFIERS) =====
+    buffs:
+      movement-speed: +0.01           # +0.01 movement speed (vanilla zombie ≈ 0.23)
+      damage: +0                      # Flat bonus to attack damage
+      armor: +0                       # Flat armor value
+      armor-toughness: +0             # Reduces effectiveness of high-damage hits
+      knockback-resistance: +0.0      # 0.0 = normal knockback, 1.0 = immune
+      max-health: +0                  # Extra max health (2.0 = 1 heart)
+    # ===== POTION EFFECTS =====
+    effects:
+      speed: 0                        # Speed potion level (0 = disabled)
+      strength: 0                     # Strength potion level
+      resistance: 0                   # Damage Resistance potion level
+      regeneration: 0                 # Regeneration potion level
+      fire-resistance: false          # Immune to fire & lava
+      jump-boost: 0                   # Jump Boost potion level
+      invisibility: false             # Entity becomes invisible
+      glowing: false                  # Outline visible through walls
+      water-breathing: false          # Can breathe underwater
+    # ===== AI / BEHAVIOR SETTINGS =====
+    behavior:
+      mode: aggressive                # aggressive | passive | flee
+      follow-range: +0                # Extra target detection range in blocks
+      forget-target-after: 0          # Seconds until target is forgotten (0 = never)
+    # ===== COMBAT MODIFIERS =====
+    combat:
+      crit-chance: +0                 # Additional crit chance in percent
+      crit-multiplier: +0.0           # Extra crit damage multiplier
+      lifesteal: +0.0                 # % of dealt damage healed back
+      deal-knockback: +0.0            # Extra knockback dealt to targets
+      receive-damage-multiplier: 1.0  # Final damage taken (1.0 = normal)
+    # ===== DAMAGE IMMUNITIES =====
+    immunities:
+      fire: false                     # Immune to fire damage
+      fall: false                     # Immune to fall damage
+      poison: false                   # Immune to poison
+      drowning: false                 # Immune to drowning
+      lightning: false                # Immune to lightning strikes
+      projectile: false               # Immune to arrows & projectiles
+      explosion: false                # Immune to explosions
+    # ===== PHASE ACTIONS (COOLDOWN BASED) =====
+    actions:
+      summon-minions:
+        enabled: false                # Enables mob summoning
+        type: ZOMBIE                  # Entity type to spawn
+        amount: 0                     # Number of mobs
+        radius: 5                     # Spawn radius in blocks
+        cooldown: 15                  # Cooldown in seconds
+      blink:
+        enabled: false                # Enables short-range teleport
+        radius: 8                     # Max teleport distance
+        chance: 0                     # Chance in percent
+        cooldown: 10                  # Cooldown in seconds
+      knockback-wave:
+        enabled: false                # Area knockback pulse
+        strength: 1.5                 # Knockback strength
+        radius: 6                     # Effect radius in blocks
+        cooldown: 12                  # Cooldown in seconds
+    # ===== PHYSICS (INTENTIONALLY UNREALISTIC / BOSS MAGIC) =====
+    physics:
+      gravity: true                   # true = normal gravity, false = floating
+      levitation: 0                   # Levitation potion level
+      slow-falling: false             # Enables slow falling
+    # ===== WORLD EFFECTS (GLOBAL – USE CAREFULLY) =====
+    world:
+      weather: NONE                   # NONE | CLEAR | RAIN | THUNDER
+      time: NONE                      # NONE | DAY | NIGHT
+  # =====================================================
+  phase2:
+    hp-range: "75-50"
+    title: "Phase 2 – Furious Assault"
+    buffs:
+      movement-speed: +0.02           # Faster movement
+      damage: +2                      # Increased attack damage
+      armor: +2                       # Increased armor
+      armor-toughness: +1
+      knockback-resistance: +0.1
+      max-health: +0
+    effects:
+      speed: 1                        # Speed I
+      strength: 1                     # Strength I
+      resistance: 0
+      regeneration: 0
+      fire-resistance: false
+      jump-boost: 0
+      invisibility: false
+      glowing: false
+      water-breathing: false
+    behavior:
+      mode: aggressive
+      follow-range: +8                # Increased detection range
+      forget-target-after: 0
+    combat:
+      crit-chance: +10                # +10% crit chance
+      crit-multiplier: +0.5
+      lifesteal: +0.0
+      deal-knockback: +0.5
+      receive-damage-multiplier: 1.0
+    immunities:
+      fire: false
+      fall: false
+      poison: false
+      drowning: false
+      lightning: false
+      projectile: false
+      explosion: false
+    actions:
+      summon-minions:
+        enabled: false
+        type: ZOMBIE
+        amount: 0
+        radius: 5
+        cooldown: 15
+      blink:
+        enabled: false
+        radius: 8
+        chance: 0
+        cooldown: 10
+      knockback-wave:
+        enabled: false
+        strength: 2.0
+        radius: 6
+        cooldown: 12
+    physics:
+      gravity: true
+      levitation: 0
+      slow-falling: false
+    world:
+      weather: NONE
+      time: NONE
+  # =====================================================
+  phase3:
+    hp-range: "50-25"
+    title: "Phase 3 – Royal Frenzy"
+    buffs:
+      movement-speed: +0.05           # Very fast movement
+      damage: +4                      # High damage bonus
+      armor: +5
+      armor-toughness: +2
+      knockback-resistance: +0.3
+      max-health: +0
+    effects:
+      speed: 2                        # Speed II
+      strength: 2                     # Strength II
+      resistance: 1                  # Resistance I
+      regeneration: 1                # Regeneration I
+      fire-resistance: false
+      jump-boost: 1
+      invisibility: false
+      glowing: true                  # Boss is always visible
+      water-breathing: false
+    behavior:
+      mode: aggressive
+      follow-range: +16
+      forget-target-after: 0
+    combat:
+      crit-chance: +20
+      crit-multiplier: +1.0
+      lifesteal: +5.0                # Heals from damage dealt
+      deal-knockback: +1.0
+      receive-damage-multiplier: 0.9 # Takes 10% less damage
+    immunities:
+      fire: false
+      fall: false
+      poison: false
+      drowning: false
+      lightning: false
+      projectile: false
+      explosion: false
+    actions:
+      summon-minions:
+        enabled: true                # Summons helper mobs
+        type: ZOMBIE
+        name: "&6Mionion &fof Zombie King"
+        amount: 3
+        radius: 6
+        cooldown: 15
+      blink:
+        enabled: true
+        radius: 10
+        chance: 20
+        cooldown: 8
+      knockback-wave:
+        enabled: true
+        strength: 2.5
+        radius: 7
+        cooldown: 10
+    physics:
+      gravity: true
+      levitation: 0
+      slow-falling: false
+    world:
+      weather: NONE
+      time: NONE
+  # =====================================================
+  phase4:
+    hp-range: "25-0"
+    title: "Phase 4 – Desperate Escape"
+    buffs:
+      movement-speed: +0.08           # Extremely fast movement
+      damage: +6
+      armor: +8
+      armor-toughness: +4
+      knockback-resistance: +1.0      # Full knockback immunity
+      max-health: +0
+    effects:
+      speed: 2
+      strength: 3
+      resistance: 2
+      regeneration: 2
+      fire-resistance: true
+      jump-boost: 2
+      invisibility: false
+      glowing: true
+      water-breathing: true
+    behavior:
+      mode: flee                     # Tries to escape instead of fighting
+      follow-range: +0
+      forget-target-after: 5         # Stops targeting after 5 seconds
+    combat:
+      crit-chance: +30
+      crit-multiplier: +1.5
+      lifesteal: +10.0
+      deal-knockback: +1.5
+      receive-damage-multiplier: 0.8 # Takes 20% less damage
+    immunities:
+      fire: true
+      fall: true
+      poison: true
+      drowning: true
+      lightning: false
+      projectile: false
+      explosion: false
+    actions:
+      summon-minions:
+        enabled: false
+        type: ZOMBIE
+        amount: 0
+        radius: 6
+        cooldown: 15
+      blink:
+        enabled: true
+        radius: 12
+        chance: 30
+        cooldown: 6
+      knockback-wave:
+        enabled: true
+        strength: 3.0
+        radius: 8
+        cooldown: 8
+    physics:
+      gravity: false                 # Floating boss
+      levitation: 1
+      slow-falling: true
+    world:
+      weather: THUNDER
+      time: NIGHT
+# STANDARD DROPS
+drops:
+  - item: DIAMOND
+    amount: 8
+    chance: 0.80                 # 80% drop chance
+  - item: GOLDEN_CARROT
+    amount: 3
+    chance: 1.0                  # 100% drop chance
+# Enable OP drops?
+opdrop: true                     # IMPORTANT: toggle legendary drops
+# LEGENDARY DROPS (only if opdrop = true)
+legendary-drops:
+  # 🗡 OMEGA SWORD
+  - item: NETHERITE_SWORD
+    amount: 1
+    chance: 1.0
+    enchants:
+      sharpness: 11
+      sweeping: 11
+      fire_aspect: 11
+      looting: 11
+      unbreaking: 11
+      mending: 11
+      knockback: 6
+    stats:
+      damage: 25
+      extra_damage: 35
+      crit: 70
+      crit_multiplier: 3.5
+      lifesteal: 20
+      movement_speed: 0.03
+    name:
+      - "&b&lBlade of Eternal Decay"
+      - "&fRarity: &6⭐⭐⭐⭐⭐" #or Legendary/Mythic/Admin Defeater...
+    lore:
+      - "&fForged by the Zombie King."
+      - "&fKnown as &4Omega Sword"
+  # 🟣 OMEGA HELMET
+  - item: NETHERITE_HELMET
+    amount: 1
+    chance: 1
+    enchants:
+      protection: 20
+      respiration: 10
+      aqua_affinity: 1
+      unbreaking: 20
+      mending: 1
+    stats:
+      armor: 18
+      health: 14
+      defense: 10
+      knockback_resistance: 0.6
+      luck: 2
+    name:
+      - "&5&lΩ Omega Helm"
+      - "&dEndgame Artifact"
+    lore:
+      - "&7Forged beyond mortal limits."
+      - "&7Reduces knockback drastically."
+      - "&5Part of the Omega Set."
+  # 🟣 OMEGA CHESTPLATE
+  - item: NETHERITE_CHESTPLATE
+    amount: 1
+    chance: 1
+    enchants:
+      protection: 25
+      thorns: 10
+      unbreaking: 25
+      mending: 1
+      blast_protection: 15
+    stats:
+      armor: 28
+      health: 30
+      defense: 22
+      knockback_resistance: 0.4
+    name:
+      - "&5&lΩ Omega Chestplate"
+      - "&dEndgame Artifact"
+    lore:
+      - "&7An impenetrable wall of power."
+      - "&7Massive armor and vitality."
+      - "&5Part of the Omega Set."
+  # 🟣 OMEGA LEGGINGS
+  - item: NETHERITE_LEGGINGS
+    amount: 1
+    chance: 1
+    enchants:
+      protection: 22
+      thorns: 15
+      unbreaking: 25
+      mending: 1
+      projectile_protection: 15
+    stats:
+      armor: 20
+      health: 18
+      defense: 16
+      crit: 20
+      crit_multiplier: 0.8
+    name:
+      - "&5&lΩ Omega Leggings"
+      - "&dEndgame Artifact"
+    lore:
+      - "&7Infused with lethal precision."
+      - "&7Enhances critical strikes."
+      - "&5Part of the Omega Set."
+  # 🟣 OMEGA BOOTS
+  - item: NETHERITE_BOOTS
+    amount: 1
+    chance: 1
+    enchants:
+      protection: 18
+      feather_falling: 25
+      soul_speed: 3
+      unbreaking: 25
+      mending: 1
+      depth_strider: 3
+    stats:
+      armor: 16
+      health: 12
+      movement_speed: 0.06
+      jump_boost: 1
+      knockback_resistance: 0.3
+    name:
+      - "&5&lΩ Omega Boots"
+      - "&dEndgame Artifact"
+    lore:
+      - "&7Grants unmatched mobility."
+      - "&7Speed and jump enhanced."
+      - "&5Part of the Omega Set."
+  # 🪓 OMEGA AXE
+  - item: NETHERITE_AXE
+    amount: 1
+    chance: 1.0
+    enchants:
+      sharpness: 10
+      efficiency: 8
+      unbreaking: 11
+      mending: 11
+    stats:
+      damage: 35
+      crit: 40
+      crit_multiplier: 4.0
+      knockback_resistance: 0.2
+    name:
+      - "&c&lAxe of Ruination"
+      - "&6OMEGA AXE"
+    lore:
+      - "&fOne hit ends worlds."
+  # ⛏ OMEGA PICKAXE
+  - item: NETHERITE_PICKAXE
+    amount: 1
+    chance: 1.0
+    enchants:
+      efficiency: 10
+      fortune: 6
+      unbreaking: 11
+      mending: 11
+    stats:
+      luck: 10
+      movement_speed: 0.02
+    name:
+      - "&9&lPick of Infinite Depth"
+      - "&6OMEGA TOOL"
+    lore:
+      - "&fNothing resists."
+  # 🪏 OMEGA SHOVEL
+  - item: NETHERITE_SHOVEL
+    amount: 1
+    chance: 1.0
+    enchants:
+      efficiency: 9
+      silk_touch: 1
+      unbreaking: 11
+      mending: 11
+    stats:
+      movement_speed: 0.04
+    name:
+      - "&7&lGravecaller"
+      - "&6OMEGA TOOL"
+    lore:
+      - "&fThe earth parts."
+  # 🔨 OMEGA HAMMER (Hoe)
+  - item: NETHERITE_HOE
+    amount: 1
+    chance: 1.0
+    enchants:
+      efficiency: 7
+      unbreaking: 11
+      mending: 11
+    stats:
+      damage: 18
+      extra_damage: 12
+      knockback: 2
+    name:
+      - "&4&lWorldbreaker Hammer"
+      - "&6OMEGA HAMMER"
+    lore:
+      - "&fForged to reshape worlds."
+  # 🔱 OMEGA TRIDENT
+  - item: TRIDENT
+    amount: 1
+    chance: 1.0
+    enchants:
+      impaling: 10
+      loyalty: 5
+      channeling: 1
+      unbreaking: 11
+      mending: 11
+    stats:
+      damage: 22
+      crit: 35
+      lifesteal: 8
+    name:
+      - "&3&lTide of Oblivion"
+      - "&6OMEGA TRIDENT"
+    lore:
+      - "&fEven oceans obey."
+  # 🏹 OMEGA BOW
+  - item: BOW
+    amount: 1
+    chance: 1.0
+    enchants:
+      power: 11
+      flame: 1
+      infinity: 1
+      unbreaking: 11
+    stats:
+      damage: 18
+      crit: 40
+      crit_multiplier: 2.5
+    name:
+      - "&5&lBow of Endless Night"
+      - "&6OMEGA BOW"
+    lore:
+      - "&fDarkness flies true."
+  # 🎯 OMEGA CROSSBOW
+  - item: CROSSBOW
+    amount: 1
+    chance: 1.0
+    enchants:
+      quick_charge: 5
+      multishot: 1
+      piercing: 4
+      unbreaking: 11
+      mending: 11
+    stats:
+      damage: 20
+      extra_damage: 25
+      crit: 30
+    name:
+      - "&e&lJudgement"
+      - "&6OMEGA CROSSBOW"
+    lore:
+      - "&fNo escape."
+# Death Commands, execute Commands from Server
+death-commands: # Command executed on death
+  - "give {player} carrot 1"
+  - "broadcast &6{mob} &7was slain by &b{player}&7!"
