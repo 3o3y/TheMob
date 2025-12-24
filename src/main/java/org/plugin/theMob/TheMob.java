@@ -69,7 +69,7 @@ public final class TheMob extends JavaPlugin {
         dropEngine = new MobDropEngine(itemBuilder);
         dropEngine.bind(mobManager);
         mobManager.setDropEngine(dropEngine);
-        healthDisplay = new MobHealthDisplay(mobManager);
+        healthDisplay = new MobHealthDisplay(this, mobManager);
         mobManager.setHealthDisplay(healthDisplay);
         playerBars = new PlayerBarCoordinator();
         BossActionEngine actionEngine = new BossActionEngine(this);
@@ -126,39 +126,106 @@ public final class TheMob extends JavaPlugin {
         HandlerList.unregisterAll(this);
         getLogger().info("[TheMob] Disabled.");
     }
+    // src/main/java/org/plugin/theMob/TheMob.java
+
     public void reloadPlugin() {
-        if (autoSpawnManager != null) autoSpawnManager.saveState();
-        if (spawnController != null) spawnController.shutdown();
-        if (hud != null) hud.shutdown();
-        if (bossBars != null) bossBars.shutdown();
-        HandlerList.unregisterAll(this);
+
+        getLogger().info("[TheMob] Reloading...");
+
+        // =====================================================
+        // 1️⃣ SHUTDOWN RUNTIME SYSTEMS (ORDER IS CRITICAL)
+        // =====================================================
+        try {
+            if (spawnController != null) {
+                spawnController.shutdown();
+                spawnController = null;
+            }
+
+            if (autoSpawnManager != null) {
+                autoSpawnManager.saveState();
+                autoSpawnManager = null;
+            }
+
+            if (hud != null) {
+                hud.shutdown();
+                hud = null;
+            }
+
+            if (bossBars != null) {
+                bossBars.shutdown();
+                bossBars = null;
+            }
+
+            if (ticks != null) {
+                ticks.shutdown();
+            }
+
+            if (playerBars != null) {
+                playerBars.clearAll();
+            }
+
+            HandlerList.unregisterAll(this);
+
+        } catch (Throwable t) {
+            getLogger().severe("[TheMob] Error while shutting down systems during reload!");
+            t.printStackTrace();
+        }
+
+        // =====================================================
+        // 2️⃣ RELOAD CONFIGS (SOURCE OF TRUTH)
+        // =====================================================
         configService.reloadAll();
+
+        // =====================================================
+        // 3️⃣ RELOAD MOB REGISTRY (MUST BE FIRST AFTER CONFIG)
+        // =====================================================
         mobManager.reloadFromConfigs();
-        healthDisplay = new MobHealthDisplay(mobManager);
+
+        // SAFETY CHECK
+        if (mobManager.registeredIds().isEmpty()) {
+            getLogger().warning("[TheMob] WARNING: No mobs loaded after reload!");
+        }
+
+        // =====================================================
+        // 4️⃣ RECREATE CORE SERVICES
+        // =====================================================
+        healthDisplay = new MobHealthDisplay(this, mobManager);
         mobManager.setHealthDisplay(healthDisplay);
-        playerBars.clearAll();
+
+        playerBars = new PlayerBarCoordinator();
+
         BossActionEngine actionEngine = new BossActionEngine(this);
         BossPhaseResolver resolver = new BossPhaseResolver();
-        phaseController = new BossPhaseController(resolver, actionEngine, null);
+
         bossBars = new BossBarService(
                 this,
                 mobManager,
                 playerBars
         );
         bossBars.start();
-        phaseController = new BossPhaseController(resolver, actionEngine, bossBars);
-        MobSpawnService spawnService =
-                new MobSpawnService(
-                        this,
-                        mobManager,
-                        keys,
-                        healthDisplay,
-                        bossBars,
-                        phaseController
-                );
+
+        phaseController = new BossPhaseController(
+                resolver,
+                actionEngine,
+                bossBars
+        );
+
+        MobSpawnService spawnService = new MobSpawnService(
+                this,
+                mobManager,
+                keys,
+                healthDisplay,
+                bossBars,
+                phaseController
+        );
         mobManager.setSpawnService(spawnService);
+
+        // =====================================================
+        // 5️⃣ AUTOSPAWN + SPAWN CONTROLLER
+        // =====================================================
         autoSpawnManager = new AutoSpawnManager(this);
         autoSpawnManager.load();
+
         spawnController = new SpawnController(
                 this,
                 mobManager,
@@ -166,6 +233,10 @@ public final class TheMob extends JavaPlugin {
                 keys
         );
         spawnController.start();
+
+        // =====================================================
+        // 6️⃣ HUD
+        // =====================================================
         hud = new NaviHudService(
                 this,
                 playerBars,
@@ -173,10 +244,16 @@ public final class TheMob extends JavaPlugin {
                 mobManager
         );
         hud.start();
+
+        // =====================================================
+        // 7️⃣ RE-REGISTER LISTENERS & COMMANDS
+        // =====================================================
         registerAllListeners();
         registerCommands();
+
         getLogger().info("[TheMob] Reload complete.");
     }
+
     private void registerAllListeners() {
         Bukkit.getPluginManager().registerEvents(
                 new org.plugin.theMob.combat.CombatListener(

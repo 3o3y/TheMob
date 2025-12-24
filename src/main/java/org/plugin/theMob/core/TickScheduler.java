@@ -1,38 +1,41 @@
+// src/main/java/org/plugin/theMob/core/TickScheduler.java
 package org.plugin.theMob.core;
 
 import org.bukkit.Bukkit;
-import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitTask;
 
-import java.util.HashSet;
-import java.util.Set;
+import java.util.ArrayList;
+import java.util.List;
 
 public final class TickScheduler {
 
-    private final JavaPlugin plugin;
-    private final Set<BukkitTask> tasks = new HashSet<>();
-    public TickScheduler(JavaPlugin plugin) {
+    private final Plugin plugin;
+    private final List<BukkitTask> tasks = new ArrayList<>();
+    private volatile boolean shutdown;
+
+    public TickScheduler(Plugin plugin) {
         this.plugin = plugin;
     }
-// SCHEDULE
-    public BukkitTask runTimer(Runnable r, long delay, long period) {
-        BukkitTask task = Bukkit.getScheduler()
-                .runTaskTimer(plugin, r, delay, period);
-        tasks.add(task);
-        return task;
+
+    public BukkitTask syncRepeating(Runnable r, long delay, long period) {
+        if (shutdown) throw new IllegalStateException("TickScheduler is shut down");
+        BukkitTask t = Bukkit.getScheduler().runTaskTimer(plugin, r, delay, period);
+        tasks.add(t);
+        return t;
     }
-    public BukkitTask runLater(Runnable r, long delay) {
-        BukkitTask task = Bukkit.getScheduler()
-                .runTaskLater(plugin, r, delay);
-        tasks.add(task);
-        return task;
+
+    public BukkitTask syncLater(Runnable r, long delay) {
+        if (shutdown) throw new IllegalStateException("TickScheduler is shut down");
+        BukkitTask t = Bukkit.getScheduler().runTaskLater(plugin, r, delay);
+        tasks.add(t);
+        return t;
     }
-// SHUTDOWN
+
     public void shutdown() {
+        shutdown = true;
         for (BukkitTask t : tasks) {
-            if (t != null && !t.isCancelled()) {
-                t.cancel();
-            }
+            try { t.cancel(); } catch (Throwable ignored) {}
         }
         tasks.clear();
     }

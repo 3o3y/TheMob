@@ -11,9 +11,11 @@ import java.util.List;
 public final class MobTabCompleter implements TabCompleter {
 
     private final MobManager mobs;
+
     public MobTabCompleter(MobManager mobs) {
         this.mobs = mobs;
     }
+
     @Override
     public List<String> onTabComplete(
             CommandSender sender,
@@ -22,46 +24,61 @@ public final class MobTabCompleter implements TabCompleter {
             String[] args
     ) {
         List<String> list = new ArrayList<>();
+
+        // /mob <sub>
         if (args.length == 1) {
-            list.add("spawn");
-            list.add("autospawn");
-            list.add("del");
-            list.add("killall");
-            list.add("reload");
-            return list;
+            String prefix = args[0].toLowerCase();
+            return List.of("spawn", "autospawn", "del", "killall", "reload")
+                    .stream()
+                    .filter(s -> s.startsWith(prefix))
+                    .toList();
         }
+
+        // /mob spawn <mob-id>
         if (args.length == 2 && args[0].equalsIgnoreCase("spawn")) {
-            list.addAll(mobs.registeredIds());
-            return list;
+            String prefix = args[1].toLowerCase();
+            return mobs.registeredIds().stream()
+                    .filter(id -> id.startsWith(prefix))
+                    .sorted()
+                    .toList();
         }
+
+        // /mob autospawn <mob-id>
         if (args.length == 2 && args[0].equalsIgnoreCase("autospawn")) {
-            list.addAll(mobs.registeredIds());
-            return list;
+            String prefix = args[1].toLowerCase();
+            return mobs.registeredIds().stream()
+                    .filter(id -> id.startsWith(prefix))
+                    .sorted()
+                    .toList();
         }
+
+        // /mob autospawn <mob-id> <interval>
         if (args.length == 3 && args[0].equalsIgnoreCase("autospawn")) {
-            list.add("10");
-            list.add("60");
-            list.add("300");
-            list.add("600");
-            return list;
+            return List.of("10", "60", "300", "600");
         }
+
+        // /mob autospawn <mob-id> <interval> <maxAlive>
         if (args.length == 4 && args[0].equalsIgnoreCase("autospawn")) {
-            list.add("1");
-            list.add("3");
-            list.add("5");
-            list.add("10");
-            return list;
+            return List.of("1", "3", "5", "10");
         }
+
+        // /mob del <type>
         if (args.length == 2 && args[0].equalsIgnoreCase("del")) {
-            list.add("autospawn");
-            return list;
+            return List.of("autospawn");
         }
+
+        // /mob del autospawn <mob-id>
         if (args.length == 3
                 && args[0].equalsIgnoreCase("del")
                 && args[1].equalsIgnoreCase("autospawn")) {
-            list.addAll(mobs.registeredIds());
-            return list;
+
+            String prefix = args[2].toLowerCase();
+            return mobs.registeredIds().stream()
+                    .filter(id -> id.startsWith(prefix))
+                    .sorted()
+                    .toList();
         }
+
         return list;
     }
 }

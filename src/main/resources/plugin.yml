@@ -1,4 +1,66 @@
-name: The Mob
-version: '0.0.1'
+name: TheMob
+version: "1.0.0"
 main: org.plugin.theMob.TheMob
-api-version: '1.21'
+api-version: "1.21"
+author: 3o3y
+description: >
+  High-performance custom mob system with YAML-based mobs,
+  boss phases, advanced drop tables, player stats GUI
+  and interval-based auto-spawning.
+
+commands:
+
+  mob:
+    description: Manage custom mobs and auto-spawn systems
+    usage: |
+      /mob spawn <mob-id>
+      /mob autospawn <mob-id> <interval-seconds> <max-alive>
+      /mob del autospawn <mob-id>
+      /mob killall
+      /mob reload
+    permission: themob.use
+    permission-message: "&cYou do not have permission to use this command."
+
+  stats:
+    description: Opens the player stats menu
+    usage: "/stats"
+    permission: themob.stats
+    permission-message: "&cYou are not allowed to open the stats menu."
+
+permissions:
+
+  # =========================
+  # BASE
+  # =========================
+  themob.use:
+    description: Allows usage of /mob base commands
+    default: op
+
+  # =========================
+  # SPAWNING
+  # =========================
+  themob.spawn:
+    description: Allows manual spawning of custom mobs
+    default: op
+
+  themob.spawn.set:
+    description: Allows creating and deleting auto-spawn entries
+    default: op
+
+  # =========================
+  # MANAGEMENT
+  # =========================
+  themob.killall:
+    description: Allows removing all active custom mobs
+    default: op
+
+  themob.reload:
+    description: Allows reloading TheMob configuration
+    default: op
+
+  # =========================
+  # PLAYER
+  # =========================
+  themob.stats:
+    description: Allows opening the stats menu
+    default: true

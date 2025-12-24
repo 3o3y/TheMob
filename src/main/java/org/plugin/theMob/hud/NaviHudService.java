@@ -1,9 +1,8 @@
+// src/main/java/org/plugin/theMob/hud/NaviHudService.java
 package org.plugin.theMob.hud;
 
 import org.bukkit.Bukkit;
-import org.bukkit.boss.BarColor;
-import org.bukkit.boss.BarStyle;
-import org.bukkit.boss.BossBar;
+import org.bukkit.boss.*;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.plugin.theMob.TheMob;
@@ -21,51 +20,44 @@ public final class NaviHudService {
     private final PlayerBarCoordinator coordinator;
     private final CompassRenderer compass;
     private final MobRadarResolver radar;
+
     private final Map<UUID, BossBar> hudBars = new HashMap<>();
     private BukkitRunnable task;
-    public NaviHudService(
-            TheMob plugin,
-            PlayerBarCoordinator coordinator,
-            CompassRenderer compass,
-            MobManager mobs
-    ) {
+
+    public NaviHudService(TheMob plugin, PlayerBarCoordinator coordinator, CompassRenderer compass, MobManager mobs) {
         this.plugin = plugin;
         this.coordinator = coordinator;
         this.compass = compass;
         this.radar = new MobRadarResolver(mobs);
     }
-// LIFECYCLE
+
     public void start() {
         if (task != null) return;
         task = new BukkitRunnable() {
-            @Override
-            public void run() {
-                tick();
-            }
+            @Override public void run() { tick(); }
         };
         task.runTaskTimer(plugin, 0L, 10L);
     }
+
     public void shutdown() {
-        if (task != null) {
-            task.cancel();
-            task = null;
-        }
-        hudBars.values().forEach(BossBar::removeAll);
+        if (task != null) { task.cancel(); task = null; }
+        for (BossBar b : hudBars.values()) b.removeAll();
         hudBars.clear();
     }
-// TICK
+
     private void tick() {
         for (Player p : Bukkit.getOnlinePlayers()) {
-            BossBar bar = hudBars.computeIfAbsent(
-                    p.getUniqueId(),
-                    id -> createBar(p)
-            );
+            BossBar bar = hudBars.computeIfAbsent(p.getUniqueId(), id -> createBar(p));
             MobRadarResolver.RadarTarget target = radar.find(p);
+
+            bar.setTitle(compass.render(p.getYaw()));
+
             if (target == null) {
                 bar.setProgress(0.0);
-                bar.setTitle(compass.render(p.getYaw()));
+                bar.setColor(BarColor.WHITE);
                 continue;
             }
+
             double progress = 1.0 - (target.distance() / MobRadarResolver.RADIUS);
             bar.setProgress(Math.max(0.0, Math.min(1.0, progress)));
             bar.setColor(switch (target.type()) {
@@ -74,20 +66,9 @@ public final class NaviHudService {
                 case NEUTRAL -> BarColor.YELLOW;
                 case PASSIVE -> BarColor.GREEN;
             });
-            bar.setTitle(compass.render(p.getYaw()));
         }
     }
-// PLAYER
-    public void onJoin(Player p) {
-        BossBar bar = hudBars.computeIfAbsent(p.getUniqueId(), id -> createBar(p));
-        coordinator.of(p).setHudBar(bar);
-    }
-    public void onQuit(Player p) {
-        BossBar bar = hudBars.remove(p.getUniqueId());
-        if (bar != null) bar.removeAll();
-        coordinator.remove(p);
-    }
-// INTERNAL
+
     private BossBar createBar(Player p) {
         BossBar bar = Bukkit.createBossBar("", BarColor.WHITE, BarStyle.SOLID);
         bar.addPlayer(p);
@@ -95,4 +76,24 @@ public final class NaviHudService {
         coordinator.of(p).setHudBar(bar);
         return bar;
     }
+    // src/main/java/org/plugin/theMob/hud/NaviHudService.java
+
+    public void onJoin(Player p) {
+        if (p == null) return;
+        BossBar bar = hudBars.computeIfAbsent(p.getUniqueId(), id -> createBar(p));
+        if (!bar.getPlayers().contains(p)) {
+            bar.addPlayer(p);
+        }
+        coordinator.of(p).setHudBar(bar);
+    }
+
+    public void onQuit(Player p) {
+        if (p == null) return;
+        BossBar bar = hudBars.remove(p.getUniqueId());
+        if (bar != null) {
+            bar.removeAll();
+        }
+        coordinator.remove(p);
+    }
+
 }

@@ -32,8 +32,8 @@ display-health: true            # Show health bar / health display
 # BASE STATS
 stats:
   health:
-    max: 75.0                   # Maximum health (1 heart = 2.0)
-    current: 75.0               # Health value when the mob spawns
+    max: 750.0                   # Maximum health (1 heart = 2.0)
+    current: 750.0               # Health value when the mob spawns
   movement-speed: 0.23          # Base movement speed (vanilla zombie ≈ 0.23)
   attack:
     damage: 6.0                 # Base melee attack damage
@@ -86,7 +86,7 @@ abilities:
       amplifier: 0              # Regeneration potion level
       permanent: false
 # BOSS PHASES
-phases:
+phases:                               #This will make your Mob as a Boss Mob
   phase1:
     hp-range: "100-75"                # Active while boss health is between 100% and 75%
     title: "Phase 1 – Royal Calm"     # Title shown when this phase starts
@@ -263,7 +263,7 @@ phases:
       summon-minions:
         enabled: true                # Summons helper mobs
         type: ZOMBIE
-        name: "&6Mionion &fof Zombie King"
+        name: "&6Minion &fof Zombie King"
         amount: 3
         radius: 6
         cooldown: 15
@@ -356,8 +356,8 @@ drops:
     amount: 3
     chance: 1.0                  # 100% drop chance
 # Enable OP drops?
-opdrop: true                     # IMPORTANT: toggle legendary drops
-# LEGENDARY DROPS (only if opdrop = true)
+opdrop: true                     # IMPORTANT: toggle leg. drops
+# LEGENDARY DROPS (only if OP drop = true)
 legendary-drops:
   # 🗡 OMEGA SWORD
   - item: NETHERITE_SWORD
