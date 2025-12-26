@@ -1,0 +1,48 @@
+# =========================================================
+# TheMob – Mob Configuration Example
+# =========================================================
+#
+# This file defines a CUSTOM MOB.
+# It can be used for arenas, events or RPG worlds.
+#
+# The mob behavior, stats, drops and rewards
+# are fully configurable.
+#
+# =========================================================
+mob-id: pig_lvl_1
+base-type: PIG
+name: "&fPig lvl 1"
+display-health: true
+stats:
+  health:
+    max: 12
+    current: 12
+  movement-speed: 0.205
+drops:
+  - item: PORKCHOP
+    amount: 1
+    chance: 1.0
+  - item: LEATHER
+    amount: 1
+    chance: 1.0
+  - item: BONE
+    amount: 1
+    chance: 0.10
+  - item: BONE_MEAL
+    amount: 1
+    chance: 0.05
+  - item: CARROT
+    amount: 1
+    chance: 0.08
+  - item: POTATO
+    amount: 1
+    chance: 0.08
+  - item: BEETROOT
+    amount: 1
+    chance: 0.06
+  - item: WHEAT
+    amount: 1
+    chance: 0.06
+  - item: SEEDS
+    amount: 1
+    chance: 0.10

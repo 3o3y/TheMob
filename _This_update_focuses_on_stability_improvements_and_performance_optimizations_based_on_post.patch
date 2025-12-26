@@ -1,0 +1,2824 @@
+Subject: [PATCH] This update focuses on stability improvements and performance optimizations based on post-release testing of v1.0.
+---
+Index: src/main/resources/mobs/zombie_normal.yml
+===================================================================
+diff --git a/src/main/resources/mobs/zombie_normal.yml b/src/main/resources/mobs/zombie_normal.yml
+deleted file mode 100644
+--- a/src/main/resources/mobs/zombie_normal.yml	(revision 1db801bce50fa1aaf70a3002b31d319dac5f7c47)
++++ /dev/null	(revision 1db801bce50fa1aaf70a3002b31d319dac5f7c47)
+@@ -1,34 +0,0 @@
+-mob-id: zombie_normal
+-base-type: ZOMBIE
+-name: "&b&lZombie"
+-display-health: true
+-stats:
+-  health:
+-    max: 20
+-    current: 20
+-  movement-speed: 0.23
+-  attack-damage: 0
+-death-commands:
+-  - "give {player} carrot 1"
+-drops:
+-  - item: ROTTEN_FLESH
+-    amount: 2
+-    chance: 1
+-  - item: BONE
+-    amount: 3
+-    chance: 0.8
+-  - item: STRING
+-    amount: 4
+-    chance: 0.6
+-  - item: STICK
+-    amount: 2
+-    chance: 0.4
+-  - item: GOLDEN_APPLE
+-    amount: 1
+-    chance: 0.12
+-  - item: DIAMOND
+-    amount: 1
+-    chance: 0.08
+-  - item: GOLDEN_CARROT
+-    amount: 1
+-    chance: 0.04
+\ No newline at end of file
+Index: src/main/resources/language/de.yml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/resources/language/de.yml b/src/main/resources/language/de.yml
+--- a/src/main/resources/language/de.yml	(revision 1db801bce50fa1aaf70a3002b31d319dac5f7c47)
++++ b/src/main/resources/language/de.yml	(date 1766761027415)
+@@ -1,6 +1,6 @@
+ # ====================================================
+ #   TheMob - Hauptkonfiguration
+ # ====================================================
+-# Bossbar wird mit der zombie_boss.yml umgeschrieben
++# Bossbar wird mit der boss_template.yml umgeschrieben
+ language: "de"          # Sprache: de / en / ... (für später)
+ show-chat-messages: false   # Wenn false → keine Nachrichten im Chat senden
+Index: src/main/java/org/plugin/theMob/mob/spawn/MobSpawnService.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/org/plugin/theMob/mob/spawn/MobSpawnService.java b/src/main/java/org/plugin/theMob/mob/spawn/MobSpawnService.java
+--- a/src/main/java/org/plugin/theMob/mob/spawn/MobSpawnService.java	(revision 1db801bce50fa1aaf70a3002b31d319dac5f7c47)
++++ b/src/main/java/org/plugin/theMob/mob/spawn/MobSpawnService.java	(date 1766689104842)
+@@ -1,4 +1,3 @@
+-// src/main/java/org/plugin/theMob/mob/spawn/MobSpawnService.java
+ package org.plugin.theMob.mob.spawn;
+ 
+ import org.bukkit.Bukkit;
+@@ -8,12 +7,11 @@
+ import org.bukkit.configuration.file.FileConfiguration;
+ import org.bukkit.entity.EntityType;
+ import org.bukkit.entity.LivingEntity;
+-import org.bukkit.persistence.PersistentDataContainer;
+ import org.bukkit.persistence.PersistentDataType;
+ import org.bukkit.plugin.Plugin;
+ import org.plugin.theMob.boss.BossTemplate;
+-import org.plugin.theMob.boss.phase.BossPhaseController;
+ import org.plugin.theMob.boss.bar.BossBarService;
++import org.plugin.theMob.boss.phase.BossPhaseController;
+ import org.plugin.theMob.core.KeyRegistry;
+ import org.plugin.theMob.mob.MobManager;
+ import org.plugin.theMob.ui.MobHealthDisplay;
+@@ -28,6 +26,7 @@
+     private final MobHealthDisplay healthDisplay;
+     private final BossBarService bossBars;
+     private final BossPhaseController phaseController;
++
+     public MobSpawnService(
+             Plugin plugin,
+             MobManager mobs,
+@@ -43,38 +42,42 @@
+         this.bossBars = bossBars;
+         this.phaseController = phaseController;
+     }
+-// SPAWN
+-    public boolean spawn(String id, Location loc) {
+-        if (id == null || loc == null || loc.getWorld() == null) return false;
+-        id = id.toLowerCase(Locale.ROOT);
+-        FileConfiguration cfg = mobs.mobConfigById(id);
+-        if (cfg == null) return false;
+-        String baseTypeStr = cfg.getString("base-type");
+-        if (baseTypeStr == null) return false;
+-        final EntityType type;
++
++    public LivingEntity spawn(String mobId, String spawnId, Location loc) {
++
++        if (mobId == null || spawnId == null || loc == null || loc.getWorld() == null) {
++            return null;
++        }
++
++        mobId = mobId.toLowerCase(Locale.ROOT);
++        FileConfiguration cfg = mobs.mobConfigById(mobId);
++        if (cfg == null) return null;
++
++        EntityType type;
+         try {
+-            type = EntityType.valueOf(baseTypeStr.toUpperCase(Locale.ROOT));
++            type = EntityType.valueOf(cfg.getString("base-type").toUpperCase());
+         } catch (Exception e) {
+-            return false;
++            return null;
+         }
+-        final LivingEntity mob;
++
++        LivingEntity mob;
+         try {
+             mob = (LivingEntity) loc.getWorld().spawnEntity(loc, type);
+         } catch (Exception e) {
+-            return false;
++            return null;
+         }
+-        final boolean isBoss = mobs.hasBossTemplate(id);
+-// PDC SETUP
+-        PersistentDataContainer pdc = mob.getPersistentDataContainer();
+-        pdc.set(keys.MOB_ID, PersistentDataType.STRING, id);
+-        pdc.set(keys.IS_BOSS, PersistentDataType.INTEGER, isBoss ? 1 : 0);
+-        String baseName = ChatColor.translateAlternateColorCodes(
+-                '&',
+-                cfg.getString("name", type.name())
++
++        boolean isBoss = mobs.hasBossTemplate(mobId);
++
++        mob.getPersistentDataContainer().set(keys.MOB_ID, PersistentDataType.STRING, mobId);
++        mob.getPersistentDataContainer().set(keys.AUTO_SPAWN_ID, PersistentDataType.STRING, spawnId);
++        mob.getPersistentDataContainer().set(keys.IS_BOSS, PersistentDataType.INTEGER, isBoss ? 1 : 0);
++
++        String name = ChatColor.translateAlternateColorCodes(
++                '&', cfg.getString("name", type.name())
+         );
+-        pdc.set(keys.BASE_NAME, PersistentDataType.STRING, baseName);
+-        pdc.set(keys.AUTO_SPAWNED, PersistentDataType.INTEGER, 1);
+-// HEALTH
++        mob.getPersistentDataContainer().set(keys.BASE_NAME, PersistentDataType.STRING, name);
++
+         if (cfg.contains("stats.health.max")) {
+             double max = cfg.getDouble("stats.health.max");
+             var attr = mob.getAttribute(Attribute.MAX_HEALTH);
+@@ -83,32 +86,22 @@
+                 mob.setHealth(max);
+             }
+         }
+-// UI
++
+         if (healthDisplay != null) {
+             healthDisplay.onSpawn(mob);
+         }
+-// BOSS INIT
++
+         if (isBoss) {
+-            BossTemplate tpl = mobs.bossTemplate(id);
++            BossTemplate tpl = mobs.bossTemplate(mobId);
+             Bukkit.getScheduler().runTask(plugin, () -> {
+-                if (!mob.isValid() || mob.isDead()) return;
+-                if (bossBars != null) {
+-                    bossBars.registerBoss(mob);
+-                    bossBars.markDirty(mob);
+-                }
++                if (!mob.isValid()) return;
++                if (bossBars != null) bossBars.registerBoss(mob);
+                 if (tpl != null && phaseController != null) {
+                     phaseController.onBossSpawn(mob, tpl);
+                 }
+             });
+         }
+-        if (isBoss && phaseController != null) {
+-            BossTemplate tpl = mobs.bossTemplate(id);
+-            if (tpl != null) {
+-                Bukkit.getScheduler().runTask(plugin, () ->
+-                        phaseController.onBossSpawn(mob, tpl)
+-                );
+-            }
+-        }
+-        return true;
++
++        return mob;
+     }
+ }
+Index: src/main/resources/mobs/zombie_boss.yml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/resources/mobs/zombie_boss.yml b/src/main/resources/mobs/boss_template.yml
+rename from src/main/resources/mobs/zombie_boss.yml
+rename to src/main/resources/mobs/boss_template.yml
+--- a/src/main/resources/mobs/zombie_boss.yml	(revision 1db801bce50fa1aaf70a3002b31d319dac5f7c47)
++++ b/src/main/resources/mobs/boss_template.yml	(date 1766762718684)
+@@ -1,35 +1,60 @@
+-mob-id: zombie_boss
++# =========================================================
++# TheMob – Boss Mob Configuration
++# =========================================================
++#
++# This file defines a CUSTOM BOSS MOB.
++# It is intended for arenas, events and RPG endgame content.
++#
++# This mob uses:
++# - Multi-phase boss system
++# - Attribute scaling per phase
++# - Optional minion summoning
++# - Legendary / OP drops
++#
++# EVERYTHING in this file is fully configurable.
++#
++# =========================================================
++
++mob-id: zombie_boss_template # Command extension
+ base-type: ZOMBIE
++
++# ---------------------------------------------------------
++# Vanilla Mob Type Reference (for Admins)
++# ---------------------------------------------------------
+ # 🟢 PASSIVE MOBS (never attack players)
+ # SHEEP # COW # PIG # CHICKEN # RABBIT # HORSE # DONKEY # MULE # LLAMA
+ # GOAT # CAMEL # SNIFFER # TURTLE # BEE # AXOLOTL # FROG # TADPOLE # PARROT
+ # CAT # OCELOT # SQUID # GLOW_SQUID
+-
++#
+ # 🟡 NEUTRAL MOBS (become aggressive when provoked)
+ # ENDERMAN # WOLF # IRON_GOLEM # SNOW_GOLEM # PANDA # DOLPHIN # PIGLIN
+ # TRADER_LLAMA # ZOMBIFIED_PIGLIN
+-
++#
+ # 🔴 HOSTILE MOBS (always aggressive)
+ # ZOMBIE # HUSK # DROWNED # ZOMBIE_VILLAGER # SKELETON # STRAY # WITHER_SKELETON
+ # CREEPER # SPIDER # CAVE_SPIDER # SLIME # MAGMA_CUBE # WITCH # VEX # EVOKER
+ # VINDICATOR # PILLAGER # RAVAGER # GUARDIAN # ELDER_GUARDIAN # BLAZE # GHAST
+ # PHANTOM # SILVERFISH # SHULKER # WARDEN
+-
++#
+ # 🟣 BOSS MOBS
+ # WITHER # ENDER_DRAGON
+-
++#
+ # 🔵 WATER MOBS
+-# COD # SALMON # PUFFERFISH # TROPICAL_FISH # SQUID # GLOW_SQUID # GUARDIAN
+-# ELDER_GUARDIAN
+-
++# COD # SALMON # PUFFERFISH # TROPICAL_FISH # SQUID # GLOW_SQUID
++# GUARDIAN # ELDER_GUARDIAN
++#
+ # ⚙️ OTHER / NPC / UTILITY
+ # VILLAGER # WANDERING_TRADER # ARMOR_STAND # ALLAY
+-# =====================================================================
+-# Example:
+-# base-type: ZOMBIE   # choose one mob type from the lists above
++# ---------------------------------------------------------
++
++# ---------------------------------------------------------
++# Display
++# ---------------------------------------------------------
+ name: "&2&lZombie King"
+ display-health: true            # Show health bar / health display
+-# BASE STATS
++# ---------------------------------------------------------
++# Base Stats
++# ---------------------------------------------------------
+ stats:
+   health:
+     max: 750.0                   # Maximum health (1 heart = 2.0)
+@@ -49,7 +74,9 @@
+   scale: 1.0                    # Entity size multiplier (1.0 = default size)
+   step-height: 0.6              # Max block height the mob can step up without jumping
+   gravity: true                 # true = affected by gravity, false = floating entity
+-# ABILITIES
++# ---------------------------------------------------------
++# Abilities & Flags !!!IN PROGRESS!!! NOT EVERYTHING IS WORKING!!!
++# ---------------------------------------------------------
+ abilities:
+   jump-boost:
+     enabled: true               # Enables Jump Boost potion effect
+@@ -85,7 +112,11 @@
+     regeneration:
+       amplifier: 0              # Regeneration potion level
+       permanent: false
+-# BOSS PHASES
++# ---------------------------------------------------------
++# Boss Phases
++# ---------------------------------------------------------
++# Each phase is activated by remaining HP %
++# ---------------------------------------------------------
+ phases:                               #This will make your Mob as a Boss Mob
+   phase1:
+     hp-range: "100-75"                # Active while boss health is between 100% and 75%
+Index: src/main/java/org/plugin/theMob/boss/BossActionEngine.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/org/plugin/theMob/boss/BossActionEngine.java b/src/main/java/org/plugin/theMob/boss/BossActionEngine.java
+--- a/src/main/java/org/plugin/theMob/boss/BossActionEngine.java	(revision 1db801bce50fa1aaf70a3002b31d319dac5f7c47)
++++ b/src/main/java/org/plugin/theMob/boss/BossActionEngine.java	(date 1766689517424)
+@@ -51,17 +51,21 @@
+             double dz = (rnd.nextDouble() * 2 - 1) * radius;
+             Location loc = base.clone().add(dx, 0, dz);
+             LivingEntity spawned = null;
++
+             if (customMinionId != null && plugin.mobs().mobExists(customMinionId)) {
+-                boolean ok = plugin.mobs().spawnCustomMob(customMinionId, loc);
+-                if (ok) {
+-                    spawned = findNearestCustomAt(loc, customMinionId, 2.0);
+-                }
++                String spawnId = "boss:" + boss.getUniqueId() + ":minion";
++                spawned = plugin.mobs().spawnCustomMob(customMinionId, spawnId, loc);
+             }
++
+             if (spawned == null && fallbackType != null) {
+                 var ent = w.spawnEntity(loc, fallbackType);
+-                if (ent instanceof LivingEntity le) spawned = le;
++                if (ent instanceof LivingEntity le) {
++                    spawned = le;
++                }
+             }
++
+             if (spawned == null) continue;
++
+             spawned.getPersistentDataContainer().set(
+                     plugin.keys().NO_DROPS,
+                     PersistentDataType.INTEGER,
+Index: src/main/java/org/plugin/theMob/mob/MobListener.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/org/plugin/theMob/mob/MobListener.java b/src/main/java/org/plugin/theMob/mob/MobListener.java
+--- a/src/main/java/org/plugin/theMob/mob/MobListener.java	(revision 1db801bce50fa1aaf70a3002b31d319dac5f7c47)
++++ b/src/main/java/org/plugin/theMob/mob/MobListener.java	(date 1766760756139)
+@@ -1,81 +1,36 @@
+-// src/main/java/org/plugin/theMob/mob/MobListener.java
+ package org.plugin.theMob.mob;
+ 
+ import org.bukkit.entity.LivingEntity;
+ import org.bukkit.event.EventHandler;
+ import org.bukkit.event.Listener;
+-import org.bukkit.event.entity.CreatureSpawnEvent;
+-import org.bukkit.event.entity.EntityDamageEvent;
+ import org.bukkit.event.entity.EntityDeathEvent;
+-import org.bukkit.event.entity.EntityRegainHealthEvent;
+-import org.bukkit.persistence.PersistentDataType;
+ import org.plugin.theMob.boss.bar.BossBarService;
+-import org.plugin.theMob.core.KeyRegistry;
+-import org.plugin.theMob.mob.spawn.AutoSpawnManager;
+-import org.plugin.theMob.ui.MobHealthDisplay;
+ 
+ public final class MobListener implements Listener {
+ 
+     private final MobManager mobs;
+-    private final MobHealthDisplay healthDisplay;
+-    private final AutoSpawnManager autoSpawnManager;
+-    private final KeyRegistry keys;
+     private final BossBarService bossBars;
++
+     public MobListener(
+             MobManager mobs,
+-            MobHealthDisplay healthDisplay,
+-            AutoSpawnManager autoSpawnManager,
+-            KeyRegistry keys,
++            org.plugin.theMob.ui.MobHealthDisplay ignored, // kept for constructor compatibility
+             BossBarService bossBars
+     ) {
+         this.mobs = mobs;
+-        this.healthDisplay = healthDisplay;
+-        this.autoSpawnManager = autoSpawnManager;
+-        this.keys = keys;
+         this.bossBars = bossBars;
+     }
+-// SPAWN
+-    @EventHandler
+-    public void onSpawn(CreatureSpawnEvent e) {
+-        if (!(e.getEntity() instanceof LivingEntity mob)) return;
+-        if (!mobs.isCustomMob(mob)) return;
+-        if (healthDisplay != null) {
+-            healthDisplay.update(mob);
+-        }
+-    }
+-// DAMAGE
+-    @EventHandler(ignoreCancelled = true)
+-    public void onDamage(EntityDamageEvent e) {
+-        if (!(e.getEntity() instanceof LivingEntity mob)) return;
+-        if (!mobs.isCustomMob(mob)) return;
+-        if (healthDisplay != null) {
+-            healthDisplay.update(mob);
+-        }
+-    }
+-// HEAL
+-    @EventHandler(ignoreCancelled = true)
+-    public void onHeal(EntityRegainHealthEvent e) {
+-        if (!(e.getEntity() instanceof LivingEntity mob)) return;
+-        if (!mobs.isCustomMob(mob)) return;
+-        if (healthDisplay != null) {
+-            healthDisplay.update(mob);
+-        }
+-    }
+-// DEATH
++
+     @EventHandler
+     public void onDeath(EntityDeathEvent e) {
+         LivingEntity mob = e.getEntity();
++
+         if (!mobs.isCustomMob(mob)) return;
++
++        // Single source of truth for death handling
+         mobs.onMobDeath(mob, e);
++
+         if (mobs.isBoss(mob) && bossBars != null) {
+             bossBars.unregisterBoss(mob);
+         }
+-        if (mob.getPersistentDataContainer()
+-                .has(keys.AUTO_SPAWNED, PersistentDataType.INTEGER)) {
+-            String id = mobs.mobIdOf(mob);
+-            if (id != null) {
+-                autoSpawnManager.decrementAlive(id);
+-            }
+-        }
+     }
+ }
+Index: src/main/java/org/plugin/theMob/TheMob.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/org/plugin/theMob/TheMob.java b/src/main/java/org/plugin/theMob/TheMob.java
+--- a/src/main/java/org/plugin/theMob/TheMob.java	(revision 1db801bce50fa1aaf70a3002b31d319dac5f7c47)
++++ b/src/main/java/org/plugin/theMob/TheMob.java	(date 1766760756167)
+@@ -1,4 +1,3 @@
+-// src/main/java/org/plugin/theMob/TheMob.java
+ package org.plugin.theMob;
+ 
+ import org.bukkit.Bukkit;
+@@ -39,61 +38,72 @@
+     private ConfigService configService;
+     private KeyRegistry keys;
+     private TickScheduler ticks;
++
+     private MobManager mobManager;
+     private MobHealthDisplay healthDisplay;
+     private MobDropEngine dropEngine;
++
+     private AutoSpawnManager autoSpawnManager;
+     private SpawnController spawnController;
++
+     private PlayerBarCoordinator playerBars;
+     private BossBarService bossBars;
+     private BossPhaseController phaseController;
++
+     private NaviHudService hud;
++
+     private ItemBuilderFromConfig itemBuilder;
+     private ItemLoreRenderer loreRenderer;
+     private ItemStatReader itemStatReader;
++
+     private PlayerStatCache playerStatCache;
+     private StatsMenuService statsMenu;
++
+     @Override
+     public void onEnable() {
+         saveDefaultConfig();
++
+         configService = new ConfigService(this);
+         configService.ensureFoldersAndDefaults();
+         configService.reloadAll();
++
+         keys = new KeyRegistry(this);
+         ticks = new TickScheduler(this);
++
+         mobManager = new MobManager(this, configService, keys);
+         mobManager.reloadFromConfigs();
++
+         itemBuilder = new ItemBuilderFromConfig(this);
+         loreRenderer = new ItemLoreRenderer();
+         itemStatReader = new ItemStatReader(this);
++
+         dropEngine = new MobDropEngine(itemBuilder);
+         dropEngine.bind(mobManager);
+         mobManager.setDropEngine(dropEngine);
++
+         healthDisplay = new MobHealthDisplay(this, mobManager);
+         mobManager.setHealthDisplay(healthDisplay);
++
+         playerBars = new PlayerBarCoordinator();
++
+         BossActionEngine actionEngine = new BossActionEngine(this);
+         BossPhaseResolver resolver = new BossPhaseResolver();
+-        phaseController = new BossPhaseController(resolver, actionEngine, null);
+-        bossBars = new BossBarService(
+-                this,
+-                mobManager,
+-                playerBars
+-        );
++
++        bossBars = new BossBarService(this, mobManager, playerBars);
+         bossBars.start();
++
+         phaseController = new BossPhaseController(resolver, actionEngine, bossBars);
+-        MobSpawnService spawnService =
+-                new MobSpawnService(
+-                        this,
+-                        mobManager,
+-                        keys,
+-                        healthDisplay,
+-                        bossBars,
+-                        phaseController
+-                );
++
++        MobSpawnService spawnService = new MobSpawnService(
++                this,
++                mobManager,
++                keys,
++                healthDisplay,
++                bossBars,
++                phaseController
++        );
+         mobManager.setSpawnService(spawnService);
+-        autoSpawnManager = new AutoSpawnManager(this);
+-        autoSpawnManager.load();
++        autoSpawnManager = new AutoSpawnManager(this, mobManager, keys);
+         spawnController = new SpawnController(
+                 this,
+                 mobManager,
+@@ -101,6 +111,7 @@
+                 keys
+         );
+         spawnController.start();
++
+         hud = new NaviHudService(
+                 this,
+                 playerBars,
+@@ -113,38 +124,31 @@
+         registerAllListeners();
+         registerCommands();
+         PluginCommand stats = getCommand("stats");
+-        if (stats != null) stats.setExecutor(new StatsCommand(statsMenu));
+-        getLogger().info("[TheMob] Enabled.");
++        if (stats != null) {
++            stats.setExecutor(new StatsCommand(statsMenu));
++        }
+     }
+     @Override
+     public void onDisable() {
+-        if (autoSpawnManager != null) autoSpawnManager.saveState();
+-        if (spawnController != null) spawnController.shutdown();
++        if (spawnController != null) spawnController.stop();
+         if (hud != null) hud.shutdown();
+         if (bossBars != null) bossBars.shutdown();
+         if (ticks != null) ticks.shutdown();
++
+         HandlerList.unregisterAll(this);
+         getLogger().info("[TheMob] Disabled.");
+     }
+-    // src/main/java/org/plugin/theMob/TheMob.java
+ 
+     public void reloadPlugin() {
+-
+         getLogger().info("[TheMob] Reloading...");
+ 
+-        // =====================================================
+-        // 1️⃣ SHUTDOWN RUNTIME SYSTEMS (ORDER IS CRITICAL)
+-        // =====================================================
+         try {
+             if (spawnController != null) {
+-                spawnController.shutdown();
+-                spawnController = null;
+-            }
+-
+-            if (autoSpawnManager != null) {
+-                autoSpawnManager.saveState();
+-                autoSpawnManager = null;
+-            }
++                spawnController.stop(); // stoppt intern autoSpawnManager
++            }
++            spawnController = null;
++            autoSpawnManager = null;
++
+ 
+             if (hud != null) {
+                 hud.shutdown();
+@@ -167,28 +171,13 @@
+             HandlerList.unregisterAll(this);
+ 
+         } catch (Throwable t) {
+-            getLogger().severe("[TheMob] Error while shutting down systems during reload!");
++            getLogger().severe("[TheMob] Error during reload shutdown!");
+             t.printStackTrace();
+         }
+ 
+-        // =====================================================
+-        // 2️⃣ RELOAD CONFIGS (SOURCE OF TRUTH)
+-        // =====================================================
+         configService.reloadAll();
+-
+-        // =====================================================
+-        // 3️⃣ RELOAD MOB REGISTRY (MUST BE FIRST AFTER CONFIG)
+-        // =====================================================
+         mobManager.reloadFromConfigs();
+ 
+-        // SAFETY CHECK
+-        if (mobManager.registeredIds().isEmpty()) {
+-            getLogger().warning("[TheMob] WARNING: No mobs loaded after reload!");
+-        }
+-
+-        // =====================================================
+-        // 4️⃣ RECREATE CORE SERVICES
+-        // =====================================================
+         healthDisplay = new MobHealthDisplay(this, mobManager);
+         mobManager.setHealthDisplay(healthDisplay);
+ 
+@@ -197,18 +186,10 @@
+         BossActionEngine actionEngine = new BossActionEngine(this);
+         BossPhaseResolver resolver = new BossPhaseResolver();
+ 
+-        bossBars = new BossBarService(
+-                this,
+-                mobManager,
+-                playerBars
+-        );
++        bossBars = new BossBarService(this, mobManager, playerBars);
+         bossBars.start();
+ 
+-        phaseController = new BossPhaseController(
+-                resolver,
+-                actionEngine,
+-                bossBars
+-        );
++        phaseController = new BossPhaseController(resolver, actionEngine, bossBars);
+ 
+         MobSpawnService spawnService = new MobSpawnService(
+                 this,
+@@ -219,13 +200,7 @@
+                 phaseController
+         );
+         mobManager.setSpawnService(spawnService);
+-
+-        // =====================================================
+-        // 5️⃣ AUTOSPAWN + SPAWN CONTROLLER
+-        // =====================================================
+-        autoSpawnManager = new AutoSpawnManager(this);
+-        autoSpawnManager.load();
+-
++        autoSpawnManager = new AutoSpawnManager(this, mobManager, keys);
+         spawnController = new SpawnController(
+                 this,
+                 mobManager,
+@@ -234,9 +209,8 @@
+         );
+         spawnController.start();
+ 
+-        // =====================================================
+-        // 6️⃣ HUD
+-        // =====================================================
++
++
+         hud = new NaviHudService(
+                 this,
+                 playerBars,
+@@ -245,15 +219,11 @@
+         );
+         hud.start();
+ 
+-        // =====================================================
+-        // 7️⃣ RE-REGISTER LISTENERS & COMMANDS
+-        // =====================================================
+         registerAllListeners();
+         registerCommands();
+ 
+         getLogger().info("[TheMob] Reload complete.");
+     }
+-
+     private void registerAllListeners() {
+         Bukkit.getPluginManager().registerEvents(
+                 new org.plugin.theMob.combat.CombatListener(
+@@ -268,23 +238,18 @@
+                 this
+         );
+         Bukkit.getPluginManager().registerEvents(
+-                new MobListener(
+-                        mobManager,
+-                        healthDisplay,
+-                        autoSpawnManager,
+-                        keys,
+-                        bossBars
+-                ),
++                new MobListener(mobManager, healthDisplay, bossBars),
+                 this
+         );
+-        Bukkit.getPluginManager().registerEvents(spawnController, this);
+         Bukkit.getPluginManager().registerEvents(new NaviHudListener(hud), this);
+         Bukkit.getPluginManager().registerEvents(
+                 new PlayerEquipListener(this, playerStatCache),
+                 this
+         );
+         Bukkit.getPluginManager().registerEvents(new StatsMenuListener(), this);
++        Bukkit.getPluginManager().registerEvents(spawnController, this);
+     }
++
+     private void registerCommands() {
+         PluginCommand mob = getCommand("mob");
+         if (mob != null) {
+@@ -292,6 +257,7 @@
+             mob.setTabCompleter(new MobTabCompleter(mobManager));
+         }
+     }
++
+     public MobManager mobs() { return mobManager; }
+     public ConfigService configs() { return configService; }
+     public KeyRegistry keys() { return keys; }
+Index: src/main/java/org/plugin/theMob/core/ConfigService.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/org/plugin/theMob/core/ConfigService.java b/src/main/java/org/plugin/theMob/core/ConfigService.java
+--- a/src/main/java/org/plugin/theMob/core/ConfigService.java	(revision 1db801bce50fa1aaf70a3002b31d319dac5f7c47)
++++ b/src/main/java/org/plugin/theMob/core/ConfigService.java	(date 1766761094862)
+@@ -1,4 +1,3 @@
+-// src/main/java/org/plugin/theMob/core/ConfigService.java
+ package org.plugin.theMob.core;
+ 
+ import org.bukkit.configuration.ConfigurationSection;
+@@ -18,37 +17,68 @@
+     private File autoSpawnFile;
+     private File statsFile;
+ 
+-    // atomic swap targets (reload-safe)
+     private volatile FileConfiguration autoSpawnCfg;
+     private volatile FileConfiguration statsCfg;
+     private volatile Map<String, FileConfiguration> mobConfigs = Map.of();
++    // =====================================================
++    // DEFAULT MOB YMLS (shipped with plugin JAR)
++    // =====================================================
++    private static final List<String> DEFAULT_MOBS = List.of(
++            "mob_template.yml",
++            "boss_template.yml",
++            "skeleton_normal.yml",
++            "spider_normal.yml",
++            "warden_normal.yml",
++            "pig_normal.yml"
++    );
+ 
+     public ConfigService(JavaPlugin plugin) {
+         this.plugin = plugin;
+     }
+-
+     // =====================================================
+     // INIT
+     // =====================================================
+     public void ensureFoldersAndDefaults() {
+-        if (!plugin.getDataFolder().exists()) plugin.getDataFolder().mkdirs();
++        if (!plugin.getDataFolder().exists()) {
++            plugin.getDataFolder().mkdirs();
++        }
+ 
+         mobsFolder = new File(plugin.getDataFolder(), "mobs");
+-        if (!mobsFolder.exists()) mobsFolder.mkdirs();
++        if (!mobsFolder.exists()) {
++            mobsFolder.mkdirs();
++        }
+ 
+         autoSpawnFile = new File(plugin.getDataFolder(), "auto_spawn.yml");
+         statsFile = new File(plugin.getDataFolder(), "stats.yml");
+ 
+-        if (!autoSpawnFile.exists()) plugin.saveResource("auto_spawn.yml", false);
+-        if (!statsFile.exists()) plugin.saveResource("stats.yml", false);
++        if (!autoSpawnFile.exists()) {
++            plugin.saveResource("auto_spawn.yml", false);
++        }
++
++        if (!statsFile.exists()) {
++            plugin.saveResource("stats.yml", false);
++        }
++
++        copyDefaultMobConfigs();
++    }
+ 
+-        // example defaults (only if missing)
+-        File z1 = new File(mobsFolder, "zombie_normal.yml");
+-        File z2 = new File(mobsFolder, "zombie_boss.yml");
+-        if (!z1.exists()) plugin.saveResource("mobs/zombie_normal.yml", false);
+-        if (!z2.exists()) plugin.saveResource("mobs/zombie_boss.yml", false);
+-    }
++    private void copyDefaultMobConfigs() {
++        for (String fileName : DEFAULT_MOBS) {
++            File out = new File(mobsFolder, fileName);
++            if (out.exists()) {
++                continue; // never overwrite
++            }
+ 
++            try {
++                plugin.saveResource("mobs/" + fileName, false);
++                plugin.getLogger().info("[Config] Installed default mob: " + fileName);
++            } catch (IllegalArgumentException ex) {
++                plugin.getLogger().warning(
++                        "[Config] Default mob resource missing in JAR: mobs/" + fileName
++                );
++            }
++        }
++    }
+     // =====================================================
+     // RELOAD (v1.1 hardened)
+     // =====================================================
+@@ -65,18 +95,17 @@
+         }
+         autoSpawnCfg = cfg;
+     }
+-
+     public void reloadStats() {
+         statsCfg = YamlConfiguration.loadConfiguration(statsFile);
+     }
+ 
+-    /**
+-     * YAML validation + atomic swap
+-     */
+     public void reloadMobsValidated() {
+         Map<String, FileConfiguration> next = new HashMap<>(256);
+ 
+-        File[] files = mobsFolder.listFiles((dir, name) -> name.toLowerCase(Locale.ROOT).endsWith(".yml"));
++        File[] files = mobsFolder.listFiles(
++                (dir, name) -> name.toLowerCase(Locale.ROOT).endsWith(".yml")
++        );
++
+         if (files == null) {
+             mobConfigs = Map.of();
+             return;
+@@ -87,32 +116,22 @@
+ 
+         for (File f : files) {
+             FileConfiguration cfg = YamlConfiguration.loadConfiguration(f);
+-
+-            // -------------------------
+-            // mob-id (required)
+-            // -------------------------
+             String mobId = cfg.getString("mob-id");
+             if (mobId == null || mobId.isBlank()) {
+                 mobId = f.getName().substring(0, f.getName().length() - 4);
+             }
+             mobId = mobId.toLowerCase(Locale.ROOT);
+-
+-            // -------------------------
+-            // type / base-type (required)
+-            // -------------------------
+             String type = cfg.getString("type");
+             if (type == null || type.isBlank()) {
+                 type = cfg.getString("base-type");
+             }
+             if (type == null || type.isBlank()) {
+-                plugin.getLogger().warning("[Config] " + mobId + " skipped: missing type/base-type");
++                plugin.getLogger().warning(
++                        "[Config] " + mobId + " skipped: missing type/base-type"
++                );
+                 bad++;
+                 continue;
+             }
+-
+-            // -------------------------
+-            // health (required)
+-            // -------------------------
+             double hp;
+             if (cfg.isDouble("stats.health")) {
+                 hp = cfg.getDouble("stats.health");
+@@ -121,14 +140,12 @@
+             }
+ 
+             if (hp <= 0) {
+-                plugin.getLogger().warning("[Config] " + mobId + " skipped: stats.health <= 0");
++                plugin.getLogger().warning(
++                        "[Config] " + mobId + " skipped: stats.health <= 0"
++                );
+                 bad++;
+                 continue;
+             }
+-
+-            // -------------------------
+-            // phase validation (safe)
+-            // -------------------------
+             ConfigurationSection ps = cfg.getConfigurationSection("phases");
+             if (ps != null) {
+                 for (String pid : ps.getKeys(false)) {
+@@ -146,10 +163,10 @@
+         }
+ 
+         mobConfigs = Collections.unmodifiableMap(next);
+-        plugin.getLogger().info("[Config] Mob configs loaded: ok=" + ok + " bad=" + bad);
++        plugin.getLogger().info(
++                "[Config] Mob configs loaded: ok=" + ok + " bad=" + bad
++        );
+     }
+-
+-
+     // =====================================================
+     // SAVE
+     // =====================================================
+@@ -157,21 +174,20 @@
+         try {
+             autoSpawnCfg.save(autoSpawnFile);
+         } catch (IOException e) {
+-            plugin.getLogger().severe("[Config] Could not save auto_spawn.yml: " + e.getMessage());
++            plugin.getLogger().severe(
++                    "[Config] Could not save auto_spawn.yml: " + e.getMessage()
++            );
+         }
+     }
+-
+     // =====================================================
+     // GETTERS (READ-ONLY)
+     // =====================================================
+     public Map<String, FileConfiguration> mobConfigs() {
+         return mobConfigs;
+     }
+-
+     public FileConfiguration autoSpawn() {
+         return autoSpawnCfg;
+     }
+-
+     public FileConfiguration stats() {
+         return statsCfg;
+     }
+Index: src/main/java/org/plugin/theMob/mob/MobManager.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/org/plugin/theMob/mob/MobManager.java b/src/main/java/org/plugin/theMob/mob/MobManager.java
+--- a/src/main/java/org/plugin/theMob/mob/MobManager.java	(revision 1db801bce50fa1aaf70a3002b31d319dac5f7c47)
++++ b/src/main/java/org/plugin/theMob/mob/MobManager.java	(date 1766760756188)
+@@ -1,4 +1,3 @@
+-// src/main/java/org/plugin/theMob/mob/MobManager.java
+ package org.plugin.theMob.mob;
+ 
+ import org.bukkit.Bukkit;
+@@ -36,10 +35,9 @@
+         this.configs = configs;
+         this.keys = keys;
+     }
+-
+-    public JavaPlugin plugin() {
+-        return plugin;
+-    }
++    // =====================================================
++    // INIT / RELOAD
++    // =====================================================
+ 
+     public void reloadFromConfigs() {
+         mobConfigs.clear();
+@@ -48,27 +46,60 @@
+         bossTemplates.clear();
+         for (Map.Entry<String, FileConfiguration> e : mobConfigs.entrySet()) {
+             BossTemplate tpl = BossTemplateParser.tryParse(e.getKey(), e.getValue());
+-            if (tpl != null && tpl.hasPhases()) bossTemplates.put(e.getKey(), tpl);
+-        }
+-        plugin.getLogger().info("[TheMob] Loaded " + mobConfigs.size() + " mob ymls | bosses=" + bossTemplates.size());
+-    }
++            if (tpl != null && tpl.hasPhases()) {
++                bossTemplates.put(e.getKey(), tpl);
++            }
++        }
+ 
+-    public void setSpawnService(MobSpawnService spawnService) {
+-        this.spawnService = spawnService;
++        plugin.getLogger().info(
++                "[TheMob] Loaded " + mobConfigs.size() +
++                        " mob configs | bosses=" + bossTemplates.size()
++        );
+     }
++    // =====================================================
++    // SPAWN
++    // =====================================================
+ 
+-    public boolean spawnCustomMob(String id, Location loc) {
++    public LivingEntity spawnCustomMob(String mobId, String spawnId, Location loc) {
+         if (spawnService == null) {
+             plugin.getLogger().severe("[TheMob] SpawnService not set!");
+-            return false;
++            return null;
+         }
+-        return spawnService.spawn(id, loc);
++        return spawnService.spawn(mobId, spawnId, loc);
+     }
++    // =====================================================
++    // LOOKUPS
++    // =====================================================
++    public String baseNameOf(LivingEntity e) {
++        if (e == null) return null;
++        return e.getPersistentDataContainer()
++                .get(keys.BASE_NAME, PersistentDataType.STRING);
++    }
+ 
++    public FileConfiguration mobConfigOf(LivingEntity mob) {
++        if (mob == null) return null;
++
++        String id = mobIdOf(mob);
++        if (id == null || id.isBlank()) return null;
++
++        return mobConfigs.get(id.toLowerCase(java.util.Locale.ROOT));
++    }
+     public FileConfiguration mobConfigById(String id) {
+         if (id == null) return null;
+-        return mobConfigs.get(id.toLowerCase(Locale.ROOT));
++        return mobConfigs.get(id.toLowerCase(java.util.Locale.ROOT));
++    }
++    public boolean hasBossTemplate(String mobId) {
++        if (mobId == null) return false;
++        return bossTemplates.containsKey(mobId.toLowerCase(java.util.Locale.ROOT));
+     }
++    public BossTemplate bossTemplate(String id) {
++        if (id == null) return null;
++        return bossTemplates.get(id.toLowerCase(java.util.Locale.ROOT));
++    }
++    public java.util.Set<String> registeredIds() {
++        return java.util.Collections.unmodifiableSet(mobConfigs.keySet());
++    }
++
+ 
+     public boolean mobExists(String id) {
+         return id != null && mobConfigs.containsKey(id.toLowerCase(Locale.ROOT));
+@@ -78,41 +109,41 @@
+         return e != null && mobIdOf(e) != null;
+     }
+ 
++    public String mobIdOf(LivingEntity e) {
++        if (e == null) return null;
++        return e.getPersistentDataContainer()
++                .get(keys.MOB_ID, PersistentDataType.STRING);
++    }
++
+     public boolean isBoss(LivingEntity e) {
+         if (e == null) return false;
+-        Integer flag = e.getPersistentDataContainer().get(keys.IS_BOSS, PersistentDataType.INTEGER);
++
++        Integer flag = e.getPersistentDataContainer()
++                .get(keys.IS_BOSS, PersistentDataType.INTEGER);
+         if (flag != null) return flag == 1;
++
+         String id = mobIdOf(e);
+         return id != null && bossTemplates.containsKey(id.toLowerCase(Locale.ROOT));
+     }
+ 
+-    public String mobIdOf(LivingEntity e) {
+-        if (e == null) return null;
+-        return e.getPersistentDataContainer().get(keys.MOB_ID, PersistentDataType.STRING);
+-    }
+-
+-    public String baseNameOf(LivingEntity e) {
+-        if (e == null) return null;
+-        return e.getPersistentDataContainer().get(keys.BASE_NAME, PersistentDataType.STRING);
+-    }
+-
+-    public BossTemplate bossTemplate(String id) {
+-        if (id == null) return null;
+-        return bossTemplates.get(id.toLowerCase(Locale.ROOT));
+-    }
+-
+-    public Set<String> registeredIds() {
+-        return Collections.unmodifiableSet(mobConfigs.keySet());
+-    }
+-
+     public KeyRegistry keys() {
+         return keys;
+     }
++    // =====================================================
++    // DEATH HANDLING
++    // =====================================================
+ 
+     public void onMobDeath(LivingEntity mob, EntityDeathEvent e) {
+-        if (dropEngine != null) dropEngine.handleDeath(mob, e);
+-        if (healthDisplay != null) healthDisplay.onDeath(mob);
++        if (dropEngine != null) {
++            dropEngine.handleDeath(mob, e);
++        }
++        if (healthDisplay != null) {
++            healthDisplay.onDeath(mob);
++        }
+     }
++    // =====================================================
++    // ADMIN
++    // =====================================================
+ 
+     public void killAll() {
+         int removed = 0;
+@@ -125,20 +156,19 @@
+         }
+         plugin.getLogger().info("[TheMob] Removed " + removed + " custom mobs.");
+     }
+-    public FileConfiguration mobConfigOf(LivingEntity mob) {
+-        if (mob == null) return null;
+-
+-        String id = mobIdOf(mob);
+-        if (id == null || id.isBlank()) return null;
++    // =====================================================
++    // SETTERS
++    // =====================================================
+ 
+-        return mobConfigs.get(id.toLowerCase(Locale.ROOT));
++    public void setSpawnService(MobSpawnService spawnService) {
++        this.spawnService = spawnService;
+     }
+ 
+-    public boolean hasBossTemplate(String mobId) {
+-        if (mobId == null) return false;
+-        return bossTemplates.containsKey(mobId.toLowerCase(Locale.ROOT));
++    public void setDropEngine(MobDropEngine dropEngine) {
++        this.dropEngine = dropEngine;
+     }
+ 
+-    public void setDropEngine(MobDropEngine dropEngine) { this.dropEngine = dropEngine; }
+-    public void setHealthDisplay(MobHealthDisplay display) { this.healthDisplay = display; }
++    public void setHealthDisplay(MobHealthDisplay display) {
++        this.healthDisplay = display;
++    }
+ }
+Index: src/main/java/org/plugin/theMob/core/KeyRegistry.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/org/plugin/theMob/core/KeyRegistry.java b/src/main/java/org/plugin/theMob/core/KeyRegistry.java
+--- a/src/main/java/org/plugin/theMob/core/KeyRegistry.java	(revision 1db801bce50fa1aaf70a3002b31d319dac5f7c47)
++++ b/src/main/java/org/plugin/theMob/core/KeyRegistry.java	(date 1766761027447)
+@@ -7,12 +7,15 @@
+ import java.util.Map;
+ 
+ public final class KeyRegistry {
+-// ENTITY / MOB
++
+     public final NamespacedKey MOB_ID;
+     public final NamespacedKey BASE_NAME;
+     public final NamespacedKey IS_BOSS;
+     public final NamespacedKey NO_DROPS;
+-// ITEM STATS
++
++    public final NamespacedKey AUTO_SPAWN_ID;    // STRING
++    public final NamespacedKey AUTO_SPAWN_FLAG;  // INTEGER (1)
++
+     public final NamespacedKey DAMAGE;
+     public final NamespacedKey EXTRA_DAMAGE;
+     public final NamespacedKey CRIT;
+@@ -25,26 +28,32 @@
+     public final NamespacedKey ATTACK_SPEED;
+     public final NamespacedKey KNOCKBACK_RESISTANCE;
+     public final NamespacedKey LUCK;
++
+     public final Map<String, NamespacedKey> ALL_STATS;
+-    public final NamespacedKey AUTO_SPAWNED;
++
+     public KeyRegistry(Plugin plugin) {
+-        this.MOB_ID = new NamespacedKey(plugin, "mob_id");
+-        this.BASE_NAME = new NamespacedKey(plugin, "base_name");
+-        this.IS_BOSS = new NamespacedKey(plugin, "is_boss");
+-        this.NO_DROPS = new NamespacedKey(plugin, "no_drops");
+-        this.DAMAGE = new NamespacedKey(plugin, "damage");
+-        this.EXTRA_DAMAGE = new NamespacedKey(plugin, "extra_damage");
+-        this.CRIT = new NamespacedKey(plugin, "crit");
+-        this.CRIT_MULTIPLIER = new NamespacedKey(plugin, "crit_multiplier");
+-        this.LIFESTEAL = new NamespacedKey(plugin, "lifesteal");
+-        this.ARMOR = new NamespacedKey(plugin, "armor");
+-        this.DEFENSE = new NamespacedKey(plugin, "defense");
+-        this.HEALTH = new NamespacedKey(plugin, "health");
+-        this.MOVEMENT_SPEED = new NamespacedKey(plugin, "movement_speed");
+-        this.ATTACK_SPEED = new NamespacedKey(plugin, "attack_speed");
+-        this.KNOCKBACK_RESISTANCE = new NamespacedKey(plugin, "knockback_resistance");
+-        this.LUCK = new NamespacedKey(plugin, "luck");
+-        this.AUTO_SPAWNED = new NamespacedKey(plugin, "auto_spawned");
++
++        MOB_ID = new NamespacedKey(plugin, "mob_id");
++        BASE_NAME = new NamespacedKey(plugin, "base_name");
++        IS_BOSS = new NamespacedKey(plugin, "is_boss");
++        NO_DROPS = new NamespacedKey(plugin, "no_drops");
++
++        AUTO_SPAWN_ID   = new NamespacedKey(plugin, "auto_spawn_id");
++        AUTO_SPAWN_FLAG = new NamespacedKey(plugin, "auto_spawn_flag");
++
++        DAMAGE = new NamespacedKey(plugin, "damage");
++        EXTRA_DAMAGE = new NamespacedKey(plugin, "extra_damage");
++        CRIT = new NamespacedKey(plugin, "crit");
++        CRIT_MULTIPLIER = new NamespacedKey(plugin, "crit_multiplier");
++        LIFESTEAL = new NamespacedKey(plugin, "lifesteal");
++        ARMOR = new NamespacedKey(plugin, "armor");
++        DEFENSE = new NamespacedKey(plugin, "defense");
++        HEALTH = new NamespacedKey(plugin, "health");
++        MOVEMENT_SPEED = new NamespacedKey(plugin, "movement_speed");
++        ATTACK_SPEED = new NamespacedKey(plugin, "attack_speed");
++        KNOCKBACK_RESISTANCE = new NamespacedKey(plugin, "knockback_resistance");
++        LUCK = new NamespacedKey(plugin, "luck");
++
+         Map<String, NamespacedKey> map = new LinkedHashMap<>();
+         map.put("damage", DAMAGE);
+         map.put("extra_damage", EXTRA_DAMAGE);
+@@ -58,6 +67,7 @@
+         map.put("attack_speed", ATTACK_SPEED);
+         map.put("knockback_resistance", KNOCKBACK_RESISTANCE);
+         map.put("luck", LUCK);
+-        this.ALL_STATS = Map.copyOf(map);
++
++        ALL_STATS = Map.copyOf(map);
+     }
+ }
+Index: src/main/java/org/plugin/theMob/command/MobCommand.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/org/plugin/theMob/command/MobCommand.java b/src/main/java/org/plugin/theMob/command/MobCommand.java
+--- a/src/main/java/org/plugin/theMob/command/MobCommand.java	(revision 1db801bce50fa1aaf70a3002b31d319dac5f7c47)
++++ b/src/main/java/org/plugin/theMob/command/MobCommand.java	(date 1766761027433)
+@@ -13,30 +13,29 @@
+     private final TheMob plugin;
+     private final MobManager mobs;
+     private final SpawnController spawns;
++
+     public MobCommand(TheMob plugin, MobManager mobs, SpawnController spawns) {
+         this.plugin = plugin;
+         this.mobs = mobs;
+         this.spawns = spawns;
+     }
++
+     @Override
+-    public boolean onCommand(
+-            CommandSender sender,
+-            Command cmd,
+-            String label,
+-            String[] args
+-    ) {
++    public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
++
+         if (args.length == 0) {
+             help(sender);
+             return true;
+         }
+-// /mob reload
+         if (args[0].equalsIgnoreCase("reload")) {
+-            perm(sender, "themob.reload");
++            if (!sender.hasPermission("themob.reload")) {
++                sender.sendMessage("§cNo permission.");
++                return true;
++            }
+             plugin.reloadPlugin();
+             sender.sendMessage("§a[TheMob] Reloaded.");
+             return true;
+         }
+-// /mob spawn <id>
+         if (args[0].equalsIgnoreCase("spawn")) {
+             if (!(sender instanceof Player p)) {
+                 sender.sendMessage("§cOnly players can spawn mobs.");
+@@ -46,90 +45,110 @@
+                 p.sendMessage("§e/mob spawn <mob-id>");
+                 return true;
+             }
++
+             String id = args[1].toLowerCase();
+             if (!mobs.mobExists(id)) {
+                 p.sendMessage("§cUnknown mob: §e" + id);
+                 return true;
+             }
++
+             mobs.spawnCustomMob(
+                     id,
++                    "manual@" + p.getUniqueId(),
+                     p.getLocation().add(p.getLocation().getDirection().multiply(2))
+             );
++
+             p.sendMessage("§aSpawned mob: §e" + id);
+             return true;
+         }
+-// /mob autospawn <id> <seconds> <amount>
+         if (args[0].equalsIgnoreCase("autospawn")) {
+             if (!(sender instanceof Player p)) {
+                 sender.sendMessage("§cOnly players can use this command.");
+                 return true;
++            }
++            if (!sender.hasPermission("themob.spawn.set")) {
++                sender.sendMessage("§cNo permission.");
++                return true;
+             }
+             if (args.length < 4) {
+-                sender.sendMessage("§e/mob autospawn <id> <seconds> <amount>");
++                sender.sendMessage("§e/mob autospawn <id> <seconds> <maxSpawns>");
+                 return true;
+             }
++
+             String id = args[1].toLowerCase();
+-            int seconds = Integer.parseInt(args[2]);
+-            int amount = Integer.parseInt(args[3]);
+             if (!mobs.mobExists(id)) {
+-                sender.sendMessage("§cUnknown mob: " + id);
++                sender.sendMessage("§cUnknown mob: §e" + id);
++                return true;
++            }
++
++            int seconds;
++            int maxSpawns;
++
++            try {
++                seconds = Integer.parseInt(args[2]);
++                maxSpawns = Integer.parseInt(args[3]);
++            } catch (NumberFormatException e) {
++                sender.sendMessage("§cSeconds and maxSpawns must be numbers.");
+                 return true;
+             }
+-            if (seconds <= 0 || amount <= 0) {
+-                sender.sendMessage("§cSeconds and amount must be > 0");
++
++            if (seconds <= 0 || maxSpawns <= 0) {
++                sender.sendMessage("§cSeconds and maxSpawns must be > 0.");
+                 return true;
+             }
+-            spawns.startAutoSpawnAt(
++
++            boolean ok = spawns.startAutoSpawn(
+                     id,
+                     p.getLocation(),
+                     seconds,
+-                    amount
++                    maxSpawns
+             );
+-            sender.sendMessage(
+-                    "§aAuto-spawn started for §e" + id +
+-                            " §7(" + amount + " mobs, every " + seconds + "s)"
++
++            sender.sendMessage(ok
++                    ? "§aAuto-spawn created for §e" + id +
++                    " §7(1 mob every " + seconds +
++                    "s, max " + maxSpawns + " per cycle)"
++                    : "§cFailed to create auto-spawn."
+             );
+             return true;
+         }
+-// /mob del autospawn <id>
+         if (args[0].equalsIgnoreCase("del")
+                 && args.length >= 3
+                 && args[1].equalsIgnoreCase("autospawn")) {
+-            String id = args[2].toLowerCase();
++
+             if (!sender.hasPermission("themob.spawn.set")) {
+                 sender.sendMessage("§cNo permission.");
+                 return true;
+             }
+-            boolean ok = spawns.deleteAutoSpawn(id);
++
++            String id = args[2].toLowerCase();
++            boolean ok = spawns.deleteAutoSpawnByMobId(id);
++
+             sender.sendMessage(ok
+-                    ? "§aAuto-spawn removed for §e" + id
++                    ? "§aAll auto-spawns removed for §e" + id
+                     : "§cNo auto-spawn found for §e" + id
+             );
+             return true;
+         }
+-// /mob killall
+         if (args[0].equalsIgnoreCase("killall")) {
+             if (!sender.hasPermission("themob.killall")) {
+-                sender.sendMessage("§cYou do not have permission.");
++                sender.sendMessage("§cNo permission.");
+                 return true;
+             }
+             mobs.killAll();
+             sender.sendMessage("§aAll custom mobs have been removed.");
+             return true;
+         }
++
+         help(sender);
+         return true;
+     }
+-// UTIL
++
+     private void help(CommandSender s) {
+-        s.sendMessage("§e/mob spawn <id>");
+-        s.sendMessage("§e/mob autospawn <id> <seconds> <amount>");
++        s.sendMessage("§e/mob spawn <mob-id>");
++        s.sendMessage("§e/mob autospawn <mob-id> <seconds> <maxSpawns>");
++        s.sendMessage("§e/mob del autospawn <mob-id>");
+         s.sendMessage("§e/mob killall");
+         s.sendMessage("§e/mob reload");
+     }
+-    private void perm(CommandSender s, String perm) {
+-        if (!s.hasPermission(perm)) {
+-            throw new RuntimeException("Missing permission: " + perm);
+-        }
+-    }
+ }
+Index: src/main/resources/mobs/mob_template.yml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/resources/mobs/mob_template.yml b/src/main/resources/mobs/mob_template.yml
+new file mode 100644
+--- /dev/null	(date 1766762718677)
++++ b/src/main/resources/mobs/mob_template.yml	(date 1766762718677)
+@@ -0,0 +1,84 @@
++# =========================================================
++# TheMob – Mob Configuration Example
++# =========================================================
++#
++# This file defines a CUSTOM MOB.
++# It can be used for arenas, events or RPG worlds.
++#
++# The mob behavior, stats, drops and rewards
++# are fully configurable.
++#
++# =========================================================
++
++mob-id: zombie_mob_template            # Unique ID (file name or explicit)
++base-type: ZOMBIE                      # Vanilla entity type
++
++# ---------------------------------------------------------
++# Display
++# ---------------------------------------------------------
++name: "&b&lZombie"             # Colored mob name
++display-health: true           # Show health above mob (HUD)
++
++# ---------------------------------------------------------
++# Stats
++# ---------------------------------------------------------
++stats:
++  health:
++    max: 20                    # Max health (10 hearts)
++    current: 20                # Spawn health
++  movement-speed: 0.23         # Vanilla = ~0.23
++  attack-damage: 0             # 0 = harmless (good for events / early game)
++
++# ---------------------------------------------------------
++# Death Commands
++# ---------------------------------------------------------
++# Executed when a PLAYER kills this mob
++# Placeholders like {player} are supported
++death-commands:
++  - "give {player} carrot 1"
++
++# ---------------------------------------------------------
++# Drops
++# ---------------------------------------------------------
++# Drops are rolled independently
++# chance = 1.0 means 100%
++# chance = 0.5 means 50%
++#
++# No vanilla drops are used – ONLY these
++# ---------------------------------------------------------
++drops:
++  - item: ROTTEN_FLESH
++    amount: 2
++    chance: 1.0                # Always drops
++  - item: BONE
++    amount: 3
++    chance: 0.8                # 80% chance
++  - item: STRING
++    amount: 4
++    chance: 0.6                # 60% chance
++  - item: STICK
++    amount: 2
++    chance: 0.4                # 40% chance
++  - item: GOLDEN_APPLE
++    amount: 1
++    chance: 0.12               # Rare drop (12%)
++  - item: DIAMOND
++    amount: 1
++    chance: 0.08               # Very rare (8%)
++  - item: GOLDEN_CARROT
++    amount: 1
++    chance: 0.04               # Ultra rare (4%)
++
++# ---------------------------------------------------------
++# Notes for Admins
++# ---------------------------------------------------------
++#
++# ✔ This mob can be used safely in AutoSpawns
++# ✔ Drops are balanced for early / mid game
++# ✔ No AFK farming possible (AutoSpawn controlled)
++#
++# Tip:
++# Use this mob as a base template
++# and scale stats + drops for higher tiers.
++#
++# =========================================================
+Index: src/main/java/org/plugin/theMob/spawn/SpawnPoint.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/org/plugin/theMob/spawn/SpawnPoint.java b/src/main/java/org/plugin/theMob/spawn/SpawnPoint.java
+--- a/src/main/java/org/plugin/theMob/spawn/SpawnPoint.java	(revision 1db801bce50fa1aaf70a3002b31d319dac5f7c47)
++++ b/src/main/java/org/plugin/theMob/spawn/SpawnPoint.java	(date 1766750635986)
+@@ -1,108 +1,88 @@
+ package org.plugin.theMob.spawn;
+ 
++import org.bukkit.Bukkit;
+ import org.bukkit.Location;
+ import org.bukkit.World;
+ 
+-import java.util.HashMap;
+-import java.util.Map;
++import java.util.Objects;
++
++public final class SpawnPoint {
++
++    private final String mobId;
++    private final String worldName;
++    private final int x, y, z;
++
++    private final int intervalSeconds;
++    private final int maxSpawns;
++    private final int arenaRadiusChunks;
++    private final boolean enabled;
+ 
+-public record SpawnPoint(
+-        String mobId,
+-        String world,
+-        double x,
+-        double y,
+-        double z,
+-        int intervalSeconds,
+-        int maxAlive,
+-        double playerRange,
+-        boolean requiresPlayer,
+-        boolean enabled
+-) {
+-// CREATE FROM PLAYER POSITION
+-    public static SpawnPoint fromPlayerBlock(
+-            String mobId,
+-            Location playerLoc,
+-            int intervalSeconds,
+-            int maxAlive
++    private volatile long lastPlayerSeenTick = 0L;
++
++    public SpawnPoint(
++            String mobId,
++            String worldName,
++            int x,
++            int y,
++            int z,
++            int intervalSeconds,
++            int maxSpawns,
++            int arenaRadiusChunks,
++            boolean enabled
+     ) {
+-        Location b = playerLoc.getBlock().getLocation().add(0.5, 0, 0.5);
+-        return new SpawnPoint(
+-                mobId.toLowerCase(),
+-                b.getWorld().getName(),
+-                b.getX(),
+-                b.getY(),
+-                b.getZ(),
+-                intervalSeconds,
+-                maxAlive,
+-                20.0,
+-                false,
+-                true
+-        );
++        this.mobId = Objects.requireNonNull(mobId).toLowerCase();
++        this.worldName = Objects.requireNonNull(worldName);
++        this.x = x;
++        this.y = y;
++        this.z = z;
++        this.intervalSeconds = Math.max(1, intervalSeconds);
++        this.maxSpawns = Math.max(1, maxSpawns);
++        this.arenaRadiusChunks = Math.max(0, arenaRadiusChunks);
++        this.enabled = enabled;
+     }
+-// UNIQUE ID (FOR REGISTRY / MAP KEYS)
++
++    // =====================================================
++    // ID / LOCATION
++    // =====================================================
++
+     public String spawnId() {
+-        return mobId + "@" + world + ":" + (int) x + ":" + (int) y + ":" + (int) z;
++        return mobId + "@" + worldName + ":" + x + "," + y + "," + z;
+     }
+-    public int chunkX() {
+-        return ((int) Math.floor(x)) >> 4;
++
++    public String mobId() {
++        return mobId;
+     }
+-    public int chunkZ() {
+-        return ((int) Math.floor(z)) >> 4;
++
++    public String worldName() {
++        return worldName;
+     }
+-    public Location location(World w) {
+-        return new Location(w, x, y, z);
++
++    public Location baseLocation() {
++        World w = Bukkit.getWorld(worldName);
++        return w == null ? null : new Location(w, x + 0.5, y, z + 0.5);
+     }
+-// SERIALIZE
+-    public Map<String, Object> toMap() {
+-        Map<String, Object> m = new HashMap<>();
+-        m.put("mobId", mobId);
+-        m.put("world", world);
+-        m.put("x", x);
+-        m.put("y", y);
+-        m.put("z", z);
+-        m.put("intervalSeconds", intervalSeconds);
+-        m.put("maxAlive", maxAlive);
+-        m.put("playerRange", playerRange);
+-        m.put("requiresPlayer", requiresPlayer);
+-        m.put("enabled", enabled);
+-        return m;
++
++    public int baseChunkX() { return x >> 4; }
++    public int baseChunkZ() { return z >> 4; }
++
++    // =====================================================
++    // CONFIG
++    // =====================================================
++
++    public int intervalSeconds() { return intervalSeconds; }
++    public int maxSpawns() { return maxSpawns; }
++    public int arenaRadiusChunks() { return arenaRadiusChunks; }
++    public boolean enabled() { return enabled; }
++
++    // =====================================================
++    // ACTIVITY TRACKING
++    // =====================================================
++
++    public void markPlayerSeen(long tick) {
++        lastPlayerSeenTick = tick;
+     }
+-// DESERIALIZE
+-    public static SpawnPoint fromMap(Map<?, ?> raw) {
+-        if (raw == null) return null;
+-        try {
+-            String mobId = String.valueOf(raw.get("mobId")).toLowerCase();
+-            String world = String.valueOf(raw.get("world"));
+-            double x = Double.parseDouble(String.valueOf(raw.get("x")));
+-            double y = Double.parseDouble(String.valueOf(raw.get("y")));
+-            double z = Double.parseDouble(String.valueOf(raw.get("z")));
+-            int intervalSeconds = raw.containsKey("intervalSeconds")
+-                    ? Integer.parseInt(String.valueOf(raw.get("intervalSeconds")))
+-                    : 300;
+-            int maxAlive = raw.containsKey("maxAlive")
+-                    ? Integer.parseInt(String.valueOf(raw.get("maxAlive")))
+-                    : 1;
+-            double playerRange = raw.containsKey("playerRange")
+-                    ? Double.parseDouble(String.valueOf(raw.get("playerRange")))
+-                    : 20.0;
+-            boolean requiresPlayer = raw.containsKey("requiresPlayer")
+-                    && Boolean.parseBoolean(String.valueOf(raw.get("requiresPlayer")));
+-            boolean enabled = !raw.containsKey("enabled")
+-                    || Boolean.parseBoolean(String.valueOf(raw.get("enabled")));
+-            return new SpawnPoint(
+-                    mobId,
+-                    world,
+-                    x,
+-                    y,
+-                    z,
+-                    intervalSeconds,
+-                    maxAlive,
+-                    playerRange,
+-                    requiresPlayer,
+-                    enabled
+-            );
+-        } catch (Exception e) {
+-            return null;
+-        }
++
++    public boolean inactiveFor(long ticks, long now) {
++        return (now - lastPlayerSeenTick) >= ticks;
+     }
+ }
+Index: src/main/java/org/plugin/theMob/spawn/SpawnController.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/org/plugin/theMob/spawn/SpawnController.java b/src/main/java/org/plugin/theMob/spawn/SpawnController.java
+--- a/src/main/java/org/plugin/theMob/spawn/SpawnController.java	(revision 1db801bce50fa1aaf70a3002b31d319dac5f7c47)
++++ b/src/main/java/org/plugin/theMob/spawn/SpawnController.java	(date 1766760756178)
+@@ -1,136 +1,241 @@
+-// src/main/java/org/plugin/theMob/spawn/SpawnController.java
+ package org.plugin.theMob.spawn;
+ 
+-import org.bukkit.Bukkit;
+ import org.bukkit.Location;
+-import org.bukkit.World;
+ import org.bukkit.configuration.file.FileConfiguration;
+ import org.bukkit.entity.LivingEntity;
+ import org.bukkit.event.EventHandler;
+ import org.bukkit.event.Listener;
+ import org.bukkit.event.entity.EntityDeathEvent;
+-import org.bukkit.scheduler.BukkitRunnable;
++import org.bukkit.event.player.PlayerChangedWorldEvent;
++import org.bukkit.event.player.PlayerMoveEvent;
++import org.bukkit.event.player.PlayerQuitEvent;
++import org.bukkit.event.player.PlayerTeleportEvent;
+ import org.plugin.theMob.TheMob;
++import org.plugin.theMob.core.ConfigService;
+ import org.plugin.theMob.core.KeyRegistry;
+ import org.plugin.theMob.mob.MobManager;
+ import org.plugin.theMob.mob.spawn.AutoSpawnManager;
+ 
+ import java.util.*;
++import java.util.concurrent.ConcurrentHashMap;
+ 
+ public final class SpawnController implements Listener {
+ 
++    private static final int DEFAULT_ARENA_RADIUS_CHUNKS = 2; // 5x5
++
+     private final TheMob plugin;
+     private final MobManager mobs;
+-    private final AutoSpawnManager autoSpawnManager;
+-    private final KeyRegistry keys;
+-    private final Map<String, SpawnPoint> registry = new HashMap<>();
+-    private final Map<String, BukkitRunnable> tasks = new HashMap<>();
++    private final AutoSpawnManager auto;
++    private final ConfigService configs;
++    private final Map<String, SpawnPoint> registry = new ConcurrentHashMap<>();
++    private final Map<UUID, Location> lastLocation = new ConcurrentHashMap<>();
++
++
+     public SpawnController(
+             TheMob plugin,
+             MobManager mobs,
+-            AutoSpawnManager autoSpawnManager,
++            AutoSpawnManager auto,
+             KeyRegistry keys
+     ) {
+         this.plugin = plugin;
+         this.mobs = mobs;
+-        this.autoSpawnManager = autoSpawnManager;
+-        this.keys = keys;
++        this.auto = auto;
++        this.configs = plugin.configs();
+     }
+-// LIFECYCLE
++    // =====================================================
++    // LIFECYCLE
++    // =====================================================
++
+     public void start() {
+-        reload();
+-        plugin.getLogger().info("[AutoSpawn] Started (" + registry.size() + ")");
+-    }
+-    public void shutdown() {
+-        tasks.values().forEach(BukkitRunnable::cancel);
+-        tasks.clear();
+-        registry.clear();
+-    }
+-    public void reload() {
+-        shutdown();
+         loadFromConfig();
++        auto.start();
++    }
++
++    public void stop() {
+         for (SpawnPoint sp : registry.values()) {
+-            schedule(sp);
++            auto.unregister(sp.spawnId());
+         }
++        registry.clear();
++        auto.stop();
+     }
+-// COMMAND API
+-    public boolean startAutoSpawnAt(
+-            String mobId,
+-            Location loc,
+-            int intervalSeconds,
+-            int maxAlive
+-    ) {
+-        SpawnPoint sp = SpawnPoint.fromPlayerBlock(
++    // =====================================================
++    // CREATE
++    // =====================================================
++
++    public boolean startAutoSpawn(String mobId, Location loc, int intervalSeconds, int maxSpawns) {
++        if (mobId == null || mobId.isBlank()) return false;
++        if (loc == null || loc.getWorld() == null) return false;
++        if (!mobs.mobExists(mobId)) return false;
++
++        SpawnPoint sp = new SpawnPoint(
+                 mobId,
+-                loc,
++                loc.getWorld().getName(),
++                loc.getBlockX(),
++                loc.getBlockY(),
++                loc.getBlockZ(),
+                 intervalSeconds,
+-                maxAlive
++                maxSpawns,
++                DEFAULT_ARENA_RADIUS_CHUNKS,
++                true
+         );
++
+         registry.put(sp.spawnId(), sp);
++        auto.register(sp);
+         saveToConfig();
+-        schedule(sp);
++
+         return true;
+     }
+-    public boolean deleteAutoSpawn(String mobId) {
++    @EventHandler(ignoreCancelled = true)
++    public void onPlayerMove(PlayerMoveEvent e) {
++        lastLocation.put(e.getPlayer().getUniqueId(), e.getFrom());
++
++        if (e.getFrom().distanceSquared(e.getTo()) < 0.01) return;
++        handleArenaTransition(e.getFrom(), e.getTo());
++    }
++    @EventHandler
++    public void onQuit(PlayerQuitEvent e) {
++        Location last = lastLocation.remove(e.getPlayer().getUniqueId());
++        if (last != null) {
++            handleArenaExit(last);
++        }
++    }
++    @EventHandler(ignoreCancelled = true)
++    public void onTeleport(PlayerTeleportEvent e) {
++        lastLocation.put(e.getPlayer().getUniqueId(), e.getFrom());
++        handleArenaTransition(e.getFrom(), e.getTo());
++    }
++    @EventHandler
++    public void onWorldChange(PlayerChangedWorldEvent e) {
++        Location last = lastLocation.remove(e.getPlayer().getUniqueId());
++        if (last != null) {
++            handleArenaExit(last);
++        }
++    }
++    private void handleArenaTransition(Location from, Location to) {
++        for (SpawnPoint sp : registry.values()) {
++            boolean wasIn = isInside(sp, from);
++            boolean isIn  = isInside(sp, to);
++
++            if (wasIn && !isIn) {
++                auto.forceCleanupIfEmpty(sp);
++            }
++        }
++    }
++    private void handleArenaExit(Location loc) {
++        for (SpawnPoint sp : registry.values()) {
++            if (isInside(sp, loc)) {
++                auto.forceCleanupIfEmpty(sp);
++            }
++        }
++    }
++    private boolean isInside(SpawnPoint sp, Location loc) {
++        if (loc == null || loc.getWorld() == null) return false;
++        if (!loc.getWorld().getName().equals(sp.worldName())) return false;
++
++        int cx = loc.getBlockX() >> 4;
++        int cz = loc.getBlockZ() >> 4;
++
++        return Math.abs(cx - sp.baseChunkX()) <= sp.arenaRadiusChunks()
++                && Math.abs(cz - sp.baseChunkZ()) <= sp.arenaRadiusChunks();
++    }
++    // =====================================================
++    // DELETE
++    // =====================================================
++
++    public boolean deleteAutoSpawnByMobId(String mobId) {
+         boolean removed = false;
+-        Iterator<Map.Entry<String, SpawnPoint>> it = registry.entrySet().iterator();
+-        while (it.hasNext()) {
++
++        for (Iterator<Map.Entry<String, SpawnPoint>> it = registry.entrySet().iterator(); it.hasNext();) {
+             Map.Entry<String, SpawnPoint> e = it.next();
+             if (!e.getValue().mobId().equalsIgnoreCase(mobId)) continue;
+-            BukkitRunnable r = tasks.remove(e.getKey());
+-            if (r != null) r.cancel();
++
++            auto.unregister(e.getKey());
+             it.remove();
+             removed = true;
+         }
+-        if (removed) saveToConfig();
++
++        if (removed) {
++            saveToConfig();
++        }
+         return removed;
+     }
+-// INTERNAL
+-    private void schedule(SpawnPoint sp) {
+-        World world = Bukkit.getWorld(sp.world());
+-        if (world == null) return;
+-        BukkitRunnable task = new BukkitRunnable() {
+-            @Override
+-            public void run() {
+-                if (!sp.enabled()) return;
+-                if (!world.isChunkLoaded(sp.chunkX(), sp.chunkZ())) return;
+-                autoSpawnManager.validateAliveCounts(mobs, keys);
+-                if (autoSpawnManager.alive(sp.mobId()) >= sp.maxAlive()) return;
+-                boolean success = mobs.spawnCustomMob(
+-                        sp.mobId(),
+-                        sp.location(world)
+-                );
+-                if (!success) return;
+-                autoSpawnManager.incrementAlive(sp.mobId());
+-                autoSpawnManager.updateLastSpawn(sp.mobId());
+-            }
+-        };
+-        task.runTaskTimer(plugin, 0L, sp.intervalSeconds() * 20L);
+-        tasks.put(sp.spawnId(), task);
+-    }
+-// CLEANUP
+-    @EventHandler
+-    public void onDeath(EntityDeathEvent e) {
+-        if (!(e.getEntity() instanceof LivingEntity le)) return;
+-        String id = mobs.mobIdOf(le);
+-        if (id == null) return;
+-        autoSpawnManager.decrementAlive(id);
+-    }
+-// CONFIG
++    // =====================================================
++    // CONFIG LOAD / SAVE
++    // =====================================================
++
++    @SuppressWarnings("unchecked")
+     private void loadFromConfig() {
+-        FileConfiguration cfg = plugin.configs().autoSpawn();
+-        for (Map<?, ?> raw : cfg.getMapList("spawns")) {
+-            SpawnPoint sp = SpawnPoint.fromMap(raw);
+-            if (sp != null) registry.put(sp.spawnId(), sp);
++        registry.clear(); // 👈 safety
++        FileConfiguration cfg = configs.autoSpawn();
++        List<Map<String, Object>> list = (List<Map<String, Object>>) cfg.getList("spawns");
++
++        if (list == null || list.isEmpty()) return;
++
++        for (Map<String, Object> raw : list) {
++            try {
++                String mobId = (String) raw.get("mobId");
++                String world = (String) raw.get("world");
++
++                int x = (int) raw.get("x");
++                int y = (int) raw.get("y");
++                int z = (int) raw.get("z");
++
++                int interval = (int) raw.get("intervalSeconds");
++                int maxSpawns = (int) raw.get("maxSpawns");
++                int radius = (int) raw.getOrDefault("arenaRadiusChunks", DEFAULT_ARENA_RADIUS_CHUNKS);
++                boolean enabled = (boolean) raw.getOrDefault("enabled", true);
++                if (!enabled) continue;
++
++                if (!mobs.mobExists(mobId)) continue;
++
++                SpawnPoint sp = new SpawnPoint(
++                        mobId,
++                        world,
++                        x, y, z,
++                        interval,
++                        maxSpawns,
++                        radius,
++                        enabled
++                );
++
++                registry.put(sp.spawnId(), sp);
++                auto.register(sp);
++
++            } catch (Exception ex) {
++                plugin.getLogger().warning("[AutoSpawn] Invalid entry skipped");
++            }
+         }
+     }
++
+     private void saveToConfig() {
+-        FileConfiguration cfg = plugin.configs().autoSpawn();
++        FileConfiguration cfg = configs.autoSpawn();
+         List<Map<String, Object>> out = new ArrayList<>();
++
+         for (SpawnPoint sp : registry.values()) {
+-            out.add(sp.toMap());
++            Map<String, Object> map = new LinkedHashMap<>();
++            map.put("mobId", sp.mobId());
++            map.put("world", sp.worldName());
++            map.put("x", sp.baseLocation().getBlockX());
++            map.put("y", sp.baseLocation().getBlockY());
++            map.put("z", sp.baseLocation().getBlockZ());
++            map.put("intervalSeconds", sp.intervalSeconds());
++            map.put("maxSpawns", sp.maxSpawns());
++            map.put("arenaRadiusChunks", sp.arenaRadiusChunks());
++            map.put("enabled", true);
++            out.add(map);
+         }
++
+         cfg.set("spawns", out);
+-        plugin.configs().saveAutoSpawn();
++        configs.saveAutoSpawn();
++    }
++    // =====================================================
++    // DEATH EVENTS
++    // =====================================================
++
++    @EventHandler
++    public void onDeath(EntityDeathEvent e) {
++        if (!(e.getEntity() instanceof LivingEntity le)) return;
++        mobs.onMobDeath(le, e);
++        auto.onEntityDeath(le);
+     }
+ }
+Index: src/main/resources/auto_spawn.yml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/resources/auto_spawn.yml b/src/main/resources/auto_spawn.yml
+--- a/src/main/resources/auto_spawn.yml	(revision 1db801bce50fa1aaf70a3002b31d319dac5f7c47)
++++ b/src/main/resources/auto_spawn.yml	(date 1766689855512)
+@@ -1,1 +1,45 @@
+-spawns: []
+\ No newline at end of file
++# =========================================================
++# TheMob – AutoSpawn Configuration
++# =========================================================
++#
++# AutoSpawns create controlled mob waves for arenas,
++# events or RPG zones.
++#
++# 🔒 AFK farming is PREVENTED by design.
++# 🔁 Spawns only reset when players leave and return.
++#
++# =========================================================
++
++spawns: []
++
++# ---------------------------------------------------------
++# Example AutoSpawn
++# ---------------------------------------------------------
++# - mobId: skeleton_normal        # Mob config ID (from /mobs/)
++#   world: world                  # World name
++#   x: 37.23                      # Spawn location
++#   y: 24.0
++#   z: -2.31
++#   enabled: true                 # Enable / disable this spawn
++#   intervalSeconds: 10           # Spawn check interval
++#   maxSpawns: 5                  # Max mobs PER WAVE
++#   maxAlive: 5                   # Max mobs alive at the same time
++#   # ---------------------------------------------
++#   # Arena Presence Detection (ANTI-AFK)
++#   # ---------------------------------------------
++#   arenaRadiusChunks: 2          # NEW in v1.2
++#
++#   # Player must be inside this chunk radius
++#   # for the spawn to be active.
++#
++#   # 0 = 1x1 Chunk  (16x16 blocks)
++#   # 1 = 3x3 Chunks (48x48 blocks)
++#   # 2 = 5x5 Chunks (80x80 blocks)   ← Recommended
++#   # 3 = 7x7 Chunks (112x112 blocks)
++#
++#   # ❌ Standing AFK does NOT create new mobs
++#   # ❌ Killing faster does NOT increase spawns
++#   # ✅ New wave only starts after players leave
++#   #    the arena and return after ~30 seconds
++#
++# ---------------------------------------------------------
+Index: src/main/java/org/plugin/theMob/hud/compass/CompassRenderer.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/org/plugin/theMob/hud/compass/CompassRenderer.java b/src/main/java/org/plugin/theMob/hud/compass/CompassRenderer.java
+--- a/src/main/java/org/plugin/theMob/hud/compass/CompassRenderer.java	(revision 1db801bce50fa1aaf70a3002b31d319dac5f7c47)
++++ b/src/main/java/org/plugin/theMob/hud/compass/CompassRenderer.java	(date 1766761027440)
+@@ -3,43 +3,45 @@
+ public final class CompassRenderer {
+ 
+     private static final int STEPS = 32;
+-    private static final int WINDOW = 21; // MUSS ungerade sein
++    private static final int WIDTH = 59; // ungerade
+     private static final String[] RING = new String[STEPS];
++
+     static {
+         for (int i = 0; i < STEPS; i++) {
+-            RING[i] = "-";
++            RING[i] = "·";
+         }
+         RING[0]  = "N";
+-        RING[4]  = "NO";
+-        RING[8]  = "O";
+-        RING[12] = "SO";
++        RING[8]  = "E";
+         RING[16] = "S";
+-        RING[20] = "SW";
+         RING[24] = "W";
+-        RING[28] = "NW";
+     }
++
+     public String render(float yaw) {
+-        float compassDeg = (yaw + 180f) % 360f; // 0(S) -> 180, 180(N)->0, -90(E)->90, 90(W)->270
+-        if (compassDeg < 0f) compassDeg += 360f;
+-        int center = Math.round((compassDeg / 360f) * STEPS) % STEPS;
+-        int half = WINDOW / 2;
++
++        float deg = (yaw + 180f) % 360f;
++        if (deg < 0f) deg += 360f;
++        int center = Math.round((deg / 360f) * STEPS) % STEPS;
++        int half = WIDTH / 2;
+         StringBuilder sb = new StringBuilder(128);
++        sb.append("§1⟮ ");
+         for (int offset = -half; offset <= half; offset++) {
+-            int idx = (center + offset + STEPS) % STEPS;
+             if (offset == 0) {
+-                sb.append("§f§l^");
++                sb.append("§f§l▲");
+                 continue;
+             }
+-            sb.append(gradientColor(offset)).append(RING[idx]);
++            int idx = (center + offset + STEPS) % STEPS;
++            sb.append(color(offset)).append(RING[idx]);
+         }
++        sb.append(" §1⟯");
+         return sb.toString();
+     }
+-    private String gradientColor(int offset) {
++    private String color(int offset) {
+         int d = Math.abs(offset);
++        if (d == 0) return "§f§l";
+         if (d <= 1) return "§f";
+-        if (d <= 2) return "§b";
+-        if (d <= 3) return "§3";
+-        if (d <= 5) return "§9";
+-        return "§1";
++        if (d <= 3) return "§b";
++        if (d <= 6) return "§9";
++        if (d <= 10) return "§1";
++        return "§0";
+     }
+ }
+Index: src/main/resources/stats.yml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/resources/stats.yml b/src/main/resources/stats.yml
+--- a/src/main/resources/stats.yml	(revision 1db801bce50fa1aaf70a3002b31d319dac5f7c47)
++++ b/src/main/resources/stats.yml	(date 1766761510209)
+@@ -1,17 +1,48 @@
++# =========================================================
++#  Player Stats Menu Configuration
++#  Status: In Development
++# =========================================================
++#
++#  This menu defines the player stats overview GUI.
++#  Each stat entry is fully configurable and optional.
++#
++#  You can:
++#   • Reorder stats via slot
++#   • Disable stats by removing entries
++#   • Change icons, names and value paths
++#
++#  Slot range: 0–53 (6 rows)
++# =========================================================
++
+ menu:
++  # Title shown at the top of the inventory
+   title: "Your Stats"
++
++  # Inventory size (must be multiple of 9)
+   size: 54
+ 
+ stats:
+ 
++  # -------------------------------------------------------
++  # Base Health
++  # -------------------------------------------------------
++  # Represents the player's core health pool.
++  # Usually increased via leveling or gear.
++  #
+   health:
+     name: "❤ Health"
+     slot: 0
+-    value-path: "player.health"
+-    level-path: "player.level.health"
+-    next-path: "player.next.health"
++    value-path: "player.health"          # Current stat value
++    level-path: "player.level.health"    # Current stat level
++    next-path: "player.next.health"      # Value required for next level
+     icon: "HEART_OF_THE_SEA"
+ 
++  # -------------------------------------------------------
++  # Bonus Health
++  # -------------------------------------------------------
++  # Additional health on top of base health.
++  # Often granted by perks, items or buffs.
++  #
+   bonus_health:
+     name: "❤+ Health+"
+     slot: 10
+@@ -20,6 +51,9 @@
+     next-path: "player.next.health"
+     icon: "GOLDEN_APPLE"
+ 
++  # -------------------------------------------------------
++  # Armor (Vanilla-style damage reduction)
++  # -------------------------------------------------------
+   armor:
+     name: "⛨ Defense"
+     slot: 45
+@@ -28,6 +62,12 @@
+     next-path: "player.next.armor"
+     icon: "SHIELD"
+ 
++  # -------------------------------------------------------
++  # Advanced Defense
++  # -------------------------------------------------------
++  # Non-vanilla damage mitigation (RPG-style).
++  # Can be used for custom formulas.
++  #
+   defense:
+     name: "⛨+ Defense+"
+     slot: 37
+@@ -36,14 +76,9 @@
+     next-path: "player.next.defense"
+     icon: "NETHERITE_SCRAP"
+ 
+-  extra_damage:
+-    name: "⚔ Extra Dmg"
+-    slot: 8
+-    value-path: "player.extra_damage"
+-    level-path: "player.level.extra_damage"
+-    next-path: "player.next.extra_damage"
+-    icon: "ANVIL"
+-
++  # -------------------------------------------------------
++  # Base Damage
++  # -------------------------------------------------------
+   damage:
+     name: "⚔ Damage"
+     slot: 5
+@@ -52,6 +87,20 @@
+     next-path: "player.next.damage"
+     icon: "DIAMOND"
+ 
++  # -------------------------------------------------------
++  # Extra Damage (additive bonus)
++  # -------------------------------------------------------
++  extra_damage:
++    name: "⚔ Extra Dmg"
++    slot: 8
++    value-path: "player.extra_damage"
++    level-path: "player.level.extra_damage"
++    next-path: "player.next.extra_damage"
++    icon: "ANVIL"
++
++  # -------------------------------------------------------
++  # Critical Hit Chance
++  # -------------------------------------------------------
+   crit_chance:
+     name: "✨ Crit Chance"
+     slot: 43
+@@ -60,6 +109,9 @@
+     next-path: "player.next.crit"
+     icon: "AMETHYST_SHARD"
+ 
++  # -------------------------------------------------------
++  # Critical Damage Multiplier
++  # -------------------------------------------------------
+   crit_multiplier:
+     name: "✨ Crit Multiplicator"
+     slot: 53
+@@ -68,6 +120,11 @@
+     next-path: "player.next.crit_multiplier"
+     icon: "GLOWSTONE_DUST"
+ 
++  # -------------------------------------------------------
++  # Lifesteal
++  # -------------------------------------------------------
++  # Converts a percentage of dealt damage into health.
++  #
+   lifesteal:
+     name: "⚡ Lifesteal"
+     slot: 16
+@@ -76,6 +133,9 @@
+     next-path: "player.next.lifesteal"
+     icon: "NETHER_WART"
+ 
++  # -------------------------------------------------------
++  # Movement Speed
++  # -------------------------------------------------------
+   movement_speed:
+     name: "🩸 Move Speed"
+     slot: 20
+@@ -84,6 +144,9 @@
+     next-path: "player.next.movement_speed"
+     icon: "DIAMOND_BOOTS"
+ 
++  # -------------------------------------------------------
++  # Attack Speed
++  # -------------------------------------------------------
+   attack_speed:
+     name: "⚡ Attack Speed"
+     slot: 24
+@@ -92,6 +155,11 @@
+     next-path: "player.next.attack_speed"
+     icon: "WIND_CHARGE"
+ 
++  # -------------------------------------------------------
++  # Luck
++  # -------------------------------------------------------
++  # Influences drop chances, rolls and RNG-based systems.
++  #
+   luck:
+     name: "🍀 Luck"
+     slot: 29
+@@ -100,6 +168,9 @@
+     next-path: "player.next.luck"
+     icon: "RABBIT_FOOT"
+ 
++  # -------------------------------------------------------
++  # Knockback Resistance
++  # -------------------------------------------------------
+   knockback_resistance:
+     name: "🛑 Knockback Res."
+     slot: 33
+@@ -108,7 +179,26 @@
+     next-path: "player.next.knockback_resistance"
+     icon: "HEAVY_CORE"
+ 
++
++# =========================================================
++#  Status Tier System
++# =========================================================
++#
++#  Each tier array defines progression breakpoints.
++#  Index = level, value = stat increase at that level.
++#
++#  You can:
++#   • Add more tiers for longer progression
++#   • Reduce tiers for shorter servers
++#   • Fine-tune balance per stat
++#
++#  IMPORTANT:
++#  Tier count should match your max stat level.
++# =========================================================
++
+ status_system:
++
++  # Health tiers (total max health)
+   health_tiers:
+     - 10
+     - 16
+@@ -121,6 +211,7 @@
+     - 81
+     - 93
+ 
++  # Armor tiers (vanilla-style armor points)
+   armor_tiers:
+     - 5
+     - 12
+@@ -133,6 +224,7 @@
+     - 66
+     - 79
+ 
++  # Base damage tiers
+   damage_tiers:
+     - 7
+     - 13
+@@ -145,6 +237,7 @@
+     - 74
+     - 85
+ 
++  # Extra damage tiers (additive bonus)
+   extra_damage_tiers:
+     - 5
+     - 10
+@@ -157,6 +250,7 @@
+     - 80
+     - 90
+ 
++  # Critical hit chance tiers (%)
+   crit_tiers:
+     - 7
+     - 14
+@@ -169,6 +263,7 @@
+     - 63
+     - 70
+ 
++  # Critical damage multiplier tiers (%)
+   crit_multiplier_tiers:
+     - 10
+     - 20
+@@ -181,7 +276,7 @@
+     - 90
+     - 100
+ 
+-
++  # Lifesteal tiers (%)
+   lifesteal_tiers:
+     - 5
+     - 10
+@@ -194,6 +289,7 @@
+     - 45
+     - 50
+ 
++  # Advanced defense tiers
+   defense_tiers:
+     - 3
+     - 8
+@@ -207,6 +303,7 @@
+     - 71
+     - 80
+ 
++  # Movement speed tiers (added to base speed)
+   movement_speed_tiers:
+     - 0.01
+     - 0.02
+@@ -219,6 +316,7 @@
+     - 0.09
+     - 0.10
+ 
++  # Attack speed tiers
+   attack_speed_tiers:
+     - 0.5
+     - 1.0
+@@ -231,6 +329,7 @@
+     - 4.5
+     - 5.0
+ 
++  # Knockback resistance tiers (0.0–1.0)
+   knockback_resistance_tiers:
+     - 0.05
+     - 0.10
+@@ -243,6 +342,7 @@
+     - 0.80
+     - 0.90
+ 
++  # Luck tiers (flat value)
+   luck_tiers:
+     - 1
+     - 2
+Index: src/main/java/org/plugin/theMob/mob/spawn/AutoSpawnManager.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/org/plugin/theMob/mob/spawn/AutoSpawnManager.java b/src/main/java/org/plugin/theMob/mob/spawn/AutoSpawnManager.java
+--- a/src/main/java/org/plugin/theMob/mob/spawn/AutoSpawnManager.java	(revision 1db801bce50fa1aaf70a3002b31d319dac5f7c47)
++++ b/src/main/java/org/plugin/theMob/mob/spawn/AutoSpawnManager.java	(date 1766760756154)
+@@ -1,89 +1,233 @@
+ package org.plugin.theMob.mob.spawn;
+ 
+ import org.bukkit.Bukkit;
++import org.bukkit.Location;
+ import org.bukkit.World;
+-import org.bukkit.configuration.ConfigurationSection;
+-import org.bukkit.configuration.file.FileConfiguration;
+-import org.bukkit.configuration.file.YamlConfiguration;
+ import org.bukkit.entity.LivingEntity;
++import org.bukkit.entity.Player;
+ import org.bukkit.persistence.PersistentDataType;
+-import org.bukkit.plugin.Plugin;
++import org.bukkit.plugin.java.JavaPlugin;
++import org.bukkit.scheduler.BukkitRunnable;
+ import org.plugin.theMob.core.KeyRegistry;
+ import org.plugin.theMob.mob.MobManager;
++import org.plugin.theMob.spawn.SpawnPoint;
+ 
+-import java.io.File;
+-import java.io.IOException;
+-import java.util.HashMap;
+ import java.util.Map;
++import java.util.Set;
++import java.util.UUID;
++import java.util.concurrent.ConcurrentHashMap;
+ 
+ public final class AutoSpawnManager {
+ 
+-    private final Plugin plugin;
+-    private File stateFile;
+-    private final Map<String, Integer> alive = new HashMap<>();
+-    private final Map<String, Long> lastSpawn = new HashMap<>();
+-    private long lastValidation = 0L;
+-    public AutoSpawnManager(Plugin plugin) {
++    private static final long RESET_TICKS = 20L * 60L; // 60s
++
++    private final JavaPlugin plugin;
++    private final MobManager mobs;
++    private final KeyRegistry keys;
++
++    private final Map<String, SpawnPoint> points = new ConcurrentHashMap<>();
++    private final Map<String, Integer> spawnedCount = new ConcurrentHashMap<>();
++    private final Map<String, Long> lastSpawnTick = new ConcurrentHashMap<>();
++    private final Map<String, Boolean> activeCycle = new ConcurrentHashMap<>();
++    private final Map<String, Set<UUID>> alive = new ConcurrentHashMap<>();
++
++    public AutoSpawnManager(JavaPlugin plugin, MobManager mobs, KeyRegistry keys) {
+         this.plugin = plugin;
+-    }
+-// LOAD / SAVE
+-    public void load() {
+-        loadState();
+-    }
+-    private void loadState() {
+-        stateFile = new File(plugin.getDataFolder(), "auto_spawn_state.yml");
+-        if (!stateFile.exists()) return;
+-        FileConfiguration state = YamlConfiguration.loadConfiguration(stateFile);
+-        ConfigurationSection sec = state.getConfigurationSection("spawners");
+-        if (sec == null) return;
+-        for (String id : sec.getKeys(false)) {
+-            alive.put(id, sec.getInt(id + ".alive", 0));
+-            lastSpawn.put(id, sec.getLong(id + ".last_spawn", 0L));
+-        }
+-    }
+-    public void saveState() {
+-        if (stateFile == null) return;
+-        YamlConfiguration out = new YamlConfiguration();
+-        for (String id : alive.keySet()) {
+-            out.set("spawners." + id + ".alive", alive.get(id));
+-            out.set("spawners." + id + ".last_spawn", lastSpawn.getOrDefault(id, 0L));
+-        }
+-        try {
+-            out.save(stateFile);
+-        } catch (IOException e) {
+-            plugin.getLogger().severe("Could not save auto_spawn_state.yml");
+-        }
++        this.mobs = mobs;
++        this.keys = keys;
+     }
+-// COUNTERS
+-    public int alive(String id) {
+-        return alive.getOrDefault(id, 0);
+-    }
+-    public void incrementAlive(String id) {
+-        alive.put(id, alive(id) + 1);
++    // =====================================================
++    // LIFECYCLE
++    // =====================================================
++
++    public void start() {
++        new BukkitRunnable() {
++            @Override public void run() {
++                tick();
++            }
++        }.runTaskTimer(plugin, 20L, 20L);
+     }
+-    public void decrementAlive(String id) {
+-        alive.put(id, Math.max(0, alive(id) - 1));
+-    }
+-    public void updateLastSpawn(String id) {
+-        lastSpawn.put(id, System.currentTimeMillis());
+-    }
+-// VALIDATION (ANTI-DESYNC)
+-    public void validateAliveCounts(MobManager mobs, KeyRegistry keys) {
+-        long now = System.currentTimeMillis();
+-        if (now - lastValidation < 30_000L) return;
+-        lastValidation = now;
+-        Map<String, Integer> real = new HashMap<>();
+-        for (World w : Bukkit.getWorlds()) {
+-            for (LivingEntity le : w.getLivingEntities()) {
+-                if (!mobs.isCustomMob(le)) continue;
+-                if (!le.getPersistentDataContainer()
+-                        .has(keys.AUTO_SPAWNED, PersistentDataType.INTEGER)) continue;
+-                String id = mobs.mobIdOf(le);
+-                if (id == null) continue;
+-                real.merge(id, 1, Integer::sum);
+-            }
+-        }
++
++    public void stop() {
++        points.clear();
++        spawnedCount.clear();
++        lastSpawnTick.clear();
++        activeCycle.clear();
+         alive.clear();
+-        alive.putAll(real);
++    }
++    // =====================================================
++    // REGISTRATION
++    // =====================================================
++
++    public void register(SpawnPoint sp) {
++        String id = sp.spawnId();
++        points.put(id, sp);
++        spawnedCount.put(id, 0);
++        lastSpawnTick.put(id, (long) Bukkit.getCurrentTick());
++        activeCycle.put(id, true); // START IMMEDIATELY
++        alive.put(id, ConcurrentHashMap.newKeySet());
++    }
++
++    public void unregister(String spawnId) {
++        points.remove(spawnId);
++        spawnedCount.remove(spawnId);
++        lastSpawnTick.remove(spawnId);
++        activeCycle.remove(spawnId);
++        alive.remove(spawnId);
++    }
++    // =====================================================
++    // DEATH TRACKING (NO REFILL!)
++    // =====================================================
++
++    public void onEntityDeath(LivingEntity e) {
++        String id = e.getPersistentDataContainer()
++                .get(keys.AUTO_SPAWN_ID, PersistentDataType.STRING);
++        if (id == null) return;
++
++        Set<UUID> set = alive.get(id);
++        if (set != null) set.remove(e.getUniqueId());
++    }
++    // =====================================================
++    // CORE TICK
++    // =====================================================
++
++    private void tick() {
++        long now = Bukkit.getCurrentTick();
++
++        for (SpawnPoint sp : points.values()) {
++            if (!sp.enabled()) continue;
++
++            String id = sp.spawnId();
++            Location base = sp.baseLocation();
++            if (base == null) continue;
++
++            World world = base.getWorld();
++            if (world == null) continue;
++
++            boolean playerNearby = false;
++
++            int cx = sp.baseChunkX();
++            int cz = sp.baseChunkZ();
++
++            for (Player p : world.getPlayers()) {
++                int pcx = p.getLocation().getBlockX() >> 4;
++                int pcz = p.getLocation().getBlockZ() >> 4;
++
++                if (Math.abs(pcx - cx) <= sp.arenaRadiusChunks()
++                        && Math.abs(pcz - cz) <= sp.arenaRadiusChunks()) {
++                    playerNearby = true;
++                    sp.markPlayerSeen(now);
++                    break;
++                }
++            }
++            if (!playerNearby && sp.inactiveFor(RESET_TICKS, now)) {
++
++                World w = base.getWorld();
++                if (w != null) {
++                    for (LivingEntity e : w.getLivingEntities()) {
++
++                        String sid = e.getPersistentDataContainer()
++                                .get(keys.AUTO_SPAWN_ID, PersistentDataType.STRING);
++
++                        if (id.equals(sid)) {
++                            e.remove();
++                        }
++                    }
++                }
++                alive.get(id).clear();
++                spawnedCount.put(id, 0);
++                activeCycle.put(id, true);
++                lastSpawnTick.put(id, now);
++
++                continue;
++            }
++            if (!playerNearby) {
++                continue;
++            }
++
++            if (Boolean.TRUE.equals(activeCycle.get(id))) {
++
++                int spawned = spawnedCount.get(id);
++                if (spawned >= sp.maxSpawns()) {
++                    activeCycle.put(id, false);
++                    continue;
++                }
++
++                long last = lastSpawnTick.get(id);
++                long intervalTicks = sp.intervalSeconds() * 20L;
++
++                if (now - last >= intervalTicks) {
++                    spawnOne(sp);
++                    spawnedCount.put(id, spawned + 1);
++                    lastSpawnTick.put(id, now);
++                }
++            }
++        }
++    }
++
++
++    private void spawnOne(SpawnPoint sp) {
++        LivingEntity mob = mobs.spawnCustomMob(
++                sp.mobId(),
++                sp.spawnId(),
++                sp.baseLocation()
++        );
++        if (mob == null) return;
++
++        mob.getPersistentDataContainer()
++                .set(keys.AUTO_SPAWN_ID, PersistentDataType.STRING, sp.spawnId());
++
++        alive.get(sp.spawnId()).add(mob.getUniqueId());
++    }
++    public void forceCleanupIfEmpty(SpawnPoint sp) {
++        Location base = sp.baseLocation();
++        if (base == null || base.getWorld() == null) return;
++
++        World world = base.getWorld();
++
++        int cx = sp.baseChunkX();
++        int cz = sp.baseChunkZ();
++        int radius = sp.arenaRadiusChunks();
++
++        for (Player p : world.getPlayers()) {
++            int pcx = p.getLocation().getBlockX() >> 4;
++            int pcz = p.getLocation().getBlockZ() >> 4;
++
++            if (Math.abs(pcx - cx) <= radius
++                    && Math.abs(pcz - cz) <= radius) {
++                return; // ❌ noch Spieler da
++            }
++        }
++
++        for (LivingEntity e : world.getLivingEntities()) {
++
++            if (!e.getPersistentDataContainer()
++                    .has(keys.MOB_ID, PersistentDataType.STRING)) {
++                continue;
++            }
++
++            if (isInArenaChunks(e.getLocation(), sp)) {
++                e.remove();
++            }
++
++        }
++
++        String id = sp.spawnId();
++        Set<UUID> set = alive.get(id);
++        if (set != null) set.clear();
++
++        spawnedCount.put(id, 0);
++        activeCycle.put(id, true);
++        lastSpawnTick.put(id, (long) Bukkit.getCurrentTick());
++    }
++    private boolean isInArenaChunks(Location loc, SpawnPoint sp) {
++        if (loc == null || loc.getWorld() == null) return false;
++        if (!loc.getWorld().getName().equals(sp.worldName())) return false;
++
++        int cx = loc.getBlockX() >> 4;
++        int cz = loc.getBlockZ() >> 4;
++
++        return Math.abs(cx - sp.baseChunkX()) <= sp.arenaRadiusChunks()
++                && Math.abs(cz - sp.baseChunkZ()) <= sp.arenaRadiusChunks();
+     }
+ }
+Index: src/main/resources/config.yml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/resources/config.yml b/src/main/resources/config.yml
+--- a/src/main/resources/config.yml	(revision 1db801bce50fa1aaf70a3002b31d319dac5f7c47)
++++ b/src/main/resources/config.yml	(date 1766709263115)
+@@ -1,8 +1,52 @@
+-# =============================================
+-#  TheMob – GLOBAL CONFIGURATION
+-# =============================================
++# =========================================================
++#  TheMob – Global Configuration
++# =========================================================
++#
++#  Welcome to TheMob.
++#
++#  TheMob is a high-performance RPG mob framework
++#  designed for survival worlds, arenas and long-running servers.
++#
++#  Focus:
++#   • Smart auto spawn logic (hot / cold arenas)
++#   • Zero AFK farming
++#   • Minimal tick impact
++#   • Fully configurable mobs & drops
++#
++#  Built for servers that care about performance,
++#  fairness and a natural gameplay experience.
++#
++# ---------------------------------------------------------
++#  Design Philosophy
++# ---------------------------------------------------------
++#
++#  When players pause, the world should breathe with them.
++#  When they return, it should feel alive again.
++#
++#  Inspired by real survival gameplay —
++#  not in theory, but in practice.
++#
++# ---------------------------------------------------------
++#  Version
++# ---------------------------------------------------------
++#  Plugin Version: v1.2
++#  Status: Stable / Production Ready
++#
++# =========================================================
+ 
+ plugin:
++
++  # -------------------------------------------------------
++  # Debug Mode
++  # -------------------------------------------------------
++  #
++  # Enables detailed logging for:
++  #  • Mob spawning
++  #  • AutoSpawn lifecycle
++  #  • Reset & inactivity detection
++  #
++  # Recommended:
++  #  - true  → during setup / testing
++  #  - false → on production servers
++  #
+   debug: true
+-#Comming in V2.0 language: "de"
+-#Comming in V2.0 license-key: ey432...insert your key

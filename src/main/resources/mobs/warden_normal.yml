@@ -1,0 +1,78 @@
+# =========================================================
+# TheMob – Mob Configuration Example
+# =========================================================
+#
+# This file defines a CUSTOM MOB.
+# It can be used for arenas, events or RPG worlds.
+#
+# The mob behavior, stats, drops and rewards
+# are fully configurable.
+#
+# =========================================================
+
+mob-id: warden_normal           # Unique ID (file name or explicit)
+base-type: WARDEN               # Vanilla entity type
+
+# ---------------------------------------------------------
+# Display
+# ---------------------------------------------------------
+name: "&8Warden"                # Dark, intimidating name
+display-health: true            # Show health above mob (HUD)
+
+# ---------------------------------------------------------
+# Stats
+# ---------------------------------------------------------
+stats:
+  health:
+    max: 500                    # Massive health pool
+    current: 500                # Spawn health
+  movement-speed: 0.30          # Fast for its size
+  attack-damage: 30             # Extremely high melee damage
+
+# ---------------------------------------------------------
+# Abilities
+# ---------------------------------------------------------
+abilities:
+  knockback-resistant: true     # Cannot be knocked back
+
+# ---------------------------------------------------------
+# Death Commands
+# ---------------------------------------------------------
+# Executed when a PLAYER kills this mob
+# Placeholders like {player} are supported
+death-commands:
+  - "broadcast &8The Warden has been defeated by &7{player}&8."
+
+# ---------------------------------------------------------
+# Drops
+# ---------------------------------------------------------
+# Drops are rolled independently
+# chance = 1.0 means 100%
+# chance = 0.5 means 50%
+#
+# No vanilla drops are used – ONLY these
+# ---------------------------------------------------------
+drops:
+  - item: SCULK_CATALYST
+    amount: 1
+    chance: 0.25                # 25% chance
+
+  - item: ECHO_SHARD
+    amount: 1
+    chance: 0.15                # 15% chance
+
+# ---------------------------------------------------------
+# Notes for Admins
+# ---------------------------------------------------------
+#
+# ⚠ VERY STRONG MOB
+#
+# ✔ Intended for late-game arenas or events
+# ✔ Not suitable for early AutoSpawns
+# ✔ Knockback immunity prevents cheese tactics
+#
+# Tip:
+# Use low spawn caps and long intervals
+# or place this mob only in boss arenas.
+#
+# =========================================================
