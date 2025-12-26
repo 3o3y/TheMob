@@ -1,0 +1,84 @@
+# =========================================================
+# TheMob – Mob Configuration Example
+# =========================================================
+#
+# This file defines a CUSTOM MOB.
+# It can be used for arenas, events or RPG worlds.
+#
+# The mob behavior, stats, drops and rewards
+# are fully configurable.
+#
+# =========================================================
+
+mob-id: zombie_mob_template            # Unique ID (file name or explicit)
+base-type: ZOMBIE                      # Vanilla entity type
+
+# ---------------------------------------------------------
+# Display
+# ---------------------------------------------------------
+name: "&b&lZombie"             # Colored mob name
+display-health: true           # Show health above mob (HUD)
+
+# ---------------------------------------------------------
+# Stats
+# ---------------------------------------------------------
+stats:
+  health:
+    max: 20                    # Max health (10 hearts)
+    current: 20                # Spawn health
+  movement-speed: 0.23         # Vanilla = ~0.23
+  attack-damage: 0             # 0 = harmless (good for events / early game)
+
+# ---------------------------------------------------------
+# Death Commands
+# ---------------------------------------------------------
+# Executed when a PLAYER kills this mob
+# Placeholders like {player} are supported
+death-commands:
+  - "give {player} carrot 1"
+
+# ---------------------------------------------------------
+# Drops
+# ---------------------------------------------------------
+# Drops are rolled independently
+# chance = 1.0 means 100%
+# chance = 0.5 means 50%
+#
+# No vanilla drops are used – ONLY these
+# ---------------------------------------------------------
+drops:
+  - item: ROTTEN_FLESH
+    amount: 2
+    chance: 1.0                # Always drops
+  - item: BONE
+    amount: 3
+    chance: 0.8                # 80% chance
+  - item: STRING
+    amount: 4
+    chance: 0.6                # 60% chance
+  - item: STICK
+    amount: 2
+    chance: 0.4                # 40% chance
+  - item: GOLDEN_APPLE
+    amount: 1
+    chance: 0.12               # Rare drop (12%)
+  - item: DIAMOND
+    amount: 1
+    chance: 0.08               # Very rare (8%)
+  - item: GOLDEN_CARROT
+    amount: 1
+    chance: 0.04               # Ultra rare (4%)
+
+# ---------------------------------------------------------
+# Notes for Admins
+# ---------------------------------------------------------
+#
+# ✔ This mob can be used safely in AutoSpawns
+# ✔ Drops are balanced for early / mid game
+# ✔ No AFK farming possible (AutoSpawn controlled)
+#
+# Tip:
+# Use this mob as a base template
+# and scale stats + drops for higher tiers.
+#
+# =========================================================

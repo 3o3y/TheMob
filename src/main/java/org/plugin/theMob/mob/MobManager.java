@@ -1,4 +1,3 @@
-// src/main/java/org/plugin/theMob/mob/MobManager.java
 package org.plugin.theMob.mob;
 
 import org.bukkit.Bukkit;
@@ -36,10 +35,9 @@ public final class MobManager {
         this.configs = configs;
         this.keys = keys;
     }
-
-    public JavaPlugin plugin() {
-        return plugin;
-    }
+    // =====================================================
+    // INIT / RELOAD
+    // =====================================================
 
     public void reloadFromConfigs() {
         mobConfigs.clear();
@@ -48,27 +46,60 @@ public final class MobManager {
         bossTemplates.clear();
         for (Map.Entry<String, FileConfiguration> e : mobConfigs.entrySet()) {
             BossTemplate tpl = BossTemplateParser.tryParse(e.getKey(), e.getValue());
-            if (tpl != null && tpl.hasPhases()) bossTemplates.put(e.getKey(), tpl);
+            if (tpl != null && tpl.hasPhases()) {
+                bossTemplates.put(e.getKey(), tpl);
+            }
         }
-        plugin.getLogger().info("[TheMob] Loaded " + mobConfigs.size() + " mob ymls | bosses=" + bossTemplates.size());
-    }
 
-    public void setSpawnService(MobSpawnService spawnService) {
-        this.spawnService = spawnService;
+        plugin.getLogger().info(
+                "[TheMob] Loaded " + mobConfigs.size() +
+                        " mob configs | bosses=" + bossTemplates.size()
+        );
     }
+    // =====================================================
+    // SPAWN
+    // =====================================================
 
-    public boolean spawnCustomMob(String id, Location loc) {
+    public LivingEntity spawnCustomMob(String mobId, String spawnId, Location loc) {
         if (spawnService == null) {
             plugin.getLogger().severe("[TheMob] SpawnService not set!");
-            return false;
+            return null;
         }
-        return spawnService.spawn(id, loc);
+        return spawnService.spawn(mobId, spawnId, loc);
+    }
+    // =====================================================
+    // LOOKUPS
+    // =====================================================
+    public String baseNameOf(LivingEntity e) {
+        if (e == null) return null;
+        return e.getPersistentDataContainer()
+                .get(keys.BASE_NAME, PersistentDataType.STRING);
     }
 
+    public FileConfiguration mobConfigOf(LivingEntity mob) {
+        if (mob == null) return null;
+
+        String id = mobIdOf(mob);
+        if (id == null || id.isBlank()) return null;
+
+        return mobConfigs.get(id.toLowerCase(java.util.Locale.ROOT));
+    }
     public FileConfiguration mobConfigById(String id) {
         if (id == null) return null;
-        return mobConfigs.get(id.toLowerCase(Locale.ROOT));
+        return mobConfigs.get(id.toLowerCase(java.util.Locale.ROOT));
     }
+    public boolean hasBossTemplate(String mobId) {
+        if (mobId == null) return false;
+        return bossTemplates.containsKey(mobId.toLowerCase(java.util.Locale.ROOT));
+    }
+    public BossTemplate bossTemplate(String id) {
+        if (id == null) return null;
+        return bossTemplates.get(id.toLowerCase(java.util.Locale.ROOT));
+    }
+    public java.util.Set<String> registeredIds() {
+        return java.util.Collections.unmodifiableSet(mobConfigs.keySet());
+    }
+
 
     public boolean mobExists(String id) {
         return id != null && mobConfigs.containsKey(id.toLowerCase(Locale.ROOT));
@@ -78,41 +109,41 @@ public final class MobManager {
         return e != null && mobIdOf(e) != null;
     }
 
-    public boolean isBoss(LivingEntity e) {
-        if (e == null) return false;
-        Integer flag = e.getPersistentDataContainer().get(keys.IS_BOSS, PersistentDataType.INTEGER);
-        if (flag != null) return flag == 1;
-        String id = mobIdOf(e);
-        return id != null && bossTemplates.containsKey(id.toLowerCase(Locale.ROOT));
-    }
-
     public String mobIdOf(LivingEntity e) {
         if (e == null) return null;
-        return e.getPersistentDataContainer().get(keys.MOB_ID, PersistentDataType.STRING);
+        return e.getPersistentDataContainer()
+                .get(keys.MOB_ID, PersistentDataType.STRING);
     }
 
-    public String baseNameOf(LivingEntity e) {
-        if (e == null) return null;
-        return e.getPersistentDataContainer().get(keys.BASE_NAME, PersistentDataType.STRING);
-    }
+    public boolean isBoss(LivingEntity e) {
+        if (e == null) return false;
 
-    public BossTemplate bossTemplate(String id) {
-        if (id == null) return null;
-        return bossTemplates.get(id.toLowerCase(Locale.ROOT));
-    }
+        Integer flag = e.getPersistentDataContainer()
+                .get(keys.IS_BOSS, PersistentDataType.INTEGER);
+        if (flag != null) return flag == 1;
 
-    public Set<String> registeredIds() {
-        return Collections.unmodifiableSet(mobConfigs.keySet());
+        String id = mobIdOf(e);
+        return id != null && bossTemplates.containsKey(id.toLowerCase(Locale.ROOT));
     }
 
     public KeyRegistry keys() {
         return keys;
     }
+    // =====================================================
+    // DEATH HANDLING
+    // =====================================================
 
     public void onMobDeath(LivingEntity mob, EntityDeathEvent e) {
-        if (dropEngine != null) dropEngine.handleDeath(mob, e);
-        if (healthDisplay != null) healthDisplay.onDeath(mob);
+        if (dropEngine != null) {
+            dropEngine.handleDeath(mob, e);
+        }
+        if (healthDisplay != null) {
+            healthDisplay.onDeath(mob);
+        }
     }
+    // =====================================================
+    // ADMIN
+    // =====================================================
 
     public void killAll() {
         int removed = 0;
@@ -125,20 +156,19 @@ public final class MobManager {
         }
         plugin.getLogger().info("[TheMob] Removed " + removed + " custom mobs.");
     }
-    public FileConfiguration mobConfigOf(LivingEntity mob) {
-        if (mob == null) return null;
+    // =====================================================
+    // SETTERS
+    // =====================================================
 
-        String id = mobIdOf(mob);
-        if (id == null || id.isBlank()) return null;
-
-        return mobConfigs.get(id.toLowerCase(Locale.ROOT));
+    public void setSpawnService(MobSpawnService spawnService) {
+        this.spawnService = spawnService;
     }
 
-    public boolean hasBossTemplate(String mobId) {
-        if (mobId == null) return false;
-        return bossTemplates.containsKey(mobId.toLowerCase(Locale.ROOT));
+    public void setDropEngine(MobDropEngine dropEngine) {
+        this.dropEngine = dropEngine;
     }
 
-    public void setDropEngine(MobDropEngine dropEngine) { this.dropEngine = dropEngine; }
-    public void setHealthDisplay(MobHealthDisplay display) { this.healthDisplay = display; }
+    public void setHealthDisplay(MobHealthDisplay display) {
+        this.healthDisplay = display;
+    }
 }

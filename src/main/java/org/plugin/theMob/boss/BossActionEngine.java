@@ -51,17 +51,21 @@ public final class BossActionEngine {
             double dz = (rnd.nextDouble() * 2 - 1) * radius;
             Location loc = base.clone().add(dx, 0, dz);
             LivingEntity spawned = null;
+
             if (customMinionId != null && plugin.mobs().mobExists(customMinionId)) {
-                boolean ok = plugin.mobs().spawnCustomMob(customMinionId, loc);
-                if (ok) {
-                    spawned = findNearestCustomAt(loc, customMinionId, 2.0);
-                }
+                String spawnId = "boss:" + boss.getUniqueId() + ":minion";
+                spawned = plugin.mobs().spawnCustomMob(customMinionId, spawnId, loc);
             }
+
             if (spawned == null && fallbackType != null) {
                 var ent = w.spawnEntity(loc, fallbackType);
-                if (ent instanceof LivingEntity le) spawned = le;
+                if (ent instanceof LivingEntity le) {
+                    spawned = le;
+                }
             }
+
             if (spawned == null) continue;
+
             spawned.getPersistentDataContainer().set(
                     plugin.keys().NO_DROPS,
                     PersistentDataType.INTEGER,

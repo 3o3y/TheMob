@@ -1,8 +1,52 @@
-# =============================================
-#  TheMob – GLOBAL CONFIGURATION
-# =============================================
+# =========================================================
+#  TheMob – Global Configuration
+# =========================================================
+#
+#  Welcome to TheMob.
+#
+#  TheMob is a high-performance RPG mob framework
+#  designed for survival worlds, arenas and long-running servers.
+#
+#  Focus:
+#   • Smart auto spawn logic (hot / cold arenas)
+#   • Zero AFK farming
+#   • Minimal tick impact
+#   • Fully configurable mobs & drops
+#
+#  Built for servers that care about performance,
+#  fairness and a natural gameplay experience.
+#
+# ---------------------------------------------------------
+#  Design Philosophy
+# ---------------------------------------------------------
+#
+#  When players pause, the world should breathe with them.
+#  When they return, it should feel alive again.
+#
+#  Inspired by real survival gameplay —
+#  not in theory, but in practice.
+#
+# ---------------------------------------------------------
+#  Version
+# ---------------------------------------------------------
+#  Plugin Version: v1.2
+#  Status: Stable / Production Ready
+#
+# =========================================================
 
 plugin:
+
+  # -------------------------------------------------------
+  # Debug Mode
+  # -------------------------------------------------------
+  #
+  # Enables detailed logging for:
+  #  • Mob spawning
+  #  • AutoSpawn lifecycle
+  #  • Reset & inactivity detection
+  #
+  # Recommended:
+  #  - true  → during setup / testing
+  #  - false → on production servers
+  #
   debug: true
-#Comming in V2.0 language: "de"
-#Comming in V2.0 license-key: ey432...insert your key

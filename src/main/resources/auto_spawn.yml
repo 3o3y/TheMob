@@ -1,1 +1,45 @@
+# =========================================================
+# TheMob – AutoSpawn Configuration
+# =========================================================
+#
+# AutoSpawns create controlled mob waves for arenas,
+# events or RPG zones.
+#
+# 🔒 AFK farming is PREVENTED by design.
+# 🔁 Spawns only reset when players leave and return.
+#
+# =========================================================
+
 spawns: []
+
+# ---------------------------------------------------------
+# Example AutoSpawn
+# ---------------------------------------------------------
+# - mobId: skeleton_normal        # Mob config ID (from /mobs/)
+#   world: world                  # World name
+#   x: 37.23                      # Spawn location
+#   y: 24.0
+#   z: -2.31
+#   enabled: true                 # Enable / disable this spawn
+#   intervalSeconds: 10           # Spawn check interval
+#   maxSpawns: 5                  # Max mobs PER WAVE
+#   maxAlive: 5                   # Max mobs alive at the same time
+#   # ---------------------------------------------
+#   # Arena Presence Detection (ANTI-AFK)
+#   # ---------------------------------------------
+#   arenaRadiusChunks: 2          # NEW in v1.2
+#
+#   # Player must be inside this chunk radius
+#   # for the spawn to be active.
+#
+#   # 0 = 1x1 Chunk  (16x16 blocks)
+#   # 1 = 3x3 Chunks (48x48 blocks)
+#   # 2 = 5x5 Chunks (80x80 blocks)   ← Recommended
+#   # 3 = 7x7 Chunks (112x112 blocks)
+#
+#   # ❌ Standing AFK does NOT create new mobs
+#   # ❌ Killing faster does NOT increase spawns
+#   # ✅ New wave only starts after players leave
+#   #    the arena and return after ~30 seconds
+#
+# ---------------------------------------------------------

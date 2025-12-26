@@ -1,4 +1,3 @@
-// src/main/java/org/plugin/theMob/core/ConfigService.java
 package org.plugin.theMob.core;
 
 import org.bukkit.configuration.ConfigurationSection;
@@ -18,37 +17,68 @@ public final class ConfigService {
     private File autoSpawnFile;
     private File statsFile;
 
-    // atomic swap targets (reload-safe)
     private volatile FileConfiguration autoSpawnCfg;
     private volatile FileConfiguration statsCfg;
     private volatile Map<String, FileConfiguration> mobConfigs = Map.of();
+    // =====================================================
+    // DEFAULT MOB YMLS (shipped with plugin JAR)
+    // =====================================================
+    private static final List<String> DEFAULT_MOBS = List.of(
+            "mob_template.yml",
+            "boss_template.yml",
+            "skeleton_normal.yml",
+            "spider_normal.yml",
+            "warden_normal.yml",
+            "pig_normal.yml"
+    );
 
     public ConfigService(JavaPlugin plugin) {
         this.plugin = plugin;
     }
-
     // =====================================================
     // INIT
     // =====================================================
     public void ensureFoldersAndDefaults() {
-        if (!plugin.getDataFolder().exists()) plugin.getDataFolder().mkdirs();
+        if (!plugin.getDataFolder().exists()) {
+            plugin.getDataFolder().mkdirs();
+        }
 
         mobsFolder = new File(plugin.getDataFolder(), "mobs");
-        if (!mobsFolder.exists()) mobsFolder.mkdirs();
+        if (!mobsFolder.exists()) {
+            mobsFolder.mkdirs();
+        }
 
         autoSpawnFile = new File(plugin.getDataFolder(), "auto_spawn.yml");
         statsFile = new File(plugin.getDataFolder(), "stats.yml");
 
-        if (!autoSpawnFile.exists()) plugin.saveResource("auto_spawn.yml", false);
-        if (!statsFile.exists()) plugin.saveResource("stats.yml", false);
+        if (!autoSpawnFile.exists()) {
+            plugin.saveResource("auto_spawn.yml", false);
+        }
 
-        // example defaults (only if missing)
-        File z1 = new File(mobsFolder, "zombie_normal.yml");
-        File z2 = new File(mobsFolder, "zombie_boss.yml");
-        if (!z1.exists()) plugin.saveResource("mobs/zombie_normal.yml", false);
-        if (!z2.exists()) plugin.saveResource("mobs/zombie_boss.yml", false);
+        if (!statsFile.exists()) {
+            plugin.saveResource("stats.yml", false);
+        }
+
+        copyDefaultMobConfigs();
     }
 
+    private void copyDefaultMobConfigs() {
+        for (String fileName : DEFAULT_MOBS) {
+            File out = new File(mobsFolder, fileName);
+            if (out.exists()) {
+                continue; // never overwrite
+            }
+
+            try {
+                plugin.saveResource("mobs/" + fileName, false);
+                plugin.getLogger().info("[Config] Installed default mob: " + fileName);
+            } catch (IllegalArgumentException ex) {
+                plugin.getLogger().warning(
+                        "[Config] Default mob resource missing in JAR: mobs/" + fileName
+                );
+            }
+        }
+    }
     // =====================================================
     // RELOAD (v1.1 hardened)
     // =====================================================
@@ -65,18 +95,17 @@ public final class ConfigService {
         }
         autoSpawnCfg = cfg;
     }
-
     public void reloadStats() {
         statsCfg = YamlConfiguration.loadConfiguration(statsFile);
     }
 
-    /**
-     * YAML validation + atomic swap
-     */
     public void reloadMobsValidated() {
         Map<String, FileConfiguration> next = new HashMap<>(256);
 
-        File[] files = mobsFolder.listFiles((dir, name) -> name.toLowerCase(Locale.ROOT).endsWith(".yml"));
+        File[] files = mobsFolder.listFiles(
+                (dir, name) -> name.toLowerCase(Locale.ROOT).endsWith(".yml")
+        );
+
         if (files == null) {
             mobConfigs = Map.of();
             return;
@@ -87,32 +116,22 @@ public final class ConfigService {
 
         for (File f : files) {
             FileConfiguration cfg = YamlConfiguration.loadConfiguration(f);
-
-            // -------------------------
-            // mob-id (required)
-            // -------------------------
             String mobId = cfg.getString("mob-id");
             if (mobId == null || mobId.isBlank()) {
                 mobId = f.getName().substring(0, f.getName().length() - 4);
             }
             mobId = mobId.toLowerCase(Locale.ROOT);
-
-            // -------------------------
-            // type / base-type (required)
-            // -------------------------
             String type = cfg.getString("type");
             if (type == null || type.isBlank()) {
                 type = cfg.getString("base-type");
             }
             if (type == null || type.isBlank()) {
-                plugin.getLogger().warning("[Config] " + mobId + " skipped: missing type/base-type");
+                plugin.getLogger().warning(
+                        "[Config] " + mobId + " skipped: missing type/base-type"
+                );
                 bad++;
                 continue;
             }
-
-            // -------------------------
-            // health (required)
-            // -------------------------
             double hp;
             if (cfg.isDouble("stats.health")) {
                 hp = cfg.getDouble("stats.health");
@@ -121,14 +140,12 @@ public final class ConfigService {
             }
 
             if (hp <= 0) {
-                plugin.getLogger().warning("[Config] " + mobId + " skipped: stats.health <= 0");
+                plugin.getLogger().warning(
+                        "[Config] " + mobId + " skipped: stats.health <= 0"
+                );
                 bad++;
                 continue;
             }
-
-            // -------------------------
-            // phase validation (safe)
-            // -------------------------
             ConfigurationSection ps = cfg.getConfigurationSection("phases");
             if (ps != null) {
                 for (String pid : ps.getKeys(false)) {
@@ -146,10 +163,10 @@ public final class ConfigService {
         }
 
         mobConfigs = Collections.unmodifiableMap(next);
-        plugin.getLogger().info("[Config] Mob configs loaded: ok=" + ok + " bad=" + bad);
+        plugin.getLogger().info(
+                "[Config] Mob configs loaded: ok=" + ok + " bad=" + bad
+        );
     }
-
-
     // =====================================================
     // SAVE
     // =====================================================
@@ -157,21 +174,20 @@ public final class ConfigService {
         try {
             autoSpawnCfg.save(autoSpawnFile);
         } catch (IOException e) {
-            plugin.getLogger().severe("[Config] Could not save auto_spawn.yml: " + e.getMessage());
+            plugin.getLogger().severe(
+                    "[Config] Could not save auto_spawn.yml: " + e.getMessage()
+            );
         }
     }
-
     // =====================================================
     // GETTERS (READ-ONLY)
     // =====================================================
     public Map<String, FileConfiguration> mobConfigs() {
         return mobConfigs;
     }
-
     public FileConfiguration autoSpawn() {
         return autoSpawnCfg;
     }
-
     public FileConfiguration stats() {
         return statsCfg;
     }

@@ -1,89 +1,233 @@
 package org.plugin.theMob.mob.spawn;
 
 import org.bukkit.Bukkit;
+import org.bukkit.Location;
 import org.bukkit.World;
-import org.bukkit.configuration.ConfigurationSection;
-import org.bukkit.configuration.file.FileConfiguration;
-import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.LivingEntity;
+import org.bukkit.entity.Player;
 import org.bukkit.persistence.PersistentDataType;
-import org.bukkit.plugin.Plugin;
+import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scheduler.BukkitRunnable;
 import org.plugin.theMob.core.KeyRegistry;
 import org.plugin.theMob.mob.MobManager;
+import org.plugin.theMob.spawn.SpawnPoint;
 
-import java.io.File;
-import java.io.IOException;
-import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 public final class AutoSpawnManager {
 
-    private final Plugin plugin;
-    private File stateFile;
-    private final Map<String, Integer> alive = new HashMap<>();
-    private final Map<String, Long> lastSpawn = new HashMap<>();
-    private long lastValidation = 0L;
-    public AutoSpawnManager(Plugin plugin) {
+    private static final long RESET_TICKS = 20L * 60L; // 60s
+
+    private final JavaPlugin plugin;
+    private final MobManager mobs;
+    private final KeyRegistry keys;
+
+    private final Map<String, SpawnPoint> points = new ConcurrentHashMap<>();
+    private final Map<String, Integer> spawnedCount = new ConcurrentHashMap<>();
+    private final Map<String, Long> lastSpawnTick = new ConcurrentHashMap<>();
+    private final Map<String, Boolean> activeCycle = new ConcurrentHashMap<>();
+    private final Map<String, Set<UUID>> alive = new ConcurrentHashMap<>();
+
+    public AutoSpawnManager(JavaPlugin plugin, MobManager mobs, KeyRegistry keys) {
         this.plugin = plugin;
+        this.mobs = mobs;
+        this.keys = keys;
     }
-// LOAD / SAVE
-    public void load() {
-        loadState();
+    // =====================================================
+    // LIFECYCLE
+    // =====================================================
+
+    public void start() {
+        new BukkitRunnable() {
+            @Override public void run() {
+                tick();
+            }
+        }.runTaskTimer(plugin, 20L, 20L);
     }
-    private void loadState() {
-        stateFile = new File(plugin.getDataFolder(), "auto_spawn_state.yml");
-        if (!stateFile.exists()) return;
-        FileConfiguration state = YamlConfiguration.loadConfiguration(stateFile);
-        ConfigurationSection sec = state.getConfigurationSection("spawners");
-        if (sec == null) return;
-        for (String id : sec.getKeys(false)) {
-            alive.put(id, sec.getInt(id + ".alive", 0));
-            lastSpawn.put(id, sec.getLong(id + ".last_spawn", 0L));
-        }
+
+    public void stop() {
+        points.clear();
+        spawnedCount.clear();
+        lastSpawnTick.clear();
+        activeCycle.clear();
+        alive.clear();
     }
-    public void saveState() {
-        if (stateFile == null) return;
-        YamlConfiguration out = new YamlConfiguration();
-        for (String id : alive.keySet()) {
-            out.set("spawners." + id + ".alive", alive.get(id));
-            out.set("spawners." + id + ".last_spawn", lastSpawn.getOrDefault(id, 0L));
-        }
-        try {
-            out.save(stateFile);
-        } catch (IOException e) {
-            plugin.getLogger().severe("Could not save auto_spawn_state.yml");
-        }
+    // =====================================================
+    // REGISTRATION
+    // =====================================================
+
+    public void register(SpawnPoint sp) {
+        String id = sp.spawnId();
+        points.put(id, sp);
+        spawnedCount.put(id, 0);
+        lastSpawnTick.put(id, (long) Bukkit.getCurrentTick());
+        activeCycle.put(id, true); // START IMMEDIATELY
+        alive.put(id, ConcurrentHashMap.newKeySet());
     }
-// COUNTERS
-    public int alive(String id) {
-        return alive.getOrDefault(id, 0);
+
+    public void unregister(String spawnId) {
+        points.remove(spawnId);
+        spawnedCount.remove(spawnId);
+        lastSpawnTick.remove(spawnId);
+        activeCycle.remove(spawnId);
+        alive.remove(spawnId);
     }
-    public void incrementAlive(String id) {
-        alive.put(id, alive(id) + 1);
+    // =====================================================
+    // DEATH TRACKING (NO REFILL!)
+    // =====================================================
+
+    public void onEntityDeath(LivingEntity e) {
+        String id = e.getPersistentDataContainer()
+                .get(keys.AUTO_SPAWN_ID, PersistentDataType.STRING);
+        if (id == null) return;
+
+        Set<UUID> set = alive.get(id);
+        if (set != null) set.remove(e.getUniqueId());
     }
-    public void decrementAlive(String id) {
-        alive.put(id, Math.max(0, alive(id) - 1));
-    }
-    public void updateLastSpawn(String id) {
-        lastSpawn.put(id, System.currentTimeMillis());
-    }
-// VALIDATION (ANTI-DESYNC)
-    public void validateAliveCounts(MobManager mobs, KeyRegistry keys) {
-        long now = System.currentTimeMillis();
-        if (now - lastValidation < 30_000L) return;
-        lastValidation = now;
-        Map<String, Integer> real = new HashMap<>();
-        for (World w : Bukkit.getWorlds()) {
-            for (LivingEntity le : w.getLivingEntities()) {
-                if (!mobs.isCustomMob(le)) continue;
-                if (!le.getPersistentDataContainer()
-                        .has(keys.AUTO_SPAWNED, PersistentDataType.INTEGER)) continue;
-                String id = mobs.mobIdOf(le);
-                if (id == null) continue;
-                real.merge(id, 1, Integer::sum);
+    // =====================================================
+    // CORE TICK
+    // =====================================================
+
+    private void tick() {
+        long now = Bukkit.getCurrentTick();
+
+        for (SpawnPoint sp : points.values()) {
+            if (!sp.enabled()) continue;
+
+            String id = sp.spawnId();
+            Location base = sp.baseLocation();
+            if (base == null) continue;
+
+            World world = base.getWorld();
+            if (world == null) continue;
+
+            boolean playerNearby = false;
+
+            int cx = sp.baseChunkX();
+            int cz = sp.baseChunkZ();
+
+            for (Player p : world.getPlayers()) {
+                int pcx = p.getLocation().getBlockX() >> 4;
+                int pcz = p.getLocation().getBlockZ() >> 4;
+
+                if (Math.abs(pcx - cx) <= sp.arenaRadiusChunks()
+                        && Math.abs(pcz - cz) <= sp.arenaRadiusChunks()) {
+                    playerNearby = true;
+                    sp.markPlayerSeen(now);
+                    break;
+                }
+            }
+            if (!playerNearby && sp.inactiveFor(RESET_TICKS, now)) {
+
+                World w = base.getWorld();
+                if (w != null) {
+                    for (LivingEntity e : w.getLivingEntities()) {
+
+                        String sid = e.getPersistentDataContainer()
+                                .get(keys.AUTO_SPAWN_ID, PersistentDataType.STRING);
+
+                        if (id.equals(sid)) {
+                            e.remove();
+                        }
+                    }
+                }
+                alive.get(id).clear();
+                spawnedCount.put(id, 0);
+                activeCycle.put(id, true);
+                lastSpawnTick.put(id, now);
+
+                continue;
+            }
+            if (!playerNearby) {
+                continue;
+            }
+
+            if (Boolean.TRUE.equals(activeCycle.get(id))) {
+
+                int spawned = spawnedCount.get(id);
+                if (spawned >= sp.maxSpawns()) {
+                    activeCycle.put(id, false);
+                    continue;
+                }
+
+                long last = lastSpawnTick.get(id);
+                long intervalTicks = sp.intervalSeconds() * 20L;
+
+                if (now - last >= intervalTicks) {
+                    spawnOne(sp);
+                    spawnedCount.put(id, spawned + 1);
+                    lastSpawnTick.put(id, now);
+                }
             }
         }
-        alive.clear();
-        alive.putAll(real);
+    }
+
+
+    private void spawnOne(SpawnPoint sp) {
+        LivingEntity mob = mobs.spawnCustomMob(
+                sp.mobId(),
+                sp.spawnId(),
+                sp.baseLocation()
+        );
+        if (mob == null) return;
+
+        mob.getPersistentDataContainer()
+                .set(keys.AUTO_SPAWN_ID, PersistentDataType.STRING, sp.spawnId());
+
+        alive.get(sp.spawnId()).add(mob.getUniqueId());
+    }
+    public void forceCleanupIfEmpty(SpawnPoint sp) {
+        Location base = sp.baseLocation();
+        if (base == null || base.getWorld() == null) return;
+
+        World world = base.getWorld();
+
+        int cx = sp.baseChunkX();
+        int cz = sp.baseChunkZ();
+        int radius = sp.arenaRadiusChunks();
+
+        for (Player p : world.getPlayers()) {
+            int pcx = p.getLocation().getBlockX() >> 4;
+            int pcz = p.getLocation().getBlockZ() >> 4;
+
+            if (Math.abs(pcx - cx) <= radius
+                    && Math.abs(pcz - cz) <= radius) {
+                return; // ❌ noch Spieler da
+            }
+        }
+
+        for (LivingEntity e : world.getLivingEntities()) {
+
+            if (!e.getPersistentDataContainer()
+                    .has(keys.MOB_ID, PersistentDataType.STRING)) {
+                continue;
+            }
+
+            if (isInArenaChunks(e.getLocation(), sp)) {
+                e.remove();
+            }
+
+        }
+
+        String id = sp.spawnId();
+        Set<UUID> set = alive.get(id);
+        if (set != null) set.clear();
+
+        spawnedCount.put(id, 0);
+        activeCycle.put(id, true);
+        lastSpawnTick.put(id, (long) Bukkit.getCurrentTick());
+    }
+    private boolean isInArenaChunks(Location loc, SpawnPoint sp) {
+        if (loc == null || loc.getWorld() == null) return false;
+        if (!loc.getWorld().getName().equals(sp.worldName())) return false;
+
+        int cx = loc.getBlockX() >> 4;
+        int cz = loc.getBlockZ() >> 4;
+
+        return Math.abs(cx - sp.baseChunkX()) <= sp.arenaRadiusChunks()
+                && Math.abs(cz - sp.baseChunkZ()) <= sp.arenaRadiusChunks();
     }
 }

@@ -1,136 +1,241 @@
-// src/main/java/org/plugin/theMob/spawn/SpawnController.java
 package org.plugin.theMob.spawn;
 
-import org.bukkit.Bukkit;
 import org.bukkit.Location;
-import org.bukkit.World;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDeathEvent;
-import org.bukkit.scheduler.BukkitRunnable;
+import org.bukkit.event.player.PlayerChangedWorldEvent;
+import org.bukkit.event.player.PlayerMoveEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.player.PlayerTeleportEvent;
 import org.plugin.theMob.TheMob;
+import org.plugin.theMob.core.ConfigService;
 import org.plugin.theMob.core.KeyRegistry;
 import org.plugin.theMob.mob.MobManager;
 import org.plugin.theMob.mob.spawn.AutoSpawnManager;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 public final class SpawnController implements Listener {
 
+    private static final int DEFAULT_ARENA_RADIUS_CHUNKS = 2; // 5x5
+
     private final TheMob plugin;
     private final MobManager mobs;
-    private final AutoSpawnManager autoSpawnManager;
-    private final KeyRegistry keys;
-    private final Map<String, SpawnPoint> registry = new HashMap<>();
-    private final Map<String, BukkitRunnable> tasks = new HashMap<>();
+    private final AutoSpawnManager auto;
+    private final ConfigService configs;
+    private final Map<String, SpawnPoint> registry = new ConcurrentHashMap<>();
+    private final Map<UUID, Location> lastLocation = new ConcurrentHashMap<>();
+
+
     public SpawnController(
             TheMob plugin,
             MobManager mobs,
-            AutoSpawnManager autoSpawnManager,
+            AutoSpawnManager auto,
             KeyRegistry keys
     ) {
         this.plugin = plugin;
         this.mobs = mobs;
-        this.autoSpawnManager = autoSpawnManager;
-        this.keys = keys;
+        this.auto = auto;
+        this.configs = plugin.configs();
     }
-// LIFECYCLE
+    // =====================================================
+    // LIFECYCLE
+    // =====================================================
+
     public void start() {
-        reload();
-        plugin.getLogger().info("[AutoSpawn] Started (" + registry.size() + ")");
-    }
-    public void shutdown() {
-        tasks.values().forEach(BukkitRunnable::cancel);
-        tasks.clear();
-        registry.clear();
-    }
-    public void reload() {
-        shutdown();
         loadFromConfig();
-        for (SpawnPoint sp : registry.values()) {
-            schedule(sp);
-        }
+        auto.start();
     }
-// COMMAND API
-    public boolean startAutoSpawnAt(
-            String mobId,
-            Location loc,
-            int intervalSeconds,
-            int maxAlive
-    ) {
-        SpawnPoint sp = SpawnPoint.fromPlayerBlock(
+
+    public void stop() {
+        for (SpawnPoint sp : registry.values()) {
+            auto.unregister(sp.spawnId());
+        }
+        registry.clear();
+        auto.stop();
+    }
+    // =====================================================
+    // CREATE
+    // =====================================================
+
+    public boolean startAutoSpawn(String mobId, Location loc, int intervalSeconds, int maxSpawns) {
+        if (mobId == null || mobId.isBlank()) return false;
+        if (loc == null || loc.getWorld() == null) return false;
+        if (!mobs.mobExists(mobId)) return false;
+
+        SpawnPoint sp = new SpawnPoint(
                 mobId,
-                loc,
+                loc.getWorld().getName(),
+                loc.getBlockX(),
+                loc.getBlockY(),
+                loc.getBlockZ(),
                 intervalSeconds,
-                maxAlive
+                maxSpawns,
+                DEFAULT_ARENA_RADIUS_CHUNKS,
+                true
         );
+
         registry.put(sp.spawnId(), sp);
+        auto.register(sp);
         saveToConfig();
-        schedule(sp);
+
         return true;
     }
-    public boolean deleteAutoSpawn(String mobId) {
+    @EventHandler(ignoreCancelled = true)
+    public void onPlayerMove(PlayerMoveEvent e) {
+        lastLocation.put(e.getPlayer().getUniqueId(), e.getFrom());
+
+        if (e.getFrom().distanceSquared(e.getTo()) < 0.01) return;
+        handleArenaTransition(e.getFrom(), e.getTo());
+    }
+    @EventHandler
+    public void onQuit(PlayerQuitEvent e) {
+        Location last = lastLocation.remove(e.getPlayer().getUniqueId());
+        if (last != null) {
+            handleArenaExit(last);
+        }
+    }
+    @EventHandler(ignoreCancelled = true)
+    public void onTeleport(PlayerTeleportEvent e) {
+        lastLocation.put(e.getPlayer().getUniqueId(), e.getFrom());
+        handleArenaTransition(e.getFrom(), e.getTo());
+    }
+    @EventHandler
+    public void onWorldChange(PlayerChangedWorldEvent e) {
+        Location last = lastLocation.remove(e.getPlayer().getUniqueId());
+        if (last != null) {
+            handleArenaExit(last);
+        }
+    }
+    private void handleArenaTransition(Location from, Location to) {
+        for (SpawnPoint sp : registry.values()) {
+            boolean wasIn = isInside(sp, from);
+            boolean isIn  = isInside(sp, to);
+
+            if (wasIn && !isIn) {
+                auto.forceCleanupIfEmpty(sp);
+            }
+        }
+    }
+    private void handleArenaExit(Location loc) {
+        for (SpawnPoint sp : registry.values()) {
+            if (isInside(sp, loc)) {
+                auto.forceCleanupIfEmpty(sp);
+            }
+        }
+    }
+    private boolean isInside(SpawnPoint sp, Location loc) {
+        if (loc == null || loc.getWorld() == null) return false;
+        if (!loc.getWorld().getName().equals(sp.worldName())) return false;
+
+        int cx = loc.getBlockX() >> 4;
+        int cz = loc.getBlockZ() >> 4;
+
+        return Math.abs(cx - sp.baseChunkX()) <= sp.arenaRadiusChunks()
+                && Math.abs(cz - sp.baseChunkZ()) <= sp.arenaRadiusChunks();
+    }
+    // =====================================================
+    // DELETE
+    // =====================================================
+
+    public boolean deleteAutoSpawnByMobId(String mobId) {
         boolean removed = false;
-        Iterator<Map.Entry<String, SpawnPoint>> it = registry.entrySet().iterator();
-        while (it.hasNext()) {
+
+        for (Iterator<Map.Entry<String, SpawnPoint>> it = registry.entrySet().iterator(); it.hasNext();) {
             Map.Entry<String, SpawnPoint> e = it.next();
             if (!e.getValue().mobId().equalsIgnoreCase(mobId)) continue;
-            BukkitRunnable r = tasks.remove(e.getKey());
-            if (r != null) r.cancel();
+
+            auto.unregister(e.getKey());
             it.remove();
             removed = true;
         }
-        if (removed) saveToConfig();
+
+        if (removed) {
+            saveToConfig();
+        }
         return removed;
     }
-// INTERNAL
-    private void schedule(SpawnPoint sp) {
-        World world = Bukkit.getWorld(sp.world());
-        if (world == null) return;
-        BukkitRunnable task = new BukkitRunnable() {
-            @Override
-            public void run() {
-                if (!sp.enabled()) return;
-                if (!world.isChunkLoaded(sp.chunkX(), sp.chunkZ())) return;
-                autoSpawnManager.validateAliveCounts(mobs, keys);
-                if (autoSpawnManager.alive(sp.mobId()) >= sp.maxAlive()) return;
-                boolean success = mobs.spawnCustomMob(
-                        sp.mobId(),
-                        sp.location(world)
+    // =====================================================
+    // CONFIG LOAD / SAVE
+    // =====================================================
+
+    @SuppressWarnings("unchecked")
+    private void loadFromConfig() {
+        registry.clear(); // 👈 safety
+        FileConfiguration cfg = configs.autoSpawn();
+        List<Map<String, Object>> list = (List<Map<String, Object>>) cfg.getList("spawns");
+
+        if (list == null || list.isEmpty()) return;
+
+        for (Map<String, Object> raw : list) {
+            try {
+                String mobId = (String) raw.get("mobId");
+                String world = (String) raw.get("world");
+
+                int x = (int) raw.get("x");
+                int y = (int) raw.get("y");
+                int z = (int) raw.get("z");
+
+                int interval = (int) raw.get("intervalSeconds");
+                int maxSpawns = (int) raw.get("maxSpawns");
+                int radius = (int) raw.getOrDefault("arenaRadiusChunks", DEFAULT_ARENA_RADIUS_CHUNKS);
+                boolean enabled = (boolean) raw.getOrDefault("enabled", true);
+                if (!enabled) continue;
+
+                if (!mobs.mobExists(mobId)) continue;
+
+                SpawnPoint sp = new SpawnPoint(
+                        mobId,
+                        world,
+                        x, y, z,
+                        interval,
+                        maxSpawns,
+                        radius,
+                        enabled
                 );
-                if (!success) return;
-                autoSpawnManager.incrementAlive(sp.mobId());
-                autoSpawnManager.updateLastSpawn(sp.mobId());
+
+                registry.put(sp.spawnId(), sp);
+                auto.register(sp);
+
+            } catch (Exception ex) {
+                plugin.getLogger().warning("[AutoSpawn] Invalid entry skipped");
             }
-        };
-        task.runTaskTimer(plugin, 0L, sp.intervalSeconds() * 20L);
-        tasks.put(sp.spawnId(), task);
+        }
     }
-// CLEANUP
+
+    private void saveToConfig() {
+        FileConfiguration cfg = configs.autoSpawn();
+        List<Map<String, Object>> out = new ArrayList<>();
+
+        for (SpawnPoint sp : registry.values()) {
+            Map<String, Object> map = new LinkedHashMap<>();
+            map.put("mobId", sp.mobId());
+            map.put("world", sp.worldName());
+            map.put("x", sp.baseLocation().getBlockX());
+            map.put("y", sp.baseLocation().getBlockY());
+            map.put("z", sp.baseLocation().getBlockZ());
+            map.put("intervalSeconds", sp.intervalSeconds());
+            map.put("maxSpawns", sp.maxSpawns());
+            map.put("arenaRadiusChunks", sp.arenaRadiusChunks());
+            map.put("enabled", true);
+            out.add(map);
+        }
+
+        cfg.set("spawns", out);
+        configs.saveAutoSpawn();
+    }
+    // =====================================================
+    // DEATH EVENTS
+    // =====================================================
+
     @EventHandler
     public void onDeath(EntityDeathEvent e) {
         if (!(e.getEntity() instanceof LivingEntity le)) return;
-        String id = mobs.mobIdOf(le);
-        if (id == null) return;
-        autoSpawnManager.decrementAlive(id);
-    }
-// CONFIG
-    private void loadFromConfig() {
-        FileConfiguration cfg = plugin.configs().autoSpawn();
-        for (Map<?, ?> raw : cfg.getMapList("spawns")) {
-            SpawnPoint sp = SpawnPoint.fromMap(raw);
-            if (sp != null) registry.put(sp.spawnId(), sp);
-        }
-    }
-    private void saveToConfig() {
-        FileConfiguration cfg = plugin.configs().autoSpawn();
-        List<Map<String, Object>> out = new ArrayList<>();
-        for (SpawnPoint sp : registry.values()) {
-            out.add(sp.toMap());
-        }
-        cfg.set("spawns", out);
-        plugin.configs().saveAutoSpawn();
+        mobs.onMobDeath(le, e);
+        auto.onEntityDeath(le);
     }
 }

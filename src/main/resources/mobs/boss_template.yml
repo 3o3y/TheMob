@@ -1,35 +1,60 @@
-mob-id: zombie_boss
+# =========================================================
+# TheMob – Boss Mob Configuration
+# =========================================================
+#
+# This file defines a CUSTOM BOSS MOB.
+# It is intended for arenas, events and RPG endgame content.
+#
+# This mob uses:
+# - Multi-phase boss system
+# - Attribute scaling per phase
+# - Optional minion summoning
+# - Legendary / OP drops
+#
+# EVERYTHING in this file is fully configurable.
+#
+# =========================================================
+
+mob-id: zombie_boss_template # Command extension
 base-type: ZOMBIE
+
+# ---------------------------------------------------------
+# Vanilla Mob Type Reference (for Admins)
+# ---------------------------------------------------------
 # 🟢 PASSIVE MOBS (never attack players)
 # SHEEP # COW # PIG # CHICKEN # RABBIT # HORSE # DONKEY # MULE # LLAMA
 # GOAT # CAMEL # SNIFFER # TURTLE # BEE # AXOLOTL # FROG # TADPOLE # PARROT
 # CAT # OCELOT # SQUID # GLOW_SQUID
-
+#
 # 🟡 NEUTRAL MOBS (become aggressive when provoked)
 # ENDERMAN # WOLF # IRON_GOLEM # SNOW_GOLEM # PANDA # DOLPHIN # PIGLIN
 # TRADER_LLAMA # ZOMBIFIED_PIGLIN
-
+#
 # 🔴 HOSTILE MOBS (always aggressive)
 # ZOMBIE # HUSK # DROWNED # ZOMBIE_VILLAGER # SKELETON # STRAY # WITHER_SKELETON
 # CREEPER # SPIDER # CAVE_SPIDER # SLIME # MAGMA_CUBE # WITCH # VEX # EVOKER
 # VINDICATOR # PILLAGER # RAVAGER # GUARDIAN # ELDER_GUARDIAN # BLAZE # GHAST
 # PHANTOM # SILVERFISH # SHULKER # WARDEN
-
+#
 # 🟣 BOSS MOBS
 # WITHER # ENDER_DRAGON
-
+#
 # 🔵 WATER MOBS
-# COD # SALMON # PUFFERFISH # TROPICAL_FISH # SQUID # GLOW_SQUID # GUARDIAN
-# ELDER_GUARDIAN
-
+# COD # SALMON # PUFFERFISH # TROPICAL_FISH # SQUID # GLOW_SQUID
+# GUARDIAN # ELDER_GUARDIAN
+#
 # ⚙️ OTHER / NPC / UTILITY
 # VILLAGER # WANDERING_TRADER # ARMOR_STAND # ALLAY
-# =====================================================================
-# Example:
-# base-type: ZOMBIE   # choose one mob type from the lists above
+# ---------------------------------------------------------
+
+# ---------------------------------------------------------
+# Display
+# ---------------------------------------------------------
 name: "&2&lZombie King"
 display-health: true            # Show health bar / health display
-# BASE STATS
+# ---------------------------------------------------------
+# Base Stats
+# ---------------------------------------------------------
 stats:
   health:
     max: 750.0                   # Maximum health (1 heart = 2.0)
@@ -49,7 +74,9 @@ stats:
   scale: 1.0                    # Entity size multiplier (1.0 = default size)
   step-height: 0.6              # Max block height the mob can step up without jumping
   gravity: true                 # true = affected by gravity, false = floating entity
-# ABILITIES
+# ---------------------------------------------------------
+# Abilities & Flags !!!IN PROGRESS!!! NOT EVERYTHING IS WORKING!!!
+# ---------------------------------------------------------
 abilities:
   jump-boost:
     enabled: true               # Enables Jump Boost potion effect
@@ -85,7 +112,11 @@ abilities:
     regeneration:
       amplifier: 0              # Regeneration potion level
       permanent: false
-# BOSS PHASES
+# ---------------------------------------------------------
+# Boss Phases
+# ---------------------------------------------------------
+# Each phase is activated by remaining HP %
+# ---------------------------------------------------------
 phases:                               #This will make your Mob as a Boss Mob
   phase1:
     hp-range: "100-75"                # Active while boss health is between 100% and 75%

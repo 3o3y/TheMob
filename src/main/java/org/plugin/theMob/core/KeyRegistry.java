@@ -7,12 +7,15 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 public final class KeyRegistry {
-// ENTITY / MOB
+
     public final NamespacedKey MOB_ID;
     public final NamespacedKey BASE_NAME;
     public final NamespacedKey IS_BOSS;
     public final NamespacedKey NO_DROPS;
-// ITEM STATS
+
+    public final NamespacedKey AUTO_SPAWN_ID;    // STRING
+    public final NamespacedKey AUTO_SPAWN_FLAG;  // INTEGER (1)
+
     public final NamespacedKey DAMAGE;
     public final NamespacedKey EXTRA_DAMAGE;
     public final NamespacedKey CRIT;
@@ -25,26 +28,32 @@ public final class KeyRegistry {
     public final NamespacedKey ATTACK_SPEED;
     public final NamespacedKey KNOCKBACK_RESISTANCE;
     public final NamespacedKey LUCK;
+
     public final Map<String, NamespacedKey> ALL_STATS;
-    public final NamespacedKey AUTO_SPAWNED;
+
     public KeyRegistry(Plugin plugin) {
-        this.MOB_ID = new NamespacedKey(plugin, "mob_id");
-        this.BASE_NAME = new NamespacedKey(plugin, "base_name");
-        this.IS_BOSS = new NamespacedKey(plugin, "is_boss");
-        this.NO_DROPS = new NamespacedKey(plugin, "no_drops");
-        this.DAMAGE = new NamespacedKey(plugin, "damage");
-        this.EXTRA_DAMAGE = new NamespacedKey(plugin, "extra_damage");
-        this.CRIT = new NamespacedKey(plugin, "crit");
-        this.CRIT_MULTIPLIER = new NamespacedKey(plugin, "crit_multiplier");
-        this.LIFESTEAL = new NamespacedKey(plugin, "lifesteal");
-        this.ARMOR = new NamespacedKey(plugin, "armor");
-        this.DEFENSE = new NamespacedKey(plugin, "defense");
-        this.HEALTH = new NamespacedKey(plugin, "health");
-        this.MOVEMENT_SPEED = new NamespacedKey(plugin, "movement_speed");
-        this.ATTACK_SPEED = new NamespacedKey(plugin, "attack_speed");
-        this.KNOCKBACK_RESISTANCE = new NamespacedKey(plugin, "knockback_resistance");
-        this.LUCK = new NamespacedKey(plugin, "luck");
-        this.AUTO_SPAWNED = new NamespacedKey(plugin, "auto_spawned");
+
+        MOB_ID = new NamespacedKey(plugin, "mob_id");
+        BASE_NAME = new NamespacedKey(plugin, "base_name");
+        IS_BOSS = new NamespacedKey(plugin, "is_boss");
+        NO_DROPS = new NamespacedKey(plugin, "no_drops");
+
+        AUTO_SPAWN_ID   = new NamespacedKey(plugin, "auto_spawn_id");
+        AUTO_SPAWN_FLAG = new NamespacedKey(plugin, "auto_spawn_flag");
+
+        DAMAGE = new NamespacedKey(plugin, "damage");
+        EXTRA_DAMAGE = new NamespacedKey(plugin, "extra_damage");
+        CRIT = new NamespacedKey(plugin, "crit");
+        CRIT_MULTIPLIER = new NamespacedKey(plugin, "crit_multiplier");
+        LIFESTEAL = new NamespacedKey(plugin, "lifesteal");
+        ARMOR = new NamespacedKey(plugin, "armor");
+        DEFENSE = new NamespacedKey(plugin, "defense");
+        HEALTH = new NamespacedKey(plugin, "health");
+        MOVEMENT_SPEED = new NamespacedKey(plugin, "movement_speed");
+        ATTACK_SPEED = new NamespacedKey(plugin, "attack_speed");
+        KNOCKBACK_RESISTANCE = new NamespacedKey(plugin, "knockback_resistance");
+        LUCK = new NamespacedKey(plugin, "luck");
+
         Map<String, NamespacedKey> map = new LinkedHashMap<>();
         map.put("damage", DAMAGE);
         map.put("extra_damage", EXTRA_DAMAGE);
@@ -58,6 +67,7 @@ public final class KeyRegistry {
         map.put("attack_speed", ATTACK_SPEED);
         map.put("knockback_resistance", KNOCKBACK_RESISTANCE);
         map.put("luck", LUCK);
-        this.ALL_STATS = Map.copyOf(map);
+
+        ALL_STATS = Map.copyOf(map);
     }
 }
