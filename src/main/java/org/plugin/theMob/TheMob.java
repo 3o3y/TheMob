@@ -112,13 +112,26 @@ public final class TheMob extends JavaPlugin {
         );
         spawnController.start();
 
-        hud = new NaviHudService(
-                this,
-                playerBars,
-                new CompassRenderer(),
-                mobManager
+        boolean hudEnabled = getConfig().getBoolean(
+                "plugin.navigation-hud.enabled",
+                true
         );
-        hud.start();
+
+        if (hudEnabled) {
+            hud = new NaviHudService(
+                    this,
+                    playerBars,
+                    new CompassRenderer(),
+                    mobManager
+            );
+            hud.start();
+
+            Bukkit.getPluginManager().registerEvents(
+                    new NaviHudListener(hud),
+                    this
+            );
+        }
+
         playerStatCache = new PlayerStatCache(this);
         statsMenu = new StatsMenuService(this, playerStatCache);
         registerAllListeners();
@@ -175,6 +188,7 @@ public final class TheMob extends JavaPlugin {
             t.printStackTrace();
         }
 
+        reloadConfig();
         configService.reloadAll();
         mobManager.reloadFromConfigs();
 
@@ -208,16 +222,26 @@ public final class TheMob extends JavaPlugin {
                 keys
         );
         spawnController.start();
-
-
-
-        hud = new NaviHudService(
-                this,
-                playerBars,
-                new CompassRenderer(),
-                mobManager
+        boolean hudEnabled = getConfig().getBoolean(
+                "plugin.navigation-hud.enabled",
+                true
         );
-        hud.start();
+
+        if (hudEnabled) {
+            hud = new NaviHudService(
+                    this,
+                    playerBars,
+                    new CompassRenderer(),
+                    mobManager
+            );
+            hud.start();
+
+            Bukkit.getPluginManager().registerEvents(
+                    new NaviHudListener(hud),
+                    this
+            );
+        }
+
 
         registerAllListeners();
         registerCommands();
@@ -238,10 +262,10 @@ public final class TheMob extends JavaPlugin {
                 this
         );
         Bukkit.getPluginManager().registerEvents(
-                new MobListener(mobManager, healthDisplay, bossBars),
+                new MobListener(mobManager, healthDisplay, bossBars, keys),
                 this
         );
-        Bukkit.getPluginManager().registerEvents(new NaviHudListener(hud), this);
+
         Bukkit.getPluginManager().registerEvents(
                 new PlayerEquipListener(this, playerStatCache),
                 this

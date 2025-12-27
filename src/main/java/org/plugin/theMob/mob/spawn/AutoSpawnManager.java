@@ -19,7 +19,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public final class AutoSpawnManager {
 
-    private static final long RESET_TICKS = 20L * 60L; // 60s
+    private static final long RESET_TICKS = 20L * 300L; // 300s
 
     private final JavaPlugin plugin;
     private final MobManager mobs;

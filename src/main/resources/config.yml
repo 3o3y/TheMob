@@ -17,19 +17,9 @@
 #  fairness and a natural gameplay experience.
 #
 # ---------------------------------------------------------
-#  Design Philosophy
-# ---------------------------------------------------------
-#
-#  When players pause, the world should breathe with them.
-#  When they return, it should feel alive again.
-#
-#  Inspired by real survival gameplay —
-#  not in theory, but in practice.
-#
-# ---------------------------------------------------------
 #  Version
 # ---------------------------------------------------------
-#  Plugin Version: v1.2
+#  Plugin Version: v1.2 (v1.3 config-ready)
 #  Status: Stable / Production Ready
 #
 # =========================================================
@@ -37,16 +27,76 @@
 plugin:
 
   # -------------------------------------------------------
-  # Debug Mode
+  # Debug & Logging
   # -------------------------------------------------------
   #
-  # Enables detailed logging for:
+  # Enables additional logging for:
   #  • Mob spawning
   #  • AutoSpawn lifecycle
-  #  • Reset & inactivity detection
+  #  • Hot / cold detection
+  #  • Reset & inactivity logic
   #
-  # Recommended:
-  #  - true  → during setup / testing
-  #  - false → on production servers
+  debug: false
+
+  # -------------------------------------------------------
+  # Navigation HUD / Direction Bossbar
+  # -------------------------------------------------------
   #
-  debug: true
+  # Client-side HUD showing player facing direction
+  # and nearby mob activity via a BossBar.
+  #
+  navigation-hud:
+
+    enabled: true
+    # true  → HUD enabled
+    # false → completely disabled (zero overhead)
+
+    update-interval-ticks: 5
+    # How often the HUD updates
+    # 1 tick  = ultra smooth, higher CPU
+    # 5 ticks = recommended (default)
+    # 10+     = very low impact
+
+    hide-in-combat: false
+    # true  → hide HUD while player is fighting
+    # false → always visible
+
+    hide-when-idle: false
+    # true  → hide HUD if no mobs are detected
+    # false → always show
+
+    hide-in-creative: false
+    hide-in-spectator: true
+
+  # -------------------------------------------------------
+  # Mob Radar
+  # -------------------------------------------------------
+
+  # Controls how nearby mobs are detected
+  # for the Navigation HUD.
+    colors:
+      plugin-mob: PURPLE
+      aggressive-mob: RED
+      neutral-mob: YELLOW
+      passive-mob: GREEN
+      empty: WHITE
+
+  mob-radar:
+    scan-radius: 20
+    # Radius in blocks to search for mobs
+
+    scan-chunks:
+      horizontal: 1
+      vertical: 1
+    # Chunk scan radius (±chunks)
+
+    priority:
+      plugin-mobs: 1
+      aggressive: 2
+      neutral: 3
+      passive: 4
+
+    ignore:
+      bats: true
+      villagers: true
+      named-mobs: false

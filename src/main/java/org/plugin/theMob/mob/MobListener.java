@@ -1,23 +1,30 @@
 package org.plugin.theMob.mob;
 
+import org.bukkit.entity.ArmorStand;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDeathEvent;
+import org.bukkit.persistence.PersistentDataType;
 import org.plugin.theMob.boss.bar.BossBarService;
+import org.plugin.theMob.core.KeyRegistry;
 
 public final class MobListener implements Listener {
 
     private final MobManager mobs;
     private final BossBarService bossBars;
+    private final KeyRegistry keys;
 
     public MobListener(
             MobManager mobs,
-            org.plugin.theMob.ui.MobHealthDisplay ignored, // kept for constructor compatibility
-            BossBarService bossBars
+            org.plugin.theMob.ui.MobHealthDisplay ignored, // constructor compatibility
+            BossBarService bossBars,
+            KeyRegistry keys
     ) {
         this.mobs = mobs;
         this.bossBars = bossBars;
+        this.keys = keys;
     }
 
     @EventHandler
@@ -26,7 +33,27 @@ public final class MobListener implements Listener {
 
         if (!mobs.isCustomMob(mob)) return;
 
-        // Single source of truth for death handling
+        // =========================================
+        // 🔥 VISUAL CLEANUP (FLOATING HEAD)
+        // =========================================
+        if (mobs.isBoss(mob)) {
+            for (Entity nearby : mob.getWorld().getNearbyEntities(
+                    mob.getLocation(),
+                    3.0, 3.0, 3.0
+            )) {
+                if (nearby instanceof ArmorStand stand &&
+                        stand.getPersistentDataContainer().has(
+                                keys.VISUAL_HEAD,
+                                PersistentDataType.INTEGER
+                        )) {
+                    stand.remove();
+                }
+            }
+        }
+
+        // =========================================
+        // CORE DEATH HANDLING
+        // =========================================
         mobs.onMobDeath(mob, e);
 
         if (mobs.isBoss(mob) && bossBars != null) {

@@ -12,6 +12,8 @@ public final class KeyRegistry {
     public final NamespacedKey BASE_NAME;
     public final NamespacedKey IS_BOSS;
     public final NamespacedKey NO_DROPS;
+    public final NamespacedKey VISUAL_HEAD;
+
 
     public final NamespacedKey AUTO_SPAWN_ID;    // STRING
     public final NamespacedKey AUTO_SPAWN_FLAG;  // INTEGER (1)
@@ -37,6 +39,7 @@ public final class KeyRegistry {
         BASE_NAME = new NamespacedKey(plugin, "base_name");
         IS_BOSS = new NamespacedKey(plugin, "is_boss");
         NO_DROPS = new NamespacedKey(plugin, "no_drops");
+        VISUAL_HEAD = new NamespacedKey(plugin, "visual_head");
 
         AUTO_SPAWN_ID   = new NamespacedKey(plugin, "auto_spawn_id");
         AUTO_SPAWN_FLAG = new NamespacedKey(plugin, "auto_spawn_flag");

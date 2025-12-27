@@ -52,6 +52,26 @@ base-type: ZOMBIE
 # ---------------------------------------------------------
 name: "&2&lZombie King"
 display-health: true            # Show health bar / health display
+visual:                         # Get him a new Crown
+  helmet:
+    # What should float above the boss
+    #
+    # Supported values:
+    # - PLAYER_HEAD        → Custom textured head (crown, skull, etc.)
+    # - ANY Minecraft item or block
+    #
+    # Examples:
+    # - GOLDEN_CARROT
+    # - NETHER_STAR
+    # - DIAMOND_BLOCK
+    # - WITHER_SKELETON_SKULL
+    #
+    type: PLAYER_HEAD
+    # Base64 texture (ONLY for PLAYER_HEAD)
+    # Leave empty or remove if using an item or block
+    #
+    texture: "eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvOTFiMGE1YmJjNjk3YzBjNDJhNmNmMWI5YzRjNDQzNWIwNzMyMmZjZTViYjI3ZDgyYjY5MzA4NDNlNWFiN2EwOSJ9fX0="
+
 # ---------------------------------------------------------
 # Base Stats
 # ---------------------------------------------------------
@@ -71,7 +91,7 @@ stats:
   follow-range: 32.0            # Detection range in blocks
   luck: 0.0                     # Influences loot tables and random outcomes
   flying-speed: 0.4             # Movement speed while flying (only applies to flying mobs)
-  scale: 1.0                    # Entity size multiplier (1.0 = default size)
+  scale: 1.5                    # Entity size multiplier (1.0 = default size)
   step-height: 0.6              # Max block height the mob can step up without jumping
   gravity: true                 # true = affected by gravity, false = floating entity
 # ---------------------------------------------------------
@@ -160,7 +180,7 @@ phases:                               #This will make your Mob as a Boss Mob
       drowning: false                 # Immune to drowning
       lightning: false                # Immune to lightning strikes
       projectile: false               # Immune to arrows & projectiles
-      explosion: false                # Immune to explosions
+      explosion: false                # V1.4 - with Anti Glitch
     # ===== PHASE ACTIONS (COOLDOWN BASED) =====
     actions:
       summon-minions:
@@ -169,7 +189,7 @@ phases:                               #This will make your Mob as a Boss Mob
         amount: 0                     # Number of mobs
         radius: 5                     # Spawn radius in blocks
         cooldown: 15                  # Cooldown in seconds
-      blink:
+      blink:                          # V1.4 - with Anti Glitch
         enabled: false                # Enables short-range teleport
         radius: 8                     # Max teleport distance
         chance: 0                     # Chance in percent

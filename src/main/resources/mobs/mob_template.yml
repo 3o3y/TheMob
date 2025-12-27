@@ -28,6 +28,7 @@ stats:
     current: 20                # Spawn health
   movement-speed: 0.23         # Vanilla = ~0.23
   attack-damage: 0             # 0 = harmless (good for events / early game)
+  scale: 0.8                   # Entity size multiplier (1.0 = default size)
 
 # ---------------------------------------------------------
 # Death Commands

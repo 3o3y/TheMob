@@ -11,13 +11,17 @@
 # =========================================================
 mob-id: pig_lvl_1
 base-type: PIG
-name: "&fPig lvl 1"
+name: "&bPig King"
 display-health: true
+visual:                         # Get him a new Crown
+  helmet:
+    type: PORKCHOP
 stats:
   health:
     max: 12
     current: 12
   movement-speed: 0.205
+  scale: 2.5
 drops:
   - item: PORKCHOP
     amount: 1

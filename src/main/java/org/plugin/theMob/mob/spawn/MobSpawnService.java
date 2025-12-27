@@ -7,14 +7,17 @@ import org.bukkit.attribute.Attribute;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.LivingEntity;
+import org.bukkit.entity.Zombie;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 import org.plugin.theMob.boss.BossTemplate;
 import org.plugin.theMob.boss.bar.BossBarService;
 import org.plugin.theMob.boss.phase.BossPhaseController;
+import org.plugin.theMob.boss.spawn.ZombieBossFactory;
 import org.plugin.theMob.core.KeyRegistry;
 import org.plugin.theMob.mob.MobManager;
 import org.plugin.theMob.ui.MobHealthDisplay;
+import org.plugin.theMob.visual.MobVisualService;
 
 import java.util.Locale;
 
@@ -60,15 +63,54 @@ public final class MobSpawnService {
             return null;
         }
 
-        LivingEntity mob;
-        try {
-            mob = (LivingEntity) loc.getWorld().spawnEntity(loc, type);
-        } catch (Exception e) {
-            return null;
-        }
-
         boolean isBoss = mobs.hasBossTemplate(mobId);
 
+        LivingEntity mob;
+
+        // ===============================
+        // BOSS ZOMBIE
+        // ===============================
+        if (isBoss && type == EntityType.ZOMBIE) {
+
+            String headBase64 = cfg.getString("visual.helmet.texture", null);
+
+            Zombie zombie = ZombieBossFactory.spawnZombieBoss(
+                    plugin,
+                    loc,
+                    mobId,
+                    keys,
+                    cfg
+            );
+
+
+
+
+            mob = zombie;
+
+        } else {
+            try {
+                mob = (LivingEntity) loc.getWorld().spawnEntity(loc, type);
+            } catch (Exception e) {
+                return null;
+            }
+        }
+
+        // ===============================
+        // SCALE (Paper 1.20.5+)
+        // ===============================
+        if (cfg.contains("stats.scale")) {
+            double scale = cfg.getDouble("stats.scale", 1.0);
+            scale = Math.max(0.25, Math.min(5.0, scale));
+
+            var scaleAttr = mob.getAttribute(Attribute.SCALE);
+            if (scaleAttr != null && scale != 1.0) {
+                scaleAttr.setBaseValue(scale);
+            }
+        }
+
+        // ===============================
+        // METADATA
+        // ===============================
         mob.getPersistentDataContainer().set(keys.MOB_ID, PersistentDataType.STRING, mobId);
         mob.getPersistentDataContainer().set(keys.AUTO_SPAWN_ID, PersistentDataType.STRING, spawnId);
         mob.getPersistentDataContainer().set(keys.IS_BOSS, PersistentDataType.INTEGER, isBoss ? 1 : 0);
@@ -78,6 +120,9 @@ public final class MobSpawnService {
         );
         mob.getPersistentDataContainer().set(keys.BASE_NAME, PersistentDataType.STRING, name);
 
+        // ===============================
+        // HEALTH
+        // ===============================
         if (cfg.contains("stats.health.max")) {
             double max = cfg.getDouble("stats.health.max");
             var attr = mob.getAttribute(Attribute.MAX_HEALTH);
@@ -91,6 +136,9 @@ public final class MobSpawnService {
             healthDisplay.onSpawn(mob);
         }
 
+        // ===============================
+        // BOSS SYSTEM
+        // ===============================
         if (isBoss) {
             BossTemplate tpl = mobs.bossTemplate(mobId);
             Bukkit.getScheduler().runTask(plugin, () -> {
@@ -101,6 +149,19 @@ public final class MobSpawnService {
                 }
             });
         }
+
+        // ===============================
+// VISUAL (Crown / Floating Item)
+// ===============================
+        if (cfg.contains("visual.helmet.type")) {
+            MobVisualService.attachVisual(
+                    plugin,
+                    mob,
+                    cfg,
+                    keys
+            );
+        }
+
 
         return mob;
     }
