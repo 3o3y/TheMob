@@ -132,9 +132,13 @@ No client mods.
 🧭 Roadmap (Short Overview)
 
 ✅v1.1 – Stability & Performance✅
+
 ✅v1.2 – Performance Optimization✅
+
 ✅v1.2.1 – Stability & Configuration Hotfix✅
+
 ✅v1.3 – Boss Phase Depth ✅
+
 v1.4 – Player Feedback & HUD
 v1.5 – Combat Extensions
 v1.6 – Minions & Summons
