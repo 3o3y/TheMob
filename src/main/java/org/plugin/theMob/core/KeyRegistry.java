@@ -8,16 +8,29 @@ import java.util.Map;
 
 public final class KeyRegistry {
 
+    // =========================
+    // CORE MOB TAGS
+    // =========================
     public final NamespacedKey MOB_ID;
     public final NamespacedKey BASE_NAME;
     public final NamespacedKey IS_BOSS;
     public final NamespacedKey NO_DROPS;
     public final NamespacedKey VISUAL_HEAD;
 
-
+    // =========================
+    // AUTOSPAWN
+    // =========================
     public final NamespacedKey AUTO_SPAWN_ID;    // STRING
     public final NamespacedKey AUTO_SPAWN_FLAG;  // INTEGER (1)
 
+    // =========================
+    // BOSS META
+    // =========================
+    public final NamespacedKey BOSS_SPAWN_TIME;  // LONG (ms)
+
+    // =========================
+    // STATS
+    // =========================
     public final NamespacedKey DAMAGE;
     public final NamespacedKey EXTRA_DAMAGE;
     public final NamespacedKey CRIT;
@@ -30,20 +43,27 @@ public final class KeyRegistry {
     public final NamespacedKey ATTACK_SPEED;
     public final NamespacedKey KNOCKBACK_RESISTANCE;
     public final NamespacedKey LUCK;
+    public final NamespacedKey DROPS_DONE;
 
     public final Map<String, NamespacedKey> ALL_STATS;
 
     public KeyRegistry(Plugin plugin) {
 
+        // CORE
         MOB_ID = new NamespacedKey(plugin, "mob_id");
         BASE_NAME = new NamespacedKey(plugin, "base_name");
         IS_BOSS = new NamespacedKey(plugin, "is_boss");
         NO_DROPS = new NamespacedKey(plugin, "no_drops");
         VISUAL_HEAD = new NamespacedKey(plugin, "visual_head");
 
+        // AUTOSPAWN
         AUTO_SPAWN_ID   = new NamespacedKey(plugin, "auto_spawn_id");
         AUTO_SPAWN_FLAG = new NamespacedKey(plugin, "auto_spawn_flag");
 
+        // BOSS META
+        BOSS_SPAWN_TIME = new NamespacedKey(plugin, "boss_spawn_time");
+
+        // STATS
         DAMAGE = new NamespacedKey(plugin, "damage");
         EXTRA_DAMAGE = new NamespacedKey(plugin, "extra_damage");
         CRIT = new NamespacedKey(plugin, "crit");
@@ -56,6 +76,7 @@ public final class KeyRegistry {
         ATTACK_SPEED = new NamespacedKey(plugin, "attack_speed");
         KNOCKBACK_RESISTANCE = new NamespacedKey(plugin, "knockback_resistance");
         LUCK = new NamespacedKey(plugin, "luck");
+        DROPS_DONE = new NamespacedKey(plugin, "drops_done");
 
         Map<String, NamespacedKey> map = new LinkedHashMap<>();
         map.put("damage", DAMAGE);

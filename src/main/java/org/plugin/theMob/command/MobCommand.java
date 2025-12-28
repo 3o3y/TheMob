@@ -27,6 +27,40 @@ public final class MobCommand implements CommandExecutor {
             help(sender);
             return true;
         }
+
+        // =====================================================
+        // /mob list autospawn
+        // =====================================================
+        if (args[0].equalsIgnoreCase("list")
+                && args.length >= 2
+                && args[1].equalsIgnoreCase("autospawn")) {
+
+            if (!sender.hasPermission("themob.spawn.set")) {
+                sender.sendMessage("§cNo permission.");
+                return true;
+            }
+
+            var list = spawns.listAutoSpawns();
+
+            if (list.isEmpty()) {
+                sender.sendMessage("§7No auto-spawns configured.");
+                return true;
+            }
+
+            sender.sendMessage("§6§lAuto-Spawns:");
+            for (var s : list) {
+                sender.sendMessage(
+                        "§e- " + s.mobId() +
+                                " §7" + s.world() +
+                                " §f" + s.x() + ", " + s.y() + ", " + s.z()
+                );
+            }
+            return true;
+        }
+
+        // =====================================================
+        // EXISTIERENDE COMMANDS (unverändert)
+        // =====================================================
         if (args[0].equalsIgnoreCase("reload")) {
             if (!sender.hasPermission("themob.reload")) {
                 sender.sendMessage("§cNo permission.");
@@ -36,6 +70,7 @@ public final class MobCommand implements CommandExecutor {
             sender.sendMessage("§a[TheMob] Reloaded.");
             return true;
         }
+
         if (args[0].equalsIgnoreCase("spawn")) {
             if (!(sender instanceof Player p)) {
                 sender.sendMessage("§cOnly players can spawn mobs.");
@@ -61,6 +96,7 @@ public final class MobCommand implements CommandExecutor {
             p.sendMessage("§aSpawned mob: §e" + id);
             return true;
         }
+
         if (args[0].equalsIgnoreCase("autospawn")) {
             if (!(sender instanceof Player p)) {
                 sender.sendMessage("§cOnly players can use this command.");
@@ -92,11 +128,6 @@ public final class MobCommand implements CommandExecutor {
                 return true;
             }
 
-            if (seconds <= 0 || maxSpawns <= 0) {
-                sender.sendMessage("§cSeconds and maxSpawns must be > 0.");
-                return true;
-            }
-
             boolean ok = spawns.startAutoSpawn(
                     id,
                     p.getLocation(),
@@ -105,13 +136,12 @@ public final class MobCommand implements CommandExecutor {
             );
 
             sender.sendMessage(ok
-                    ? "§aAuto-spawn created for §e" + id +
-                    " §7(1 mob every " + seconds +
-                    "s, max " + maxSpawns + " per cycle)"
+                    ? "§aAuto-spawn created for §e" + id
                     : "§cFailed to create auto-spawn."
             );
             return true;
         }
+
         if (args[0].equalsIgnoreCase("del")
                 && args.length >= 3
                 && args[1].equalsIgnoreCase("autospawn")) {
@@ -130,6 +160,7 @@ public final class MobCommand implements CommandExecutor {
             );
             return true;
         }
+
         if (args[0].equalsIgnoreCase("killall")) {
             if (!sender.hasPermission("themob.killall")) {
                 sender.sendMessage("§cNo permission.");
@@ -147,6 +178,7 @@ public final class MobCommand implements CommandExecutor {
     private void help(CommandSender s) {
         s.sendMessage("§e/mob spawn <mob-id>");
         s.sendMessage("§e/mob autospawn <mob-id> <seconds> <maxSpawns>");
+        s.sendMessage("§e/mob list autospawn");
         s.sendMessage("§e/mob del autospawn <mob-id>");
         s.sendMessage("§e/mob killall");
         s.sendMessage("§e/mob reload");

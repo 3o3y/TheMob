@@ -79,19 +79,19 @@ stats:
   health:
     max: 750.0                   # Maximum health (1 heart = 2.0)
     current: 750.0               # Health value when the mob spawns
-  movement-speed: 0.23          # Base movement speed (vanilla zombie ≈ 0.23)
+  movement-speed: 0.3          # Base movement speed (vanilla zombie ≈ 0.23)
   attack:
-    damage: 6.0                 # Base melee attack damage
+    damage: 16.0                 # Base melee attack damage
     speed: 4.0                  # Attack speed (higher = faster attacks)
-    knockback: 0.0              # Extra knockback applied on hit
+    knockback: 20.0              # Extra knockback applied on hit
   defense:
-    armor: 0.0                  # Flat armor value (reduces incoming damage)
-    armor-toughness: 0.0        # Reduces effectiveness of high-damage hits
-    knockback-resistance: 0.0   # 0.0 = normal knockback, 1.0 = immune
-  follow-range: 32.0            # Detection range in blocks
+    armor: 20.0                  # Flat armor value (reduces incoming damage)
+    armor-toughness: 10.0        # Reduces effectiveness of high-damage hits
+    knockback-resistance: 3.0   # 0.0 = normal knockback, 1.0 = immune
+  follow-range: 5.0            # Detection range in blocks
   luck: 0.0                     # Influences loot tables and random outcomes
   flying-speed: 0.4             # Movement speed while flying (only applies to flying mobs)
-  scale: 1.5                    # Entity size multiplier (1.0 = default size)
+  scale: 1.8                    # Entity size multiplier (1.0 = default size)
   step-height: 0.6              # Max block height the mob can step up without jumping
   gravity: true                 # true = affected by gravity, false = floating entity
 # ---------------------------------------------------------
@@ -105,7 +105,7 @@ abilities:
   fire-immunity: false          # Grants Fire Resistance (lava & fire immunity)
   water-breathing: false        # Allows breathing underwater
   invisibility: false           # Makes the entity invisible
-  glowing: false                # Makes the entity glow (outline visible through walls)
+  glowing: true                # Makes the entity glow (outline visible through walls)
   no-ai: false                  # Disables all AI behavior (static mob)
   silent: false                 # Disables all sounds from the entity
   invulnerable: false           # Entity cannot take any damage
@@ -141,7 +141,23 @@ phases:                               #This will make your Mob as a Boss Mob
   phase1:
     hp-range: "100-75"                # Active while boss health is between 100% and 75%
     title: "Phase 1 – Royal Calm"     # Title shown when this phase starts
-    # ===== BASE BUFFS (ATTRIBUTE MODIFIERS) =====
+    on-enter:
+      effects:
+        particles:
+          type: FLAME           #
+          amount: 120           #
+          radius: 1.8           #
+          height: 2.2           #
+          duration: 0           # 0 = one time
+        sound:
+          type: ENTITY_WITHER_SPAWN
+          volume: 1.2
+          pitch: 0.6
+        message:
+          type: TITLE
+          title: "&c&lThe Zombie King"
+          subtitle: "&4You'll Die here!"
+# ===== BASE BUFFS (ATTRIBUTE MODIFIERS) =====
     buffs:
       movement-speed: +0.01           # +0.01 movement speed (vanilla zombie ≈ 0.23)
       damage: +0                      # Flat bonus to attack damage
@@ -149,7 +165,7 @@ phases:                               #This will make your Mob as a Boss Mob
       armor-toughness: +0             # Reduces effectiveness of high-damage hits
       knockback-resistance: +0.0      # 0.0 = normal knockback, 1.0 = immune
       max-health: +0                  # Extra max health (2.0 = 1 heart)
-    # ===== POTION EFFECTS =====
+# ===== POTION EFFECTS =====
     effects:
       speed: 0                        # Speed potion level (0 = disabled)
       strength: 0                     # Strength potion level
@@ -160,19 +176,19 @@ phases:                               #This will make your Mob as a Boss Mob
       invisibility: false             # Entity becomes invisible
       glowing: false                  # Outline visible through walls
       water-breathing: false          # Can breathe underwater
-    # ===== AI / BEHAVIOR SETTINGS =====
+# ===== AI / BEHAVIOR SETTINGS =====
     behavior:
-      mode: aggressive                # aggressive | passive | flee
+      mode: passive                # aggressive | passive | flee
       follow-range: +0                # Extra target detection range in blocks
       forget-target-after: 0          # Seconds until target is forgotten (0 = never)
-    # ===== COMBAT MODIFIERS =====
+# ===== COMBAT MODIFIERS =====
     combat:
       crit-chance: +0                 # Additional crit chance in percent
       crit-multiplier: +0.0           # Extra crit damage multiplier
       lifesteal: +0.0                 # % of dealt damage healed back
       deal-knockback: +0.0            # Extra knockback dealt to targets
       receive-damage-multiplier: 1.0  # Final damage taken (1.0 = normal)
-    # ===== DAMAGE IMMUNITIES =====
+# ===== DAMAGE IMMUNITIES =====
     immunities:
       fire: false                     # Immune to fire damage
       fall: false                     # Immune to fall damage
@@ -181,7 +197,7 @@ phases:                               #This will make your Mob as a Boss Mob
       lightning: false                # Immune to lightning strikes
       projectile: false               # Immune to arrows & projectiles
       explosion: false                # V1.4 - with Anti Glitch
-    # ===== PHASE ACTIONS (COOLDOWN BASED) =====
+# ===== PHASE ACTIONS (COOLDOWN BASED) =====
     actions:
       summon-minions:
         enabled: false                # Enables mob summoning
@@ -199,19 +215,35 @@ phases:                               #This will make your Mob as a Boss Mob
         strength: 1.5                 # Knockback strength
         radius: 6                     # Effect radius in blocks
         cooldown: 12                  # Cooldown in seconds
-    # ===== PHYSICS (INTENTIONALLY UNREALISTIC / BOSS MAGIC) =====
+# ===== PHYSICS (INTENTIONALLY UNREALISTIC / BOSS MAGIC) =====
     physics:
       gravity: true                   # true = normal gravity, false = floating
       levitation: 0                   # Levitation potion level
       slow-falling: false             # Enables slow falling
-    # ===== WORLD EFFECTS (GLOBAL – USE CAREFULLY) =====
+# ===== WORLD EFFECTS (GLOBAL – USE CAREFULLY) =====
     world:
-      weather: NONE                   # NONE | CLEAR | RAIN | THUNDER
-      time: NONE                      # NONE | DAY | NIGHT
+      weather: THUNDER                   # NONE | CLEAR | RAIN | THUNDER
+      time: NIGHT                      # NONE | DAY | NIGHT
   # =====================================================
   phase2:
     hp-range: "75-50"
     title: "Phase 2 – Furious Assault"
+    on-enter:
+      effects:
+        particles:
+          type: FLAME           #
+          amount: 120           #
+          radius: 1.8           #
+          height: 2.2           #
+          duration: 0           # 0 = one time
+        sound:
+          type: ENTITY_WITHER_SPAWN
+          volume: 1.2
+          pitch: 0.6
+        message:
+          type: TITLE
+          title: "&c&lNext Phase"
+          subtitle: "&4I'll smell BLOOD!"
     buffs:
       movement-speed: +0.02           # Faster movement
       damage: +2                      # Increased attack damage
@@ -339,6 +371,22 @@ phases:                               #This will make your Mob as a Boss Mob
   phase4:
     hp-range: "25-0"
     title: "Phase 4 – Desperate Escape"
+    on-enter:
+      effects:
+        particles:
+          type: FLAME           #
+          amount: 120           #
+          radius: 1.8           #
+          height: 2.2           #
+          duration: 0           # 0 = one time
+        sound:
+          type: ENTITY_WITHER_SPAWN
+          volume: 1.2
+          pitch: 0.6
+        message:
+          type: TITLE
+          title: "&c&lFINAL PHASE"
+          subtitle: "&4KILL THE BOSS"
     buffs:
       movement-speed: +0.08           # Extremely fast movement
       damage: +6
@@ -392,7 +440,7 @@ phases:                               #This will make your Mob as a Boss Mob
         radius: 8
         cooldown: 8
     physics:
-      gravity: false                 # Floating boss
+      gravity: true
       levitation: 1
       slow-falling: true
     world:
@@ -654,5 +702,4 @@ legendary-drops:
       - "&fNo escape."
 # Death Commands, execute Commands from Server
 death-commands: # Command executed on death
-  - "give {player} carrot 1"
   - "broadcast &6{mob} &7was slain by &b{player}&7!"

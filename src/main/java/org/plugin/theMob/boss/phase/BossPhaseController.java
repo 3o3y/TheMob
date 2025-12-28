@@ -11,6 +11,7 @@ import org.plugin.theMob.boss.bar.BossBarService;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 public final class BossPhaseController {
@@ -71,6 +72,35 @@ public final class BossPhaseController {
         if (bars != null) bars.markDirty(boss);
     }
 
+    // =====================================================
+// READ-ONLY ACCESS
+// =====================================================
+    public BossPhase currentPhase(LivingEntity boss) {
+        if (boss == null) return null;
+
+        BossTemplate template = templates.get(boss.getUniqueId());
+        if (template == null) return null;
+
+        return resolver.resolve(boss, template);
+    }
+
+    // =====================================================
+// ACTIVE BOSSES (READ-ONLY)
+// =====================================================
+    public Iterable<LivingEntity> activeBosses() {
+        return templates.keySet().stream()
+                .map(uuid -> {
+                    for (var world : org.bukkit.Bukkit.getWorlds()) {
+                        var e = world.getEntity(uuid);
+                        if (e instanceof LivingEntity le) return le;
+                    }
+                    return null;
+                })
+                .filter(Objects::nonNull)
+                .toList();
+    }
+
+
     // DEATH
     public void onBossDeath(LivingEntity boss) {
         if (boss == null) return;
@@ -83,6 +113,7 @@ public final class BossPhaseController {
             bars.setPhaseTitle(boss, null);
             bars.unregisterBoss(boss);
         }
+
     }
 
     private boolean isPhaseVisible(String phaseId) {

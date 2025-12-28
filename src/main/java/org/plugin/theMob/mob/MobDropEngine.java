@@ -19,14 +19,36 @@ public final class MobDropEngine {
     private final ItemBuilderFromConfig builder;
     private final ItemLoreRenderer loreRenderer = new ItemLoreRenderer();
     private final Random random = new Random();
+
     public MobDropEngine(ItemBuilderFromConfig builder) {
         this.builder = builder;
     }
+
     public void bind(MobManager manager) {
         this.mobs = manager;
     }
+
     public void handleDeath(LivingEntity mob, EntityDeathEvent event) {
         if (mobs == null || mob == null || event == null) return;
+
+        // =========================================
+        // 🔒 DROP GUARD (PREVENT DOUBLE LOOT)
+        // =========================================
+        if (mob.getPersistentDataContainer().has(
+                mobs.keys().DROPS_DONE,
+                PersistentDataType.INTEGER
+        )) {
+            return;
+        }
+        mob.getPersistentDataContainer().set(
+                mobs.keys().DROPS_DONE,
+                PersistentDataType.INTEGER,
+                1
+        );
+
+        // =========================================
+        // NO DROPS FLAG
+        // =========================================
         Integer noDrops = mob.getPersistentDataContainer()
                 .get(mobs.keys().NO_DROPS, PersistentDataType.INTEGER);
         if (noDrops != null && noDrops == 1) {
@@ -34,16 +56,36 @@ public final class MobDropEngine {
             event.setDroppedExp(0);
             return;
         }
+
         FileConfiguration cfg = mobs.mobConfigOf(mob);
         if (cfg == null) return;
+
+        // =========================================
+        // OVERRIDE VANILLA DROPS
+        // =========================================
         event.getDrops().clear();
         event.setDroppedExp(0);
+
+        // =========================================
+        // NORMAL DROPS
+        // =========================================
         dropList(cfg.getMapList("drops"), mob);
+
+        // =========================================
+        // BOSS LEGENDARY DROPS
+        // =========================================
         if (mobs.isBoss(mob) && cfg.getBoolean("opdrop", false)) {
             dropList(cfg.getMapList("legendary-drops"), mob);
         }
+
+        // =========================================
+        // DEATH COMMANDS
+        // =========================================
         String id = mobs.mobIdOf(mob);
-        String killer = mob.getKiller() != null ? mob.getKiller().getName() : "console";
+        String killer = mob.getKiller() != null
+                ? mob.getKiller().getName()
+                : "console";
+
         for (String cmd : cfg.getStringList("death-commands")) {
             Bukkit.dispatchCommand(
                     Bukkit.getConsoleSender(),
@@ -52,19 +94,27 @@ public final class MobDropEngine {
             );
         }
     }
+
     private void dropList(List<Map<?, ?>> list, LivingEntity mob) {
         if (list == null || list.isEmpty()) return;
+
         for (Map<?, ?> raw : list) {
             double chance = parse(raw.get("chance"), 1.0);
             if (random.nextDouble() > chance) continue;
+
             ItemStack it = builder.build(raw);
             if (it == null) continue;
+
             loreRenderer.apply(it);
             mob.getWorld().dropItemNaturally(mob.getLocation(), it);
         }
     }
+
     private double parse(Object o, double def) {
-        try { return Double.parseDouble(String.valueOf(o)); }
-        catch (Exception e) { return def; }
+        try {
+            return Double.parseDouble(String.valueOf(o));
+        } catch (Exception e) {
+            return def;
+        }
     }
 }

@@ -13,7 +13,6 @@ public final class ZombieBossFactory {
 
     private ZombieBossFactory() {}
 
-
     public static Zombie spawnZombieBoss(
             Plugin plugin,
             Location loc,
@@ -21,6 +20,9 @@ public final class ZombieBossFactory {
             KeyRegistry keys,
             FileConfiguration cfg
     ) {
+        if (loc == null || loc.getWorld() == null) {
+            throw new IllegalArgumentException("Location/world is null");
+        }
 
         // ===============================
         // SPAWN ZOMBIE
@@ -33,7 +35,12 @@ public final class ZombieBossFactory {
         zombie.setCanPickupItems(false);
 
         // ===============================
-        // METADATA
+        // SCOREBOARD TAG (FAILSAFE CLEANUP)
+        // ===============================
+        zombie.addScoreboardTag("themob_boss");
+
+        // ===============================
+        // METADATA (PDC)
         // ===============================
         zombie.getPersistentDataContainer().set(
                 keys.MOB_ID,
@@ -47,10 +54,16 @@ public final class ZombieBossFactory {
                 1
         );
 
+        zombie.getPersistentDataContainer().set(
+                keys.BOSS_SPAWN_TIME,
+                PersistentDataType.LONG,
+                System.currentTimeMillis()
+        );
+
         // ===============================
         // BASE HEALTH
         // ===============================
-        if (cfg.contains("stats.health.max")) {
+        if (cfg != null && cfg.contains("stats.health.max")) {
             double max = cfg.getDouble("stats.health.max");
             var attr = zombie.getAttribute(Attribute.MAX_HEALTH);
             if (attr != null) {

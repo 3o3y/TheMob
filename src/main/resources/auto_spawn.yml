@@ -23,7 +23,6 @@ spawns: []
 #   enabled: true                 # Enable / disable this spawn
 #   intervalSeconds: 10           # Spawn check interval
 #   maxSpawns: 5                  # Max mobs PER WAVE
-#   maxAlive: 5                   # Max mobs alive at the same time
 #   # ---------------------------------------------
 #   # Arena Presence Detection (ANTI-AFK)
 #   # ---------------------------------------------

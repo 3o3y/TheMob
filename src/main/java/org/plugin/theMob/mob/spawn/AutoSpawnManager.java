@@ -19,7 +19,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public final class AutoSpawnManager {
 
-    private static final long RESET_TICKS = 20L * 300L; // 300s
+    private static final long RESET_TICKS = 20L * 60L; // 60s cold reset
 
     private final JavaPlugin plugin;
     private final MobManager mobs;
@@ -36,25 +36,45 @@ public final class AutoSpawnManager {
         this.mobs = mobs;
         this.keys = keys;
     }
+
     // =====================================================
     // LIFECYCLE
     // =====================================================
 
     public void start() {
         new BukkitRunnable() {
-            @Override public void run() {
+            @Override
+            public void run() {
                 tick();
             }
         }.runTaskTimer(plugin, 20L, 20L);
     }
 
+    /**
+     * 🔥 HARD STOP (Reload / Restart Safe)
+     * Entfernt ALLE TheMob-Mobs aus allen Welten
+     */
     public void stop() {
+
+        for (World world : Bukkit.getWorlds()) {
+            for (LivingEntity e : world.getLivingEntities()) {
+
+                if (!e.getPersistentDataContainer()
+                        .has(keys.MOB_ID, PersistentDataType.STRING)) {
+                    continue;
+                }
+
+                e.remove();
+            }
+        }
+
         points.clear();
         spawnedCount.clear();
         lastSpawnTick.clear();
         activeCycle.clear();
         alive.clear();
     }
+
     // =====================================================
     // REGISTRATION
     // =====================================================
@@ -63,8 +83,8 @@ public final class AutoSpawnManager {
         String id = sp.spawnId();
         points.put(id, sp);
         spawnedCount.put(id, 0);
-        lastSpawnTick.put(id, (long) Bukkit.getCurrentTick());
-        activeCycle.put(id, true); // START IMMEDIATELY
+        lastSpawnTick.put(id, 0L);
+        activeCycle.put(id, true);
         alive.put(id, ConcurrentHashMap.newKeySet());
     }
 
@@ -75,8 +95,17 @@ public final class AutoSpawnManager {
         activeCycle.remove(spawnId);
         alive.remove(spawnId);
     }
+
     // =====================================================
-    // DEATH TRACKING (NO REFILL!)
+    // PLAYER EXIT NOTIFY
+    // =====================================================
+
+    public void markPlayerLeft(SpawnPoint sp) {
+        // bewusst leer – Cold-Timeout läuft im Tick
+    }
+
+    // =====================================================
+    // DEATH TRACKING (NO REFILL)
     // =====================================================
 
     public void onEntityDeath(LivingEntity e) {
@@ -87,8 +116,9 @@ public final class AutoSpawnManager {
         Set<UUID> set = alive.get(id);
         if (set != null) set.remove(e.getUniqueId());
     }
+
     // =====================================================
-    // CORE TICK
+    // CORE LOOP
     // =====================================================
 
     private void tick() {
@@ -97,107 +127,88 @@ public final class AutoSpawnManager {
         for (SpawnPoint sp : points.values()) {
             if (!sp.enabled()) continue;
 
-            String id = sp.spawnId();
             Location base = sp.baseLocation();
             if (base == null) continue;
 
             World world = base.getWorld();
-            if (world == null) continue;
-
             boolean playerNearby = false;
 
-            int cx = sp.baseChunkX();
-            int cz = sp.baseChunkZ();
-
             for (Player p : world.getPlayers()) {
-                int pcx = p.getLocation().getBlockX() >> 4;
-                int pcz = p.getLocation().getBlockZ() >> 4;
-
-                if (Math.abs(pcx - cx) <= sp.arenaRadiusChunks()
-                        && Math.abs(pcz - cz) <= sp.arenaRadiusChunks()) {
+                if (isInArena(p.getLocation(), sp)) {
                     playerNearby = true;
                     sp.markPlayerSeen(now);
                     break;
                 }
             }
+
+            String id = sp.spawnId();
+
+            // =================================================
+            // 🔒 BOSS FAILSAFE
+            // Wenn ein Boss im Arena-Radius lebt → KEIN RESET
+            // =================================================
+            if (hasLivingBossInArena(sp)) {
+                continue;
+            }
+
+            // -------------------------------
+            // COLD RESET
+            // -------------------------------
             if (!playerNearby && sp.inactiveFor(RESET_TICKS, now)) {
-
-                World w = base.getWorld();
-                if (w != null) {
-                    for (LivingEntity e : w.getLivingEntities()) {
-
-                        String sid = e.getPersistentDataContainer()
-                                .get(keys.AUTO_SPAWN_ID, PersistentDataType.STRING);
-
-                        if (id.equals(sid)) {
-                            e.remove();
-                        }
-                    }
-                }
-                alive.get(id).clear();
-                spawnedCount.put(id, 0);
-                activeCycle.put(id, true);
-                lastSpawnTick.put(id, now);
-
-                continue;
-            }
-            if (!playerNearby) {
+                hardReset(sp, now);
                 continue;
             }
 
-            if (Boolean.TRUE.equals(activeCycle.get(id))) {
+            if (!playerNearby || !Boolean.TRUE.equals(activeCycle.get(id))) {
+                continue;
+            }
 
-                int spawned = spawnedCount.get(id);
-                if (spawned >= sp.maxSpawns()) {
-                    activeCycle.put(id, false);
-                    continue;
-                }
+            // -------------------------------
+            // SPAWN LOGIC
+            // -------------------------------
+            if (spawnedCount.get(id) >= sp.maxSpawns()) {
+                activeCycle.put(id, false);
+                continue;
+            }
 
-                long last = lastSpawnTick.get(id);
-                long intervalTicks = sp.intervalSeconds() * 20L;
-
-                if (now - last >= intervalTicks) {
-                    spawnOne(sp);
-                    spawnedCount.put(id, spawned + 1);
-                    lastSpawnTick.put(id, now);
-                }
+            if (now - lastSpawnTick.get(id) >= sp.intervalSeconds() * 20L) {
+                spawnOne(sp, id, now);
             }
         }
     }
 
+    // =====================================================
+    // HELPERS
+    // =====================================================
 
-    private void spawnOne(SpawnPoint sp) {
+    private void spawnOne(SpawnPoint sp, String id, long now) {
         LivingEntity mob = mobs.spawnCustomMob(
                 sp.mobId(),
-                sp.spawnId(),
+                id,
                 sp.baseLocation()
         );
         if (mob == null) return;
 
         mob.getPersistentDataContainer()
-                .set(keys.AUTO_SPAWN_ID, PersistentDataType.STRING, sp.spawnId());
+                .set(keys.AUTO_SPAWN_ID, PersistentDataType.STRING, id);
 
-        alive.get(sp.spawnId()).add(mob.getUniqueId());
+        alive.get(id).add(mob.getUniqueId());
+        spawnedCount.put(id, spawnedCount.get(id) + 1);
+        lastSpawnTick.put(id, now);
     }
-    public void forceCleanupIfEmpty(SpawnPoint sp) {
-        Location base = sp.baseLocation();
-        if (base == null || base.getWorld() == null) return;
 
-        World world = base.getWorld();
+    /**
+     * 🔥 HARD RESET
+     * Löscht ALLE TheMob-Custom-Mobs im Arena-Radius
+     * (Bosses sind hier bereits ausgeschlossen!)
+     */
+    private void hardReset(SpawnPoint sp, long now) {
+        World world = sp.baseLocation().getWorld();
+        if (world == null) return;
 
-        int cx = sp.baseChunkX();
-        int cz = sp.baseChunkZ();
+        int baseCx = sp.baseChunkX();
+        int baseCz = sp.baseChunkZ();
         int radius = sp.arenaRadiusChunks();
-
-        for (Player p : world.getPlayers()) {
-            int pcx = p.getLocation().getBlockX() >> 4;
-            int pcz = p.getLocation().getBlockZ() >> 4;
-
-            if (Math.abs(pcx - cx) <= radius
-                    && Math.abs(pcz - cz) <= radius) {
-                return; // ❌ noch Spieler da
-            }
-        }
 
         for (LivingEntity e : world.getLivingEntities()) {
 
@@ -206,28 +217,62 @@ public final class AutoSpawnManager {
                 continue;
             }
 
-            if (isInArenaChunks(e.getLocation(), sp)) {
-                e.remove();
+            // ❌ Boss NIE löschen
+            if (e.getPersistentDataContainer()
+                    .has(keys.IS_BOSS, PersistentDataType.INTEGER)) {
+                continue;
             }
 
+            int cx = e.getLocation().getBlockX() >> 4;
+            int cz = e.getLocation().getBlockZ() >> 4;
+
+            if (Math.abs(cx - baseCx) <= radius
+                    && Math.abs(cz - baseCz) <= radius) {
+                e.remove();
+            }
         }
 
         String id = sp.spawnId();
-        Set<UUID> set = alive.get(id);
-        if (set != null) set.clear();
-
+        alive.get(id).clear();
         spawnedCount.put(id, 0);
         activeCycle.put(id, true);
-        lastSpawnTick.put(id, (long) Bukkit.getCurrentTick());
+        lastSpawnTick.put(id, now);
     }
-    private boolean isInArenaChunks(Location loc, SpawnPoint sp) {
-        if (loc == null || loc.getWorld() == null) return false;
-        if (!loc.getWorld().getName().equals(sp.worldName())) return false;
 
+    private boolean isInArena(Location loc, SpawnPoint sp) {
         int cx = loc.getBlockX() >> 4;
         int cz = loc.getBlockZ() >> 4;
 
         return Math.abs(cx - sp.baseChunkX()) <= sp.arenaRadiusChunks()
                 && Math.abs(cz - sp.baseChunkZ()) <= sp.arenaRadiusChunks();
+    }
+
+    /**
+     * 🔒 Prüft, ob ein lebender Boss im Arena-Radius existiert
+     */
+    private boolean hasLivingBossInArena(SpawnPoint sp) {
+        World world = sp.baseLocation().getWorld();
+        if (world == null) return false;
+
+        int baseCx = sp.baseChunkX();
+        int baseCz = sp.baseChunkZ();
+        int radius = sp.arenaRadiusChunks();
+
+        for (LivingEntity e : world.getLivingEntities()) {
+
+            if (!e.getPersistentDataContainer()
+                    .has(keys.IS_BOSS, PersistentDataType.INTEGER)) {
+                continue;
+            }
+
+            int cx = e.getLocation().getBlockX() >> 4;
+            int cz = e.getLocation().getBlockZ() >> 4;
+
+            if (Math.abs(cx - baseCx) <= radius
+                    && Math.abs(cz - baseCz) <= radius) {
+                return true;
+            }
+        }
+        return false;
     }
 }

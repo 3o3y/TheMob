@@ -28,7 +28,7 @@ public final class MobTabCompleter implements TabCompleter {
         // /mob <sub>
         if (args.length == 1) {
             String prefix = args[0].toLowerCase();
-            return List.of("spawn", "autospawn", "del", "killall", "reload")
+            return List.of("spawn", "autospawn", "list", "del", "killall", "reload")
                     .stream()
                     .filter(s -> s.startsWith(prefix))
                     .toList();
@@ -51,6 +51,12 @@ public final class MobTabCompleter implements TabCompleter {
                     .sorted()
                     .toList();
         }
+
+        // /mob list <type>
+        if (args.length == 2 && args[0].equalsIgnoreCase("list")) {
+            return List.of("autospawn");
+        }
+
 
         // /mob autospawn <mob-id> <interval>
         if (args.length == 3 && args[0].equalsIgnoreCase("autospawn")) {
