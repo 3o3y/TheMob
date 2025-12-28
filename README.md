@@ -131,11 +131,19 @@ No client mods.
 
 🧭 Roadmap (Short Overview)
 
+v1.1 – Stability & Performance✅
+v1.2 – Performance Optimization✅
+v1.2.1 – Stability & Configuration Hotfix✅
 v1.3 – Boss Phase Depth ✅
 v1.4 – Player Feedback & HUD
 v1.5 – Combat Extensions
 v1.6 – Minions & Summons
-v1.7+ – World Interaction, AI, Automation
+v1.7 – World Interaction
+v1.8 – AI & Behavior Enhancements
+v1.9 – Automation & Scaling
+v1.10 – Monitoring & Debugging
+v1.11 – Advanced Items & Progression (Optional)
+v1.12 – Polishing & Long-Term Support
 
 Core stays lightweight.
 Advanced features stay optional.
