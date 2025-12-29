@@ -13,7 +13,6 @@ public final class SpawnPoint {
     private final int x, y, z;
     private final int intervalSeconds;
     private final int maxSpawns;
-    private final int arenaRadiusChunks;
     private final boolean enabled;
 
     private volatile long lastPlayerSeenTick = -1;
@@ -24,7 +23,6 @@ public final class SpawnPoint {
             int x, int y, int z,
             int intervalSeconds,
             int maxSpawns,
-            int arenaRadiusChunks,
             boolean enabled
     ) {
         this.mobId = Objects.requireNonNull(mobId).toLowerCase();
@@ -34,7 +32,6 @@ public final class SpawnPoint {
         this.z = z;
         this.intervalSeconds = Math.max(1, intervalSeconds);
         this.maxSpawns = Math.max(1, maxSpawns);
-        this.arenaRadiusChunks = Math.max(0, arenaRadiusChunks);
         this.enabled = enabled;
     }
 
@@ -44,11 +41,8 @@ public final class SpawnPoint {
 
     public String mobId() { return mobId; }
     public String worldName() { return worldName; }
-    public int baseChunkX() { return x >> 4; }
-    public int baseChunkZ() { return z >> 4; }
     public int intervalSeconds() { return intervalSeconds; }
     public int maxSpawns() { return maxSpawns; }
-    public int arenaRadiusChunks() { return arenaRadiusChunks; }
     public boolean enabled() { return enabled; }
 
     public Location baseLocation() {

@@ -6,9 +6,6 @@ Copyright (c) 2025 3o3y
 You are allowed to:
 - Use TheMob (the "Software") on any Minecraft server (personal or commercial).
 - Modify the source code for your own server use.
-- Create and sell addons that integrate with TheMob.
-- Create and sell configuration packs (YAML / data packs) for TheMob.
-- Offer paid services related to TheMob (setup, balancing, configuration, hosting support).
 
 ## 2) Redistribution Restrictions
 You are NOT allowed to:
@@ -17,6 +14,9 @@ You are NOT allowed to:
 - Mirror this repository or publish the source code elsewhere as your own project.
 - Sell TheMob core itself (the compiled plugin JAR), even if modified.
 - Remove or change author credits or project identity.
+- Create and sell addons that integrate with TheMob.
+- Create and sell configuration packs (YAML / data packs) for TheMob.
+- Offer paid services related to TheMob (setup, balancing, configuration, hosting support).
 
 ## 3) Forking
 Forking on GitHub is allowed for contribution purposes only.

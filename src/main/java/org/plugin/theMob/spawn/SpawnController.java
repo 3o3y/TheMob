@@ -2,9 +2,7 @@ package org.plugin.theMob.spawn;
 
 import org.bukkit.Location;
 import org.bukkit.configuration.file.FileConfiguration;
-import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
-import org.bukkit.event.player.*;
 import org.plugin.theMob.TheMob;
 import org.plugin.theMob.core.ConfigService;
 import org.plugin.theMob.mob.MobManager;
@@ -15,21 +13,14 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public final class SpawnController implements Listener {
 
-    private static final int DEFAULT_ARENA_RADIUS_CHUNKS = 2;
-
     private final TheMob plugin;
     private final MobManager mobs;
     private final AutoSpawnManager auto;
     private final ConfigService configs;
 
     private final Map<String, SpawnPoint> registry = new ConcurrentHashMap<>();
-    private final Map<UUID, Location> lastLocation = new ConcurrentHashMap<>();
 
-    public SpawnController(
-            TheMob plugin,
-            MobManager mobs,
-            AutoSpawnManager auto
-    ) {
+    public SpawnController(TheMob plugin, MobManager mobs, AutoSpawnManager auto) {
         this.plugin = plugin;
         this.mobs = mobs;
         this.auto = auto;
@@ -52,7 +43,7 @@ public final class SpawnController implements Listener {
     }
 
     // =====================================================
-    // COMMAND API
+    // COMMAND API (WIRD VON MobCommand BENUTZT)
     // =====================================================
 
     public boolean startAutoSpawn(String mobId, Location loc, int intervalSeconds, int maxSpawns) {
@@ -68,7 +59,6 @@ public final class SpawnController implements Listener {
                 loc.getBlockZ(),
                 intervalSeconds,
                 maxSpawns,
-                DEFAULT_ARENA_RADIUS_CHUNKS,
                 true
         );
 
@@ -99,6 +89,8 @@ public final class SpawnController implements Listener {
 
         for (SpawnPoint sp : registry.values()) {
             Location l = sp.baseLocation();
+            if (l == null) continue;
+
             list.add(new AutoSpawnInfo(
                     sp.mobId(),
                     sp.worldName(),
@@ -109,63 +101,8 @@ public final class SpawnController implements Listener {
                     sp.maxSpawns()
             ));
         }
+
         return list;
-    }
-
-    // =====================================================
-    // PLAYER TRACKING
-    // =====================================================
-
-    @EventHandler(ignoreCancelled = true)
-    public void onMove(PlayerMoveEvent e) {
-        lastLocation.put(e.getPlayer().getUniqueId(), e.getFrom());
-        if (e.getFrom().distanceSquared(e.getTo()) < 0.01) return;
-        handleTransition(e.getFrom(), e.getTo());
-    }
-
-    @EventHandler
-    public void onQuit(PlayerQuitEvent e) {
-        Location last = lastLocation.remove(e.getPlayer().getUniqueId());
-        if (last != null) notifyExit(last);
-    }
-
-    @EventHandler(ignoreCancelled = true)
-    public void onTeleport(PlayerTeleportEvent e) {
-        lastLocation.put(e.getPlayer().getUniqueId(), e.getFrom());
-        handleTransition(e.getFrom(), e.getTo());
-    }
-
-    @EventHandler
-    public void onWorldChange(PlayerChangedWorldEvent e) {
-        Location last = lastLocation.remove(e.getPlayer().getUniqueId());
-        if (last != null) notifyExit(last);
-    }
-
-    private void handleTransition(Location from, Location to) {
-        for (SpawnPoint sp : registry.values()) {
-            if (isInside(sp, from) && !isInside(sp, to)) {
-                auto.markPlayerLeft(sp);
-            }
-        }
-    }
-
-    private void notifyExit(Location loc) {
-        for (SpawnPoint sp : registry.values()) {
-            if (isInside(sp, loc)) {
-                auto.markPlayerLeft(sp);
-            }
-        }
-    }
-
-    private boolean isInside(SpawnPoint sp, Location loc) {
-        if (loc == null || loc.getWorld() == null) return false;
-        if (!loc.getWorld().getName().equals(sp.worldName())) return false;
-
-        int cx = loc.getBlockX() >> 4;
-        int cz = loc.getBlockZ() >> 4;
-
-        return Math.abs(cx - sp.baseChunkX()) <= sp.arenaRadiusChunks()
-                && Math.abs(cz - sp.baseChunkZ()) <= sp.arenaRadiusChunks();
     }
 
     // =====================================================
@@ -193,10 +130,6 @@ public final class SpawnController implements Listener {
 
                 int interval = (int) raw.get("intervalSeconds");
                 int maxSpawns = (int) raw.get("maxSpawns");
-                int radius = (int) raw.getOrDefault(
-                        "arenaRadiusChunks",
-                        DEFAULT_ARENA_RADIUS_CHUNKS
-                );
 
                 boolean enabled = (boolean) raw.getOrDefault("enabled", true);
                 if (!enabled || !mobs.mobExists(mobId)) continue;
@@ -207,7 +140,6 @@ public final class SpawnController implements Listener {
                         x, y, z,
                         interval,
                         maxSpawns,
-                        radius,
                         true
                 );
 
@@ -225,15 +157,17 @@ public final class SpawnController implements Listener {
         List<Map<String, Object>> out = new ArrayList<>();
 
         for (SpawnPoint sp : registry.values()) {
+            Location l = sp.baseLocation();
+            if (l == null) continue;
+
             Map<String, Object> map = new LinkedHashMap<>();
             map.put("mobId", sp.mobId());
             map.put("world", sp.worldName());
-            map.put("x", sp.baseLocation().getBlockX());
-            map.put("y", sp.baseLocation().getBlockY());
-            map.put("z", sp.baseLocation().getBlockZ());
+            map.put("x", l.getBlockX());
+            map.put("y", l.getBlockY());
+            map.put("z", l.getBlockZ());
             map.put("intervalSeconds", sp.intervalSeconds());
             map.put("maxSpawns", sp.maxSpawns());
-            map.put("arenaRadiusChunks", sp.arenaRadiusChunks());
             map.put("enabled", true);
             out.add(map);
         }
@@ -243,7 +177,7 @@ public final class SpawnController implements Listener {
     }
 
     // =====================================================
-    // DTO
+    // DTO (WIRD VON MobCommand GENUTZT)
     // =====================================================
 
     public record AutoSpawnInfo(
