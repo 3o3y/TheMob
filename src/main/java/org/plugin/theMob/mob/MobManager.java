@@ -154,7 +154,7 @@ public final class MobManager {
                 removed++;
             }
         }
-        plugin.getLogger().info("[TheMob] Removed " + removed + " custom mobs.");
+
     }
     // =====================================================
     // SETTERS

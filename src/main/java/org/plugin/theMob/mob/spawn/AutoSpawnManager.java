@@ -2,8 +2,8 @@ package org.plugin.theMob.mob.spawn;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
-import org.bukkit.World;
 import org.bukkit.entity.LivingEntity;
+import org.bukkit.entity.Player;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
@@ -18,7 +18,8 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public final class AutoSpawnManager {
 
-    private static final long RESET_TICKS = 20L * 60L; // 60s cold
+    private static final long COLD_TICKS = 20L * 60L;   // 60 Sekunden
+    private static final long FIRST_SPAWN_DELAY = 20L; // 1 Sekunde
 
     private final JavaPlugin plugin;
     private final MobManager mobs;
@@ -28,6 +29,12 @@ public final class AutoSpawnManager {
     private final Map<String, Integer> spawnedCount = new ConcurrentHashMap<>();
     private final Map<String, Long> lastSpawnTick = new ConcurrentHashMap<>();
     private final Map<String, Set<UUID>> alive = new ConcurrentHashMap<>();
+
+    // ❄️ Arena leer seit Tick
+    private final Map<String, Long> arenaEmptySince = new ConcurrentHashMap<>();
+
+    // ⛔ Spawn-Sperre nach Reset
+    private final Map<String, Long> spawnBlockedUntil = new ConcurrentHashMap<>();
 
     public AutoSpawnManager(JavaPlugin plugin, MobManager mobs, KeyRegistry keys) {
         this.plugin = plugin;
@@ -49,10 +56,15 @@ public final class AutoSpawnManager {
     }
 
     public void stop() {
+        // nur beim Stop global
+        mobs.killAll();
+
         points.clear();
         spawnedCount.clear();
         lastSpawnTick.clear();
         alive.clear();
+        arenaEmptySince.clear();
+        spawnBlockedUntil.clear();
     }
 
     // =====================================================
@@ -68,57 +80,71 @@ public final class AutoSpawnManager {
     }
 
     public void unregister(String spawnId) {
+        killSpawnPointMobs(spawnId);
         points.remove(spawnId);
         spawnedCount.remove(spawnId);
         lastSpawnTick.remove(spawnId);
         alive.remove(spawnId);
+        arenaEmptySince.remove(spawnId);
+        spawnBlockedUntil.remove(spawnId);
     }
 
     // =====================================================
-    // CORE LOOP (v1.3)
+    // CORE LOOP – 60s SAFE RE-ENTRY
     // =====================================================
 
     private void tick() {
         long now = Bukkit.getCurrentTick();
 
         for (SpawnPoint sp : points.values()) {
-            if (!sp.enabled()) continue;
-
+            String id = sp.spawnId();
             Location base = sp.baseLocation();
             if (base == null) continue;
 
-            World world = base.getWorld();
-            boolean worldHot = !world.getPlayers().isEmpty();
-
-            if (worldHot) {
-                sp.markPlayerSeen(now);
+            boolean playerInArena = false;
+            for (Player p : base.getWorld().getPlayers()) {
+                if (sp.isInsideArena(p.getLocation())) {
+                    playerInArena = true;
+                    break;
+                }
             }
 
-            // -------------------------------
-            // COLD RESET
-            // -------------------------------
-            if (!worldHot && sp.inactiveFor(RESET_TICKS, now)) {
-                reset(sp);
+            // ============================
+            // 🔥 HOT
+            // ============================
+            if (playerInArena) {
+
+                Long emptySince = arenaEmptySince.get(id);
+
+                // ❗ Reset NUR wenn ≥ 60s leer
+                if (emptySince != null && (now - emptySince) >= COLD_TICKS) {
+
+                    killSpawnPointMobs(id);
+                    spawnedCount.put(id, 0);
+
+                    // First-Spawn-Gate
+                    spawnBlockedUntil.put(id, now + FIRST_SPAWN_DELAY);
+                    lastSpawnTick.put(id, now);
+                }
+
+                arenaEmptySince.remove(id);
+
+                // ⛔ Spawn noch blockiert
+                long blockedUntil = spawnBlockedUntil.getOrDefault(id, 0L);
+                if (now < blockedUntil) continue;
+
+                if (spawnedCount.get(id) >= sp.maxSpawns()) continue;
+
+                if (now - lastSpawnTick.get(id) >= sp.intervalSeconds() * 20L) {
+                    spawnOne(sp, id, now);
+                }
                 continue;
             }
 
-            if (!worldHot) continue;
-
-            String id = sp.spawnId();
-
-            // -------------------------------
-            // LIMIT
-            // -------------------------------
-            if (spawnedCount.get(id) >= sp.maxSpawns()) {
-                continue;
-            }
-
-            // -------------------------------
-            // INTERVAL SPAWN (1 MOB)
-            // -------------------------------
-            if (now - lastSpawnTick.get(id) >= sp.intervalSeconds() * 20L) {
-                spawnOne(sp, id, now);
-            }
+            // ============================
+            // ❄️ COLD
+            // ============================
+            arenaEmptySince.putIfAbsent(id, now);
         }
     }
 
@@ -142,18 +168,16 @@ public final class AutoSpawnManager {
         lastSpawnTick.put(id, now);
     }
 
-    private void reset(SpawnPoint sp) {
-        String id = sp.spawnId();
+    private void killSpawnPointMobs(String spawnId) {
+        Bukkit.getWorlds().forEach(world -> {
+            for (LivingEntity e : world.getLivingEntities()) {
+                String id = e.getPersistentDataContainer()
+                        .get(keys.AUTO_SPAWN_ID, PersistentDataType.STRING);
 
-        alive.get(id).forEach(uuid -> {
-            LivingEntity e = (LivingEntity) Bukkit.getEntity(uuid);
-            if (e != null && e.isValid()) {
-                e.remove();
+                if (spawnId.equals(id)) {
+                    e.remove();
+                }
             }
         });
-
-        alive.get(id).clear();
-        spawnedCount.put(id, 0);
-        lastSpawnTick.put(id, 0L);
     }
 }
