@@ -48,9 +48,7 @@ public final class MobSpawnService {
 
     public LivingEntity spawn(String mobId, String spawnId, Location loc) {
 
-        if (mobId == null || spawnId == null || loc == null || loc.getWorld() == null) {
-            return null;
-        }
+        if (mobId == null || loc == null || loc.getWorld() == null) return null;
 
         mobId = mobId.toLowerCase(Locale.ROOT);
         FileConfiguration cfg = mobs.mobConfigById(mobId);
@@ -58,61 +56,31 @@ public final class MobSpawnService {
 
         EntityType type;
         try {
-            type = EntityType.valueOf(cfg.getString("base-type").toUpperCase());
+            type = EntityType.valueOf(cfg.getString("base-type").toUpperCase(Locale.ROOT));
         } catch (Exception e) {
             return null;
         }
 
         boolean isBoss = mobs.hasBossTemplate(mobId);
-
         LivingEntity mob;
 
-        // ===============================
-        // BOSS ZOMBIE
-        // ===============================
         if (isBoss && type == EntityType.ZOMBIE) {
-
-            String headBase64 = cfg.getString("visual.helmet.texture", null);
-
-            Zombie zombie = ZombieBossFactory.spawnZombieBoss(
-                    plugin,
-                    loc,
-                    mobId,
-                    keys,
-                    cfg
+            mob = ZombieBossFactory.spawnZombieBoss(
+                    plugin, loc, mobId, keys, cfg
             );
-
-
-
-
-            mob = zombie;
-
         } else {
-            try {
-                mob = (LivingEntity) loc.getWorld().spawnEntity(loc, type);
-            } catch (Exception e) {
-                return null;
-            }
+            mob = (LivingEntity) loc.getWorld().spawnEntity(loc, type);
         }
 
-        // ===============================
-        // SCALE (Paper 1.20.5+)
-        // ===============================
+        // SCALE
         if (cfg.contains("stats.scale")) {
-            double scale = cfg.getDouble("stats.scale", 1.0);
-            scale = Math.max(0.25, Math.min(5.0, scale));
-
-            var scaleAttr = mob.getAttribute(Attribute.SCALE);
-            if (scaleAttr != null && scale != 1.0) {
-                scaleAttr.setBaseValue(scale);
-            }
+            double scale = Math.max(0.25, Math.min(5.0, cfg.getDouble("stats.scale", 1.0)));
+            var attr = mob.getAttribute(Attribute.SCALE);
+            if (attr != null && scale != 1.0) attr.setBaseValue(scale);
         }
 
-        // ===============================
-        // METADATA
-        // ===============================
+        // CORE META
         mob.getPersistentDataContainer().set(keys.MOB_ID, PersistentDataType.STRING, mobId);
-        mob.getPersistentDataContainer().set(keys.AUTO_SPAWN_ID, PersistentDataType.STRING, spawnId);
         mob.getPersistentDataContainer().set(keys.IS_BOSS, PersistentDataType.INTEGER, isBoss ? 1 : 0);
 
         String name = ChatColor.translateAlternateColorCodes(
@@ -120,9 +88,24 @@ public final class MobSpawnService {
         );
         mob.getPersistentDataContainer().set(keys.BASE_NAME, PersistentDataType.STRING, name);
 
-        // ===============================
+        // ✅ SPAWN META (FIX)
+        boolean isAutoSpawn = spawnId != null && spawnId.contains("@");
+
+        mob.getPersistentDataContainer().set(
+                keys.SPAWN_TYPE,
+                PersistentDataType.STRING,
+                isAutoSpawn ? "AUTOSPAWN" : "MANUAL"
+        );
+
+        if (isAutoSpawn) {
+            mob.getPersistentDataContainer().set(
+                    keys.AUTO_SPAWN_ID,
+                    PersistentDataType.STRING,
+                    spawnId
+            );
+        }
+
         // HEALTH
-        // ===============================
         if (cfg.contains("stats.health.max")) {
             double max = cfg.getDouble("stats.health.max");
             var attr = mob.getAttribute(Attribute.MAX_HEALTH);
@@ -132,13 +115,9 @@ public final class MobSpawnService {
             }
         }
 
-        if (healthDisplay != null) {
-            healthDisplay.onSpawn(mob);
-        }
+        if (healthDisplay != null) healthDisplay.onSpawn(mob);
 
-        // ===============================
         // BOSS SYSTEM
-        // ===============================
         if (isBoss) {
             BossTemplate tpl = mobs.bossTemplate(mobId);
             Bukkit.getScheduler().runTask(plugin, () -> {
@@ -150,18 +129,10 @@ public final class MobSpawnService {
             });
         }
 
-        // ===============================
-// VISUAL (Crown / Floating Item)
-// ===============================
+        // VISUAL
         if (cfg.contains("visual.helmet.type")) {
-            MobVisualService.attachVisual(
-                    plugin,
-                    mob,
-                    cfg,
-                    keys
-            );
+            MobVisualService.attachVisual(plugin, mob, cfg, keys);
         }
-
 
         return mob;
     }

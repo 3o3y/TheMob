@@ -18,15 +18,15 @@ public final class KeyRegistry {
     public final NamespacedKey VISUAL_HEAD;
 
     // =========================
-    // AUTOSPAWN
+    // SPAWN META
     // =========================
-    public final NamespacedKey AUTO_SPAWN_ID;    // STRING
-    public final NamespacedKey AUTO_SPAWN_FLAG;  // INTEGER (1)
+    public final NamespacedKey SPAWN_TYPE;        // STRING: MANUAL | AUTOSPAWN
+    public final NamespacedKey AUTO_SPAWN_ID;     // STRING: spawnPointId
 
     // =========================
     // BOSS META
     // =========================
-    public final NamespacedKey BOSS_SPAWN_TIME;  // LONG (ms)
+    public final NamespacedKey BOSS_SPAWN_TIME;   // LONG (ms)
 
     // =========================
     // STATS
@@ -56,9 +56,9 @@ public final class KeyRegistry {
         NO_DROPS = new NamespacedKey(plugin, "no_drops");
         VISUAL_HEAD = new NamespacedKey(plugin, "visual_head");
 
-        // AUTOSPAWN
-        AUTO_SPAWN_ID   = new NamespacedKey(plugin, "auto_spawn_id");
-        AUTO_SPAWN_FLAG = new NamespacedKey(plugin, "auto_spawn_flag");
+        // SPAWN META
+        SPAWN_TYPE    = new NamespacedKey(plugin, "spawn_type");
+        AUTO_SPAWN_ID = new NamespacedKey(plugin, "auto_spawn_id");
 
         // BOSS META
         BOSS_SPAWN_TIME = new NamespacedKey(plugin, "boss_spawn_time");

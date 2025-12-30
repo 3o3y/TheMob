@@ -104,8 +104,8 @@ public final class TheMob extends JavaPlugin {
         mobManager.setHealthDisplay(healthDisplay);
 
         // =========================
-// BOSS SYSTEM
-// =========================
+        // BOSS SYSTEM
+        // =========================
         playerBars = new PlayerBarCoordinator();
 
         bossActionEngine = new BossActionEngine(this);
@@ -120,16 +120,14 @@ public final class TheMob extends JavaPlugin {
                 bossBars
         );
 
-// Behavior controller (ticks internally)
         behaviorController = new BossBehaviorController(
                 this,
                 mobManager,
                 phaseController
         );
 
-
         // =========================
-        // SPAWN SYSTEM
+        // SPAWN SYSTEM  ✅ FIXED
         // =========================
         MobSpawnService spawnService = new MobSpawnService(
                 this,
@@ -190,7 +188,6 @@ public final class TheMob extends JavaPlugin {
             stats.setExecutor(new StatsCommand(statsMenu));
         }
 
-        // Boss listeners (NEW ARCH)
         Bukkit.getPluginManager().registerEvents(
                 new BossImmunityListener(mobManager, phaseController),
                 this
@@ -206,24 +203,42 @@ public final class TheMob extends JavaPlugin {
     @Override
     public void onDisable() {
         try {
+            // 🔴 STOP GAME LOGIC FIRST
             if (spawnController != null) spawnController.stop();
+            if (ticks != null) ticks.shutdown();
+
+            // 🔴 BOSS PHASES CLEANUP (triggers onPhaseLeave)
+            if (phaseController != null) {
+                for (var boss : phaseController.activeBosses()) {
+                    phaseController.onBossDeath(boss);
+                }
+            }
+
+
+            // 🔴 ARENA WEATHER / TIME RESET
+            if (bossActionEngine != null) {
+                bossActionEngine.shutdown();
+            }
+
+            // 🔴 UI CLEANUP
             if (hud != null) hud.shutdown();
             if (bossBars != null) bossBars.shutdown();
-            if (ticks != null) ticks.shutdown();
+
         } finally {
             HandlerList.unregisterAll(this);
         }
 
-        getLogger().info("[TheMob] Disabled.");
+        getLogger().info("[TheMob] Disabled cleanly (arena + bosses + weather reset).");
     }
+
 
     public void reloadPlugin() {
         getLogger().info("[TheMob] Reloading...");
 
-        // =========================
-        // SHUTDOWN OLD STUFF
-        // =========================
         try {
+            if (bossActionEngine != null) {
+                bossActionEngine.shutdown();
+            }
             if (spawnController != null) {
                 spawnController.stop();
             }
@@ -268,8 +283,14 @@ public final class TheMob extends JavaPlugin {
         mobManager.setHealthDisplay(healthDisplay);
 
         // =========================
-// REBUILD BOSS SYSTEM
-// =========================
+        // REBUILD STATS (✅ sonst NPE in listeners)
+        // =========================
+        playerStatCache = new PlayerStatCache(this);
+        statsMenu = new StatsMenuService(this, playerStatCache);
+
+        // =========================
+        // REBUILD BOSS SYSTEM
+        // =========================
         playerBars = new PlayerBarCoordinator();
 
         bossActionEngine = new BossActionEngine(this);
@@ -289,7 +310,6 @@ public final class TheMob extends JavaPlugin {
                 mobManager,
                 phaseController
         );
-
 
         // =========================
         // REBUILD SPAWN SYSTEM
@@ -342,7 +362,6 @@ public final class TheMob extends JavaPlugin {
         registerAllListeners();
         registerCommands();
 
-        // Boss listeners (NEW ARCH)
         Bukkit.getPluginManager().registerEvents(
                 new BossImmunityListener(mobManager, phaseController),
                 this
@@ -371,15 +390,13 @@ public final class TheMob extends JavaPlugin {
                 this
         );
 
-        // ✅ HIER DER FIX
         MobListener mobListener = new MobListener(
                 mobManager,
                 healthDisplay,
                 bossBars,
-                bossActionEngine, // ← EXISTIERT JETZT
+                bossActionEngine,
                 keys
         );
-
         Bukkit.getPluginManager().registerEvents(mobListener, this);
 
         Bukkit.getPluginManager().registerEvents(
@@ -398,7 +415,6 @@ public final class TheMob extends JavaPlugin {
         );
     }
 
-
     private void registerCommands() {
         PluginCommand mob = getCommand("mob");
         if (mob != null) {
@@ -412,7 +428,6 @@ public final class TheMob extends JavaPlugin {
     public KeyRegistry keys() { return keys; }
     public ItemStatReader itemStats() { return itemStatReader; }
 
-    // Utility (optional): nearest player in radius
     private Player findNearestPlayer(Location loc, double radius) {
         if (loc == null || loc.getWorld() == null) return null;
 

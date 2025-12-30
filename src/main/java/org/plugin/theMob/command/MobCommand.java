@@ -29,37 +29,7 @@ public final class MobCommand implements CommandExecutor {
         }
 
         // =====================================================
-        // /mob list autospawn
-        // =====================================================
-        if (args[0].equalsIgnoreCase("list")
-                && args.length >= 2
-                && args[1].equalsIgnoreCase("autospawn")) {
-
-            if (!sender.hasPermission("themob.spawn.set")) {
-                sender.sendMessage("§cNo permission.");
-                return true;
-            }
-
-            var list = spawns.listAutoSpawns();
-
-            if (list.isEmpty()) {
-                sender.sendMessage("§7No auto-spawns configured.");
-                return true;
-            }
-
-            sender.sendMessage("§6§lAuto-Spawns:");
-            for (var s : list) {
-                sender.sendMessage(
-                        "§e- " + s.mobId() +
-                                " §7" + s.world() +
-                                " §f" + s.x() + ", " + s.y() + ", " + s.z()
-                );
-            }
-            return true;
-        }
-
-        // =====================================================
-        // EXISTIERENDE COMMANDS (unverändert)
+        // /mob reload
         // =====================================================
         if (args[0].equalsIgnoreCase("reload")) {
             if (!sender.hasPermission("themob.reload")) {
@@ -71,11 +41,15 @@ public final class MobCommand implements CommandExecutor {
             return true;
         }
 
+        // =====================================================
+        // /mob spawn <mob-id>   ✅ MANUAL ONLY
+        // =====================================================
         if (args[0].equalsIgnoreCase("spawn")) {
             if (!(sender instanceof Player p)) {
                 sender.sendMessage("§cOnly players can spawn mobs.");
                 return true;
             }
+
             if (args.length < 2) {
                 p.sendMessage("§e/mob spawn <mob-id>");
                 return true;
@@ -89,23 +63,30 @@ public final class MobCommand implements CommandExecutor {
 
             mobs.spawnCustomMob(
                     id,
-                    "manual@" + p.getUniqueId(),
-                    p.getLocation().add(p.getLocation().getDirection().multiply(2))
+                    null, // 🔥 KRITISCH: NULL = MANUAL
+                    p.getLocation().add(
+                            p.getLocation().getDirection().normalize().multiply(2)
+                    )
             );
 
             p.sendMessage("§aSpawned mob: §e" + id);
             return true;
         }
 
+        // =====================================================
+        // /mob autospawn <id> <seconds> <max>
+        // =====================================================
         if (args[0].equalsIgnoreCase("autospawn")) {
             if (!(sender instanceof Player p)) {
                 sender.sendMessage("§cOnly players can use this command.");
                 return true;
             }
+
             if (!sender.hasPermission("themob.spawn.set")) {
                 sender.sendMessage("§cNo permission.");
                 return true;
             }
+
             if (args.length < 4) {
                 sender.sendMessage("§e/mob autospawn <id> <seconds> <maxSpawns>");
                 return true;
@@ -142,6 +123,38 @@ public final class MobCommand implements CommandExecutor {
             return true;
         }
 
+        // =====================================================
+        // /mob list autospawn
+        // =====================================================
+        if (args[0].equalsIgnoreCase("list")
+                && args.length >= 2
+                && args[1].equalsIgnoreCase("autospawn")) {
+
+            if (!sender.hasPermission("themob.spawn.set")) {
+                sender.sendMessage("§cNo permission.");
+                return true;
+            }
+
+            var list = spawns.listAutoSpawns();
+            if (list.isEmpty()) {
+                sender.sendMessage("§7No auto-spawns configured.");
+                return true;
+            }
+
+            sender.sendMessage("§6§lAuto-Spawns:");
+            for (var s : list) {
+                sender.sendMessage(
+                        "§e- " + s.mobId() +
+                                " §7" + s.world() +
+                                " §f" + s.x() + ", " + s.y() + ", " + s.z()
+                );
+            }
+            return true;
+        }
+
+        // =====================================================
+        // /mob del autospawn <id>
+        // =====================================================
         if (args[0].equalsIgnoreCase("del")
                 && args.length >= 3
                 && args[1].equalsIgnoreCase("autospawn")) {
@@ -161,6 +174,9 @@ public final class MobCommand implements CommandExecutor {
             return true;
         }
 
+        // =====================================================
+        // /mob killall
+        // =====================================================
         if (args[0].equalsIgnoreCase("killall")) {
             if (!sender.hasPermission("themob.killall")) {
                 sender.sendMessage("§cNo permission.");
