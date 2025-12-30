@@ -7,6 +7,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
+import org.plugin.theMob.boss.BossLockService;
 import org.plugin.theMob.core.KeyRegistry;
 import org.plugin.theMob.mob.MobManager;
 import org.plugin.theMob.spawn.SpawnPoint;
@@ -24,21 +25,27 @@ public final class AutoSpawnManager {
     private final JavaPlugin plugin;
     private final MobManager mobs;
     private final KeyRegistry keys;
+    private final BossLockService bossLocks;
 
     private final Map<String, SpawnPoint> points = new ConcurrentHashMap<>();
     private final Map<String, Integer> spawnedCount = new ConcurrentHashMap<>();
     private final Map<String, Long> lastSpawnTick = new ConcurrentHashMap<>();
     private final Map<String, Set<UUID>> alive = new ConcurrentHashMap<>();
-
     private final Map<String, Long> arenaEmptySince = new ConcurrentHashMap<>();
     private final Map<String, Long> spawnBlockedUntil = new ConcurrentHashMap<>();
 
     private volatile boolean started = false;
 
-    public AutoSpawnManager(JavaPlugin plugin, MobManager mobs, KeyRegistry keys) {
+    public AutoSpawnManager(
+            JavaPlugin plugin,
+            MobManager mobs,
+            KeyRegistry keys,
+            BossLockService bossLocks
+    ) {
         this.plugin = plugin;
         this.mobs = mobs;
         this.keys = keys;
+        this.bossLocks = bossLocks;
     }
 
     // =====================================================
@@ -114,9 +121,6 @@ public final class AutoSpawnManager {
                 }
             }
 
-            // ============================
-            // 🔥 HOT
-            // ============================
             if (hot) {
 
                 Long emptySince = arenaEmptySince.get(id);
@@ -136,23 +140,23 @@ public final class AutoSpawnManager {
                 if (cnt == 0 || (now - lastSpawnTick.getOrDefault(id, 0L)) >= sp.intervalSeconds() * 20L) {
                     spawnOne(sp, id, now);
                 }
-                continue;
-            }
-
-            // ============================
-            // ❄️ COLD
-            // ============================
-            if (!hot && spawnedCount.getOrDefault(id, 0) > 0) {
+            } else if (spawnedCount.getOrDefault(id, 0) > 0) {
                 arenaEmptySince.putIfAbsent(id, now);
             }
         }
     }
 
     // =====================================================
-    // HELPERS
+    // SPAWN
     // =====================================================
 
     private void spawnOne(SpawnPoint sp, String id, long now) {
+
+        // 🔒 BOSS LOCK – BEFORE SPAWN
+        if (mobs.hasBossTemplate(sp.mobId()) && bossLocks.hasBoss(id)) {
+            return;
+        }
+
         LivingEntity mob = mobs.spawnCustomMob(
                 sp.mobId(),
                 id,
@@ -182,26 +186,32 @@ public final class AutoSpawnManager {
         alive.get(id).add(mob.getUniqueId());
         spawnedCount.put(id, spawnedCount.getOrDefault(id, 0) + 1);
         lastSpawnTick.put(id, now);
+
+        // 🔐 REGISTER BOSS
+        if (mobs.isBoss(mob)) {
+            bossLocks.register(id, mob);
+        }
     }
 
-    /**
-     * 🔥 HARTER RESET
-     * Entfernt ALLES, was zu diesem SpawnPoint gehört – inkl. Bosse
-     */
+    // =====================================================
+    // HARD RESET
+    // =====================================================
+
     private void hardReset(String spawnId) {
         Set<UUID> set = alive.get(spawnId);
-        if (set == null || set.isEmpty()) return;
-
-        Bukkit.getWorlds().forEach(world -> {
-            for (UUID uuid : set) {
-                LivingEntity e = (LivingEntity) world.getEntity(uuid);
-                if (e != null && !e.isDead()) {
-                    e.remove();
+        if (set != null) {
+            Bukkit.getWorlds().forEach(world -> {
+                for (UUID uuid : set) {
+                    var e = world.getEntity(uuid);
+                    if (e instanceof LivingEntity le && !le.isDead()) {
+                        le.remove();
+                    }
                 }
-            }
-        });
+            });
+            set.clear();
+        }
 
-        set.clear();
         spawnedCount.put(spawnId, 0);
+        bossLocks.release(spawnId);
     }
 }

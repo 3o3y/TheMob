@@ -30,6 +30,16 @@ stats:
   attack-damage: 0             # 0 = harmless (good for events / early game)
   scale: 0.8                   # Entity size multiplier (1.0 = default size)
 
+
+# ---------------------------------------------------------
+# Equipment (Resource Pack Skin)
+# ---------------------------------------------------------
+equipment:
+  helmet:
+    material: CARVED_PUMPKIN
+    custom-model-data: 1001   # ⬅ Zombie Skin CMD
+    drop: false               # wichtig: kein Drop
+
 # ---------------------------------------------------------
 # Death Commands
 # ---------------------------------------------------------

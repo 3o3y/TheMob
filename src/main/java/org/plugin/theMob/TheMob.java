@@ -9,6 +9,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.plugin.theMob.boss.BossActionEngine;
 import org.plugin.theMob.boss.BossCombatListener;
 import org.plugin.theMob.boss.BossImmunityListener;
+import org.plugin.theMob.boss.BossLockService;
 import org.plugin.theMob.boss.bar.BossBarService;
 import org.plugin.theMob.boss.behavior.BossBehaviorController;
 import org.plugin.theMob.boss.phase.BossPhaseController;
@@ -56,6 +57,7 @@ public final class TheMob extends JavaPlugin {
     private BossPhaseController phaseController;
     private BossBehaviorController behaviorController;
     private BossActionEngine bossActionEngine;
+    private BossLockService bossLocks;
 
     private NaviHudService hud;
 
@@ -139,7 +141,15 @@ public final class TheMob extends JavaPlugin {
         );
         mobManager.setSpawnService(spawnService);
 
-        autoSpawnManager = new AutoSpawnManager(this, mobManager, keys);
+        bossLocks = new BossLockService();
+
+        autoSpawnManager = new AutoSpawnManager(
+                this,
+                mobManager,
+                keys,
+                bossLocks
+        );
+
 
         spawnController = new SpawnController(
                 this,
@@ -225,6 +235,12 @@ public final class TheMob extends JavaPlugin {
         } finally {
             HandlerList.unregisterAll(this);
         }
+        if (autoSpawnManager != null) autoSpawnManager.stop();
+        if (bossLocks != null) bossLocks.clearAll();
+        if (bossActionEngine != null) bossActionEngine.shutdown();
+        if (bossBars != null) bossBars.shutdown();
+
+
 
         getLogger().info("[TheMob] Disabled cleanly (arena + bosses + weather reset).");
     }
@@ -321,8 +337,14 @@ public final class TheMob extends JavaPlugin {
                 phaseController
         );
         mobManager.setSpawnService(spawnService);
+        bossLocks = new BossLockService();
 
-        autoSpawnManager = new AutoSpawnManager(this, mobManager, keys);
+        autoSpawnManager = new AutoSpawnManager(
+                this,
+                mobManager,
+                keys,
+                bossLocks
+        );
 
         spawnController = new SpawnController(
                 this,
@@ -439,4 +461,5 @@ public final class TheMob extends JavaPlugin {
         }
         return nearest;
     }
+
 }
