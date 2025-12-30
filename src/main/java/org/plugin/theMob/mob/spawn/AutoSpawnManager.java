@@ -58,7 +58,7 @@ public final class AutoSpawnManager {
     }
 
     public void stop() {
-        mobs.killAll();
+        points.keySet().forEach(this::hardReset);
         points.clear();
         spawnedCount.clear();
         lastSpawnTick.clear();
@@ -85,7 +85,7 @@ public final class AutoSpawnManager {
     }
 
     public void unregister(String spawnId) {
-        killSpawnPointMobs(spawnId);
+        hardReset(spawnId);
         points.remove(spawnId);
         spawnedCount.remove(spawnId);
         lastSpawnTick.remove(spawnId);
@@ -121,9 +121,7 @@ public final class AutoSpawnManager {
 
                 Long emptySince = arenaEmptySince.get(id);
                 if (emptySince != null && (now - emptySince) >= COLD_TICKS) {
-                    killSpawnPointMobs(id);
-                    spawnedCount.put(id, 0);
-                    alive.get(id).clear();
+                    hardReset(id);
                     spawnBlockedUntil.put(id, now + FIRST_SPAWN_DELAY);
                     lastSpawnTick.put(id, now);
                 }
@@ -133,19 +131,9 @@ public final class AutoSpawnManager {
                 if (now < spawnBlockedUntil.getOrDefault(id, 0L)) continue;
 
                 int cnt = spawnedCount.getOrDefault(id, 0);
-
-                // 🔥 HARTER FIX: erster HOT = sofortiger Spawn
-                if (cnt == 0) {
-                    spawnOne(sp, id, now);
-                    continue;
-                }
-
                 if (cnt >= sp.maxSpawns()) continue;
 
-                long last = lastSpawnTick.getOrDefault(id, 0L);
-                long interval = sp.intervalSeconds() * 20L;
-
-                if ((now - last) >= interval) {
+                if (cnt == 0 || (now - lastSpawnTick.getOrDefault(id, 0L)) >= sp.intervalSeconds() * 20L) {
                     spawnOne(sp, id, now);
                 }
                 continue;
@@ -156,10 +144,7 @@ public final class AutoSpawnManager {
             // ============================
             if (!hot && spawnedCount.getOrDefault(id, 0) > 0) {
                 arenaEmptySince.putIfAbsent(id, now);
-            } else if (hot) {
-                arenaEmptySince.remove(id);
             }
-
         }
     }
 
@@ -199,33 +184,24 @@ public final class AutoSpawnManager {
         lastSpawnTick.put(id, now);
     }
 
+    /**
+     * 🔥 HARTER RESET
+     * Entfernt ALLES, was zu diesem SpawnPoint gehört – inkl. Bosse
+     */
+    private void hardReset(String spawnId) {
+        Set<UUID> set = alive.get(spawnId);
+        if (set == null || set.isEmpty()) return;
 
-    private void killSpawnPointMobs(String spawnId) {
         Bukkit.getWorlds().forEach(world -> {
-            for (LivingEntity e : world.getLivingEntities()) {
-
-                if (!"AUTOSPAWN".equals(
-                        e.getPersistentDataContainer().get(
-                                keys.SPAWN_TYPE,
-                                PersistentDataType.STRING
-                        )
-                )) continue;
-
-                // 🔒 BOSS NIE AUTOKILLEN
-                Integer isBoss = e.getPersistentDataContainer()
-                        .get(keys.IS_BOSS, PersistentDataType.INTEGER);
-                if (isBoss != null && isBoss == 1) {
-                    continue;
-                }
-
-                String id = e.getPersistentDataContainer()
-                        .get(keys.AUTO_SPAWN_ID, PersistentDataType.STRING);
-
-                if (spawnId.equals(id)) {
+            for (UUID uuid : set) {
+                LivingEntity e = (LivingEntity) world.getEntity(uuid);
+                if (e != null && !e.isDead()) {
                     e.remove();
                 }
             }
         });
-    }
 
+        set.clear();
+        spawnedCount.put(spawnId, 0);
+    }
 }

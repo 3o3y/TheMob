@@ -1,15 +1,21 @@
 package org.plugin.theMob.mob;
 
+import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
 import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
+import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.persistence.PersistentDataType;
 import org.plugin.theMob.boss.BossActionEngine;
+import org.plugin.theMob.boss.Placeholder;
 import org.plugin.theMob.boss.bar.BossBarService;
 import org.plugin.theMob.core.KeyRegistry;
+
+import java.util.List;
 
 public final class MobListener implements Listener {
 
@@ -56,10 +62,33 @@ public final class MobListener implements Listener {
         }
 
         // =========================================
-        // 🌍 WORLD RESTORE (CRITICAL FIX)
+        // 🌍 WORLD RESTORE
         // =========================================
         if (mobs.isBoss(mob)) {
             bossActions.onBossDeath(mob);
+        }
+
+        // =========================================
+        // 💀 DEATH COMMANDS (WITH PLACEHOLDERS)
+        // =========================================
+        List<String> deathCommands = mobs.getDeathCommands(mob);
+        if (deathCommands != null && !deathCommands.isEmpty()) {
+
+            Player killer = mob.getKiller();
+
+            for (String raw : deathCommands) {
+                String resolved = Placeholder.resolve(
+                        raw,
+                        mob,
+                        null,
+                        killer
+                );
+
+                Bukkit.dispatchCommand(
+                        Bukkit.getConsoleSender(),
+                        ChatColor.translateAlternateColorCodes('&', resolved)
+                );
+            }
         }
 
         // =========================================
@@ -71,4 +100,6 @@ public final class MobListener implements Listener {
             bossBars.unregisterBoss(mob);
         }
     }
+
+
 }

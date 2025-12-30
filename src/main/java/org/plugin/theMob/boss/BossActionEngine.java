@@ -480,9 +480,10 @@ public final class BossActionEngine implements Listener {
         Collection<Player> targets = resolveAudience(boss, audience, radius);
         if (targets.isEmpty()) return;
 
+        // TITLE
         if (type.equals("TITLE")) {
-            String title = color(msg.getString("title", ""));
-            String subtitle = color(msg.getString("subtitle", ""));
+            String rawTitle = msg.getString("title", "");
+            String rawSubtitle = msg.getString("subtitle", "");
 
             int fadeIn = msg.getInt("fade-in", 10);
             int stay = msg.getInt("stay", 50);
@@ -490,38 +491,56 @@ public final class BossActionEngine implements Listener {
 
             for (Player p : targets) {
                 try {
+                    String title = color(
+                            Placeholder.resolve(rawTitle, boss, null, p)
+                    );
+                    String subtitle = color(
+                            Placeholder.resolve(rawSubtitle, boss, null, p)
+                    );
+
                     p.sendTitle(title, subtitle, fadeIn, stay, fadeOut);
                 } catch (Exception ignored) {}
             }
             return;
         }
 
+        // CHAT
         if (type.equals("CHAT")) {
-            String text = color(msg.getString("text", ""));
-            if (text.isEmpty()) return;
+            String raw = msg.getString("text", "");
+            if (raw.isEmpty()) return;
 
             for (Player p : targets) {
+                String text = color(
+                        Placeholder.resolve(raw, boss, null, p)
+                );
                 p.sendMessage(text);
             }
             return;
         }
 
-        // default: ACTIONBAR
-        String text = color(msg.getString("text", ""));
-        if (text.isEmpty()) {
-            // fallback falls jemand TITLE-style YAML nutzt aber ACTIONBAR schreibt
-            String t = color(msg.getString("title", ""));
-            String s = color(msg.getString("subtitle", ""));
-            text = (t + (s.isEmpty() ? "" : " §7" + s)).trim();
+        // ACTIONBAR (default)
+        String raw = msg.getString("text", "");
+        if (raw.isEmpty()) {
+            // fallback if someone uses TITLE-style keys
+            String t = msg.getString("title", "");
+            String s = msg.getString("subtitle", "");
+            raw = (t + (s.isEmpty() ? "" : " §7" + s)).trim();
         }
-        if (text.isEmpty()) return;
+        if (raw.isEmpty()) return;
 
         for (Player p : targets) {
             try {
-                p.spigot().sendMessage(ChatMessageType.ACTION_BAR, TextComponent.fromLegacyText(text));
+                String text = color(
+                        Placeholder.resolve(raw, boss, null, p)
+                );
+                p.spigot().sendMessage(
+                        ChatMessageType.ACTION_BAR,
+                        TextComponent.fromLegacyText(text)
+                );
             } catch (Exception ignored) {}
         }
     }
+
 
     private Collection<Player> resolveAudience(LivingEntity boss, String audience, double radius) {
         if (boss == null || !boss.isValid()) return List.of();

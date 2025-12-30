@@ -702,4 +702,4 @@ legendary-drops:
       - "&fNo escape."
 # Death Commands, execute Commands from Server
 death-commands: # Command executed on death
-  - "broadcast &6{mob} &7was slain by &b{player}&7!"
+  - "broadcast &6{mob_name} &7was slain by &b{player}&7!"

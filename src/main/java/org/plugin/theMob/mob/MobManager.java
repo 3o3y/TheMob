@@ -130,6 +130,25 @@ public final class MobManager {
         return keys;
     }
     // =====================================================
+    // DEATH COMMANDS
+    // =====================================================
+
+    public List<String> getDeathCommands(LivingEntity mob) {
+        if (mob == null) return List.of();
+
+        String id = mobIdOf(mob);
+        if (id == null) return List.of();
+
+        FileConfiguration cfg = mobConfigs.get(id.toLowerCase(Locale.ROOT));
+        if (cfg == null) return List.of();
+
+        if (!cfg.contains("death-commands")) return List.of();
+
+        List<String> list = cfg.getStringList("death-commands");
+        return list != null ? list : List.of();
+    }
+
+    // =====================================================
     // DEATH HANDLING
     // =====================================================
 
