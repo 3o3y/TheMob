@@ -23,15 +23,26 @@ public final class MobTabCompleter implements TabCompleter {
             String alias,
             String[] args
     ) {
-        List<String> list = new ArrayList<>();
 
         // /mob <sub>
         if (args.length == 1) {
             String prefix = args[0].toLowerCase();
-            return List.of("spawn", "autospawn", "list", "del", "killall", "reload")
-                    .stream()
+            return List.of(
+                            "spawn",
+                            "autospawn",
+                            "list",
+                            "del",
+                            "killall",
+                            "reload",
+                            "toggle" // ✅ NEU
+                    ).stream()
                     .filter(s -> s.startsWith(prefix))
                     .toList();
+        }
+
+        // /mob toggle <option>
+        if (args.length == 2 && args[0].equalsIgnoreCase("toggle")) {
+            return List.of("hud");
         }
 
         // /mob spawn <mob-id>
@@ -56,7 +67,6 @@ public final class MobTabCompleter implements TabCompleter {
         if (args.length == 2 && args[0].equalsIgnoreCase("list")) {
             return List.of("autospawn");
         }
-
 
         // /mob autospawn <mob-id> <interval>
         if (args.length == 3 && args[0].equalsIgnoreCase("autospawn")) {
@@ -85,6 +95,6 @@ public final class MobTabCompleter implements TabCompleter {
                     .toList();
         }
 
-        return list;
+        return new ArrayList<>();
     }
 }

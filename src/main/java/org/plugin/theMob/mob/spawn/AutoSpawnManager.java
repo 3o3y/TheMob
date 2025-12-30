@@ -154,9 +154,12 @@ public final class AutoSpawnManager {
             // ============================
             // ❄️ COLD
             // ============================
-            if (spawnedCount.getOrDefault(id, 0) > 0) {
+            if (!hot && spawnedCount.getOrDefault(id, 0) > 0) {
                 arenaEmptySince.putIfAbsent(id, now);
+            } else if (hot) {
+                arenaEmptySince.remove(id);
             }
+
         }
     }
 
@@ -176,6 +179,10 @@ public final class AutoSpawnManager {
             return;
         }
 
+        mob.setRemoveWhenFarAway(false);
+        mob.setPersistent(true);
+        mob.setAI(true);
+
         mob.getPersistentDataContainer().set(
                 keys.SPAWN_TYPE,
                 PersistentDataType.STRING,
@@ -192,18 +199,33 @@ public final class AutoSpawnManager {
         lastSpawnTick.put(id, now);
     }
 
+
     private void killSpawnPointMobs(String spawnId) {
         Bukkit.getWorlds().forEach(world -> {
             for (LivingEntity e : world.getLivingEntities()) {
+
                 if (!"AUTOSPAWN".equals(
-                        e.getPersistentDataContainer().get(keys.SPAWN_TYPE, PersistentDataType.STRING)
+                        e.getPersistentDataContainer().get(
+                                keys.SPAWN_TYPE,
+                                PersistentDataType.STRING
+                        )
                 )) continue;
+
+                // 🔒 BOSS NIE AUTOKILLEN
+                Integer isBoss = e.getPersistentDataContainer()
+                        .get(keys.IS_BOSS, PersistentDataType.INTEGER);
+                if (isBoss != null && isBoss == 1) {
+                    continue;
+                }
 
                 String id = e.getPersistentDataContainer()
                         .get(keys.AUTO_SPAWN_ID, PersistentDataType.STRING);
 
-                if (spawnId.equals(id)) e.remove();
+                if (spawnId.equals(id)) {
+                    e.remove();
+                }
             }
         });
     }
+
 }

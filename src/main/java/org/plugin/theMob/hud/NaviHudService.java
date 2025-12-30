@@ -5,7 +5,6 @@ import org.bukkit.boss.*;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.plugin.theMob.TheMob;
-import org.plugin.theMob.core.context.PlayerBarCoordinator;
 import org.plugin.theMob.hud.compass.CompassRenderer;
 import org.plugin.theMob.mob.MobManager;
 
@@ -14,15 +13,17 @@ import java.util.*;
 public final class NaviHudService {
 
     private final TheMob plugin;
-    private final PlayerBarCoordinator coordinator;
     private final CompassRenderer compass;
     private final MobRadarResolver radar;
 
-    private final boolean navEnabled;
+    private final boolean enabled;
     private final boolean radarEnabled;
     private final boolean hideWhenIdle;
     private final boolean hideCreative;
     private final boolean hideSpectator;
+
+    private final double maxVisibleDistance;
+    private final int updateInterval;
 
     private final Map<String, BarColor> colors;
     private final Map<UUID, BossBar> hudBars = new HashMap<>();
@@ -31,22 +32,29 @@ public final class NaviHudService {
 
     public NaviHudService(
             TheMob plugin,
-            PlayerBarCoordinator coordinator,
-            CompassRenderer compass,
             MobManager mobs
     ) {
         this.plugin = plugin;
-        this.coordinator = coordinator;
-        this.compass = compass;
+        this.compass = new CompassRenderer();
 
         var cfg = plugin.getConfig();
 
-        navEnabled = cfg.getBoolean("plugin.navigation-hud.enabled", true);
+        enabled = cfg.getBoolean("plugin.navigation-hud.enabled", true);
         radarEnabled = cfg.getBoolean("plugin.mob-radar.enabled", true);
 
         hideWhenIdle = cfg.getBoolean("plugin.navigation-hud.hide-when-idle", false);
-        hideCreative = cfg.getBoolean("plugin.navigation-hud.hide-in-creative", true);
+        hideCreative = cfg.getBoolean("plugin.navigation-hud.hide-in-creative", false);
         hideSpectator = cfg.getBoolean("plugin.navigation-hud.hide-in-spectator", true);
+
+        maxVisibleDistance = cfg.getDouble(
+                "plugin.navigation-hud.max-visible-distance",
+                32.0
+        );
+
+        updateInterval = cfg.getInt(
+                "plugin.navigation-hud.update-interval-ticks",
+                5
+        );
 
         radar = new MobRadarResolver(
                 mobs,
@@ -71,11 +79,7 @@ public final class NaviHudService {
     // -------------------------------------------------------
 
     public void start() {
-        if ((!navEnabled && !radarEnabled) || task != null) return;
-
-        int interval = plugin.getConfig().getInt(
-                "plugin.navigation-hud.update-interval-ticks", 5
-        );
+        if (!enabled || task != null) return;
 
         task = new BukkitRunnable() {
             @Override
@@ -83,14 +87,16 @@ public final class NaviHudService {
                 tick();
             }
         };
-        task.runTaskTimer(plugin, 0L, interval);
+        task.runTaskTimer(plugin, 0L, updateInterval);
     }
 
     public void shutdown() {
         if (task != null) task.cancel();
         task = null;
 
-        hudBars.values().forEach(BossBar::removeAll);
+        for (BossBar bar : hudBars.values()) {
+            bar.removeAll();
+        }
         hudBars.clear();
     }
 
@@ -102,57 +108,51 @@ public final class NaviHudService {
 
         for (Player p : Bukkit.getOnlinePlayers()) {
 
-            if (hideCreative && p.getGameMode() == GameMode.CREATIVE) continue;
-            if (hideSpectator && p.getGameMode() == GameMode.SPECTATOR) continue;
+            if (!PlayerHudState.isEnabled(p.getUniqueId())) {
+                removeHud(p);
+                continue;
+            }
 
-            if (!navEnabled && !radarEnabled) {
-                remove(p);
+            if (hideCreative && p.getGameMode() == GameMode.CREATIVE) {
+                removeHud(p);
+                continue;
+            }
+
+            if (hideSpectator && p.getGameMode() == GameMode.SPECTATOR) {
+                removeHud(p);
                 continue;
             }
 
             BossBar bar = hudBars.computeIfAbsent(
                     p.getUniqueId(),
-                    id -> createBar(p)
+                    id -> createHudBar(p)
             );
 
-            // --- Radar nur EINMAL ---
             MobRadarResolver.RadarTarget target =
                     radarEnabled ? radar.find(p) : null;
 
-            // --- Visibility ---
+            bar.setTitle(compass.render(p.getYaw()));
             bar.setVisible(true);
 
-            // --- TITLE (N-W-S-O) ---
-            if (navEnabled) {
-                bar.setTitle(compass.render(p.getYaw()));
-            } else {
-                bar.setTitle(" "); // wichtig: nicht ""
-            }
-
-            // --- RADAR AUS ---
-            if (!radarEnabled) {
-                bar.setProgress(0.0001);
-                bar.setColor(colors.get("EMPTY"));
+            if (!radarEnabled || target == null) {
+                if (hideWhenIdle) {
+                    removeHud(p);
+                } else {
+                    bar.setProgress(0.0001);
+                    bar.setColor(colors.get("EMPTY"));
+                }
                 continue;
             }
 
-            // --- RADAR AN, aber idle ---
-            if (hideWhenIdle && target == null) {
-                bar.setProgress(0.0001);
-                bar.setColor(colors.get("EMPTY"));
+            if (target.distance() > maxVisibleDistance) {
+                removeHud(p);
                 continue;
             }
 
-            if (target == null) {
-                bar.setProgress(0.0001);
-                bar.setColor(colors.get("EMPTY"));
-                continue;
-            }
-
-            double progress = Math.max(0.0, Math.min(
-                    1.0,
+            double progress = Math.max(
+                    0.0001,
                     1.0 - (target.distance() / radar.getRadius())
-            ));
+            );
 
             bar.setProgress(progress);
             bar.setColor(colors.get(target.type().name()));
@@ -160,29 +160,34 @@ public final class NaviHudService {
     }
 
     // -------------------------------------------------------
-    // Helpers
+    // HUD ONLY (❗ DOES NOT TOUCH BOSS BARS)
     // -------------------------------------------------------
 
-    private BossBar createBar(Player p) {
-        BossBar bar = Bukkit.createBossBar("", BarColor.WHITE, BarStyle.SOLID);
+    private BossBar createHudBar(Player p) {
+        BossBar bar = Bukkit.createBossBar(
+                "",
+                BarColor.WHITE,
+                BarStyle.SOLID
+        );
         bar.setProgress(0.0001);
         bar.addPlayer(p);
-        coordinator.of(p).setHudBar(bar);
         return bar;
     }
 
-    private void remove(Player p) {
+    private void removeHud(Player p) {
         BossBar bar = hudBars.remove(p.getUniqueId());
-        if (bar != null) bar.removeAll();
-        coordinator.remove(p);
+        if (bar != null) {
+            bar.removeAll();
+        }
     }
 
     public void onJoin(Player p) {
-        if (!navEnabled && !radarEnabled) return;
-        hudBars.computeIfAbsent(p.getUniqueId(), id -> createBar(p));
+        if (!PlayerHudState.isEnabled(p.getUniqueId())) return;
+        hudBars.computeIfAbsent(p.getUniqueId(), id -> createHudBar(p));
     }
 
     public void onQuit(Player p) {
-        remove(p);
+        PlayerHudState.clear(p.getUniqueId());
+        removeHud(p);
     }
 }

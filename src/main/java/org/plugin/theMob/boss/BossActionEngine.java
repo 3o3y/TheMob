@@ -1,5 +1,7 @@
 package org.plugin.theMob.boss;
 
+import net.md_5.bungee.api.ChatMessageType;
+import net.md_5.bungee.api.chat.TextComponent;
 import org.bukkit.*;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeInstance;
@@ -104,33 +106,14 @@ public final class BossActionEngine implements Listener {
     // =====================================================
     public void onPhaseLeave(LivingEntity boss, BossPhase phase) {
         if (boss == null || !boss.isValid()) return;
-
-        // ✅ WICHTIG:
-        // Phase leave darf den Boss NICHT "zum Vanilla Mob" resetten.
-        // Sonst sieht es so aus, als würde er seinen Boss-Status verlieren.
-        //
-        // Wir machen hier absichtlich KEIN:
-        // - resetAttributes()
-        // - boss.setAI(true) / gravity true / silent false etc.
-        // - clearWeatherStation()
-        //
-        // Cleanup passiert nur:
-        // - beim nächsten onPhaseEnter (überschreibt die Werte sauber)
-        // - bei onBossDeath()/shutdown() (harte Rücksetzung der Spieler-Wetter/Time)
-
-        // Optional: Wenn du willst, kannst du hier "phasenspezifische" Effekte entfernen,
-        // aber nur gezielt (nicht alles pauschal).
-        // Beispiel: remove fire resistance wenn Phase es gesetzt hat und du es nicht carry-over willst.
-        // -> aktuell lassen wir Effekte bewusst bestehen, bis nächste Phase sie überschreibt.
+        // bewusst kein hard reset hier
     }
 
     // =====================================================
     // BOSS DEATH / DESPAWN
     // =====================================================
     public void onBossDeath(LivingEntity boss) {
-        // PhaseController ruft das bei Boss-Tod / cleanup auf
         clearWeatherStation();
-
         if (boss != null) {
             bossSnapshots.remove(boss.getUniqueId());
         }
@@ -143,8 +126,6 @@ public final class BossActionEngine implements Listener {
         if (boss == null || !boss.isValid()) return;
 
         if (cfg == null) {
-            // Phase hat keinen world-block: Station deaktivieren
-            // (Spieler werden zurückgesetzt)
             clearWeatherStation();
             return;
         }
@@ -154,7 +135,6 @@ public final class BossActionEngine implements Listener {
         this.activeWeather = cfg.getString("weather");
         this.activeTime = cfg.getString("time");
 
-        // Apply to players currently inside / reset outside
         for (Player p : boss.getWorld().getPlayers()) {
             if (isInsideStation(p)) {
                 applyToPlayer(p);
@@ -277,7 +257,6 @@ public final class BossActionEngine implements Listener {
     public void onMove(PlayerMoveEvent e) {
         if (activeBoss == null) return;
 
-        // Avoid heavy checks when player hasn't changed block
         if (e.getFrom().getBlockX() == e.getTo().getBlockX()
                 && e.getFrom().getBlockY() == e.getTo().getBlockY()
                 && e.getFrom().getBlockZ() == e.getTo().getBlockZ()) {
@@ -296,7 +275,7 @@ public final class BossActionEngine implements Listener {
     }
 
     // =====================================================
-    // SNAPSHOT (prevents stacking & keeps boss "bossy")
+    // SNAPSHOT
     // =====================================================
     private void ensureSnapshot(LivingEntity boss) {
         UUID id = boss.getUniqueId();
@@ -304,7 +283,6 @@ public final class BossActionEngine implements Listener {
     }
 
     private void cleanupSnapshots() {
-        // Remove snapshots for entities that no longer exist
         for (UUID id : new HashSet<>(bossSnapshots.keySet())) {
             LivingEntity le = findLivingEntity(id);
             if (le == null || !le.isValid()) {
@@ -329,7 +307,6 @@ public final class BossActionEngine implements Listener {
 
         BossSnapshot snap = bossSnapshots.get(boss.getUniqueId());
         if (snap == null) {
-            // fallback (should not happen)
             applyAttributeAdditive(boss, Attribute.MOVEMENT_SPEED, cfg.getDouble("movement-speed", 0));
             applyAttributeAdditive(boss, Attribute.ATTACK_DAMAGE, cfg.getDouble("damage", 0));
             applyAttributeAdditive(boss, Attribute.ARMOR, cfg.getDouble("armor", 0));
@@ -338,7 +315,6 @@ public final class BossActionEngine implements Listener {
             return;
         }
 
-        // ✅ Set relative to original base values (NO stacking)
         setAttribute(boss, Attribute.MOVEMENT_SPEED, snap.base(Attribute.MOVEMENT_SPEED) + cfg.getDouble("movement-speed", 0));
         setAttribute(boss, Attribute.ATTACK_DAMAGE, snap.base(Attribute.ATTACK_DAMAGE) + cfg.getDouble("damage", 0));
         setAttribute(boss, Attribute.ARMOR, snap.base(Attribute.ARMOR) + cfg.getDouble("armor", 0));
@@ -360,8 +336,6 @@ public final class BossActionEngine implements Listener {
     private void applyAbilities(LivingEntity boss, ConfigurationSection cfg) {
         if (cfg == null) return;
 
-        // ✅ WICHTIG: wir setzen hier nur, was YAML sagt.
-        // Kein globaler Reset bei Phase-Wechsel.
         boss.setAI(!cfg.getBoolean("no-ai", false));
         boss.setSilent(cfg.getBoolean("silent", false));
         boss.setInvulnerable(cfg.getBoolean("invulnerable", false));
@@ -385,10 +359,6 @@ public final class BossActionEngine implements Listener {
         }
     }
 
-    private void clearPotionEffects(LivingEntity e) {
-        e.getActivePotionEffects().forEach(pe -> e.removePotionEffect(pe.getType()));
-    }
-
     private void applyPhysics(LivingEntity boss, ConfigurationSection cfg) {
         if (cfg != null) boss.setGravity(cfg.getBoolean("gravity", true));
     }
@@ -401,7 +371,6 @@ public final class BossActionEngine implements Listener {
             BossPhase phase,
             ConfigurationSection cfg
     ) {
-        // 🔒 Prevent re-spawn for this phase
         NamespacedKey key = new NamespacedKey(plugin, "minions_" + phase.id());
         if (boss.getPersistentDataContainer().has(key, PersistentDataType.INTEGER)) {
             return;
@@ -411,22 +380,17 @@ public final class BossActionEngine implements Listener {
         int amount = cfg.getInt("amount", 1);
         double radius = cfg.getDouble("radius", 5.0);
 
-        // cooldown == lifetime (seconds)
         int lifetimeSeconds = cfg.getInt("cooldown", 15);
 
-        // ✅ SAFE enum parsing
         String typeRaw = cfg.getString("type", "ZOMBIE");
         EntityType type;
         try {
             type = EntityType.valueOf(typeRaw.toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException ex) {
-            plugin.getLogger().warning(
-                    "[TheMob] Invalid minion type: " + typeRaw + " – fallback to ZOMBIE"
-            );
+            plugin.getLogger().warning("[TheMob] Invalid minion type: " + typeRaw + " – fallback to ZOMBIE");
             type = EntityType.ZOMBIE;
         }
 
-        // ✅ OPTIONAL NAME
         String name = cfg.getString("name");
 
         for (int i = 0; i < amount; i++) {
@@ -440,34 +404,28 @@ public final class BossActionEngine implements Listener {
             minion.setPersistent(true);
             minion.setRemoveWhenFarAway(false);
 
-            // ✅ Name from YAML
             if (name != null && !name.isEmpty()) {
                 minion.setCustomName(ChatColor.translateAlternateColorCodes('&', name));
                 minion.setCustomNameVisible(true);
             }
 
-            // ❌ Prevent drops
             minion.getPersistentDataContainer().set(
                     plugin.keys().NO_DROPS,
                     PersistentDataType.INTEGER,
                     1
             );
 
-            // ⏱ Lifetime = cooldown
             new BukkitRunnable() {
                 @Override
                 public void run() {
-                    if (minion.isValid()) {
-                        minion.remove();
-                    }
+                    if (minion.isValid()) minion.remove();
                 }
             }.runTaskLater(plugin, lifetimeSeconds * 20L);
         }
     }
 
-
     // =====================================================
-    // ON-ENTER EFFECTS
+    // ON-ENTER EFFECTS  (Particles/Sound + NEW Message)
     // =====================================================
     private void runOnEnterEffects(LivingEntity boss, ConfigurationSection onEnter) {
         ConfigurationSection effects = onEnter.getConfigurationSection("effects");
@@ -475,11 +433,14 @@ public final class BossActionEngine implements Listener {
 
         Location loc = boss.getLocation().clone().add(0, 1, 0);
 
+        // Particles
         ConfigurationSection particles = effects.getConfigurationSection("particles");
         if (particles != null) {
             try {
                 Particle type = Particle.valueOf(particles.getString("type", "FLAME").toUpperCase(Locale.ROOT));
-                boss.getWorld().spawnParticle(type, loc,
+                boss.getWorld().spawnParticle(
+                        type,
+                        loc,
                         particles.getInt("amount", 20),
                         particles.getDouble("radius", 1),
                         particles.getDouble("height", 1),
@@ -489,17 +450,118 @@ public final class BossActionEngine implements Listener {
             } catch (Exception ignored) {}
         }
 
+        // Sound
         ConfigurationSection sound = effects.getConfigurationSection("sound");
         if (sound != null) {
             try {
                 boss.getWorld().playSound(
                         boss.getLocation(),
-                        Sound.valueOf(sound.getString("type")),
+                        Sound.valueOf(sound.getString("type", "ENTITY_WITHER_SPAWN").toUpperCase(Locale.ROOT)),
                         (float) sound.getDouble("volume", 1),
                         (float) sound.getDouble("pitch", 1)
                 );
             } catch (Exception ignored) {}
         }
+
+        // ✅ Message (ACTIONBAR / TITLE / CHAT)
+        ConfigurationSection msg = effects.getConfigurationSection("message");
+        if (msg != null) {
+            sendPhaseEnterMessage(boss, msg);
+        }
+    }
+
+    private void sendPhaseEnterMessage(LivingEntity boss, ConfigurationSection msg) {
+        String type = msg.getString("type", "ACTIONBAR").toUpperCase(Locale.ROOT);
+
+        String audience = msg.getString("audience", "NEARBY").toUpperCase(Locale.ROOT);
+        double radius = msg.getDouble("radius", activeRadius > 0.0 ? activeRadius : 32.0);
+
+        // resolve targets
+        Collection<Player> targets = resolveAudience(boss, audience, radius);
+        if (targets.isEmpty()) return;
+
+        if (type.equals("TITLE")) {
+            String title = color(msg.getString("title", ""));
+            String subtitle = color(msg.getString("subtitle", ""));
+
+            int fadeIn = msg.getInt("fade-in", 10);
+            int stay = msg.getInt("stay", 50);
+            int fadeOut = msg.getInt("fade-out", 10);
+
+            for (Player p : targets) {
+                try {
+                    p.sendTitle(title, subtitle, fadeIn, stay, fadeOut);
+                } catch (Exception ignored) {}
+            }
+            return;
+        }
+
+        if (type.equals("CHAT")) {
+            String text = color(msg.getString("text", ""));
+            if (text.isEmpty()) return;
+
+            for (Player p : targets) {
+                p.sendMessage(text);
+            }
+            return;
+        }
+
+        // default: ACTIONBAR
+        String text = color(msg.getString("text", ""));
+        if (text.isEmpty()) {
+            // fallback falls jemand TITLE-style YAML nutzt aber ACTIONBAR schreibt
+            String t = color(msg.getString("title", ""));
+            String s = color(msg.getString("subtitle", ""));
+            text = (t + (s.isEmpty() ? "" : " §7" + s)).trim();
+        }
+        if (text.isEmpty()) return;
+
+        for (Player p : targets) {
+            try {
+                p.spigot().sendMessage(ChatMessageType.ACTION_BAR, TextComponent.fromLegacyText(text));
+            } catch (Exception ignored) {}
+        }
+    }
+
+    private Collection<Player> resolveAudience(LivingEntity boss, String audience, double radius) {
+        if (boss == null || !boss.isValid()) return List.of();
+        World w = boss.getWorld();
+
+        switch (audience) {
+            case "WORLD" -> {
+                return new ArrayList<>(w.getPlayers());
+            }
+            case "STATION" -> {
+                // Nur Spieler, die aktuell im WeatherStation Radius sind (falls aktiv)
+                if (activeBoss != null && activeBoss.isValid() && activeBoss.getUniqueId().equals(boss.getUniqueId()) && activeRadius > 0.0) {
+                    List<Player> out = new ArrayList<>();
+                    for (UUID id : affectedPlayers) {
+                        Player p = Bukkit.getPlayer(id);
+                        if (p != null && p.isOnline() && Objects.equals(p.getWorld(), w)) out.add(p);
+                    }
+                    return out;
+                }
+                // Fallback: NEARBY
+            }
+        }
+
+        // NEARBY (default)
+        double r2 = Math.max(0.0, radius);
+        r2 = r2 * r2;
+
+        List<Player> out = new ArrayList<>();
+        Location b = boss.getLocation();
+
+        for (Player p : w.getPlayers()) {
+            if (!p.isOnline()) continue;
+            if (p.getLocation().distanceSquared(b) <= r2) out.add(p);
+        }
+        return out;
+    }
+
+    private String color(String s) {
+        if (s == null) return "";
+        return ChatColor.translateAlternateColorCodes('&', s);
     }
 
     // =====================================================
@@ -520,18 +582,13 @@ public final class BossActionEngine implements Listener {
     // =====================================================
     // SNAPSHOT RECORD
     // =====================================================
-    private record BossSnapshot(
-            Map<Attribute, Double> bases
-    ) {
+    private record BossSnapshot(Map<Attribute, Double> bases) {
 
         static BossSnapshot capture(LivingEntity e) {
             Map<Attribute, Double> map = new HashMap<>();
-
             for (Attribute a : Attribute.values()) {
                 AttributeInstance inst = e.getAttribute(a);
-                if (inst != null) {
-                    map.put(a, inst.getBaseValue());
-                }
+                if (inst != null) map.put(a, inst.getBaseValue());
             }
             return new BossSnapshot(map);
         }
@@ -540,5 +597,4 @@ public final class BossActionEngine implements Listener {
             return bases.getOrDefault(a, 0.0);
         }
     }
-
 }

@@ -159,8 +159,6 @@ public final class TheMob extends JavaPlugin {
         if (hudEnabled) {
             hud = new NaviHudService(
                     this,
-                    playerBars,
-                    new CompassRenderer(),
                     mobManager
             );
             hud.start();
@@ -344,8 +342,6 @@ public final class TheMob extends JavaPlugin {
         if (hudEnabled) {
             hud = new NaviHudService(
                     this,
-                    playerBars,
-                    new CompassRenderer(),
                     mobManager
             );
             hud.start();

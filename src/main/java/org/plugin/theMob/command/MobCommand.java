@@ -29,6 +29,28 @@ public final class MobCommand implements CommandExecutor {
         }
 
         // =====================================================
+// /mob toggle hud
+// =====================================================
+        if (args[0].equalsIgnoreCase("toggle")
+                && args.length >= 2
+                && args[1].equalsIgnoreCase("hud")) {
+
+            if (!(sender instanceof Player p)) {
+                sender.sendMessage("§cOnly players can toggle HUD.");
+                return true;
+            }
+
+            boolean enabled = org.plugin.theMob.hud.PlayerHudState.toggle(p.getUniqueId());
+
+            p.sendMessage(enabled
+                    ? "§aNavigation HUD enabled."
+                    : "§cNavigation HUD disabled.");
+
+            return true;
+        }
+
+
+        // =====================================================
         // /mob reload
         // =====================================================
         if (args[0].equalsIgnoreCase("reload")) {
@@ -198,5 +220,7 @@ public final class MobCommand implements CommandExecutor {
         s.sendMessage("§e/mob del autospawn <mob-id>");
         s.sendMessage("§e/mob killall");
         s.sendMessage("§e/mob reload");
+        s.sendMessage("§e/mob toggle hud");
+
     }
 }
