@@ -1,25 +1,38 @@
 name: TheMob
-version: "1.4.0"
+version: "1.4.2"
 main: org.plugin.theMob.TheMob
 api-version: "1.21"
 author: 3o3y
 description: >
   High-performance custom mob system with YAML-based mobs,
   boss phases, advanced drop tables, player stats GUI
-  and interval-based auto-spawning.
+  and multi-mode spawn framework (FIXED_POINT, FOLLOW_PLAYER,
+  RANDOM_RADIUS, RANDOM_WORLD).
 
 commands:
 
   mob:
-    description: Manage custom mobs and auto-spawn systems
+    description: Manage custom mobs and all spawn systems
     usage: |
       /mob spawn <mob-id>
-      /mob autospawn <mob-id> <interval-seconds> <max-alive>
-      /mob del autospawn <mob-id>
-      /mob list autospawn
       /mob killall
       /mob reload
       /mob toggle hud
+
+      /mob autospawn <mob-id> <seconds> <maxSpawns>   (legacy)
+
+      /mob set autospawn <mob-id> <seconds> <maxSpawns>
+      /mob set followplayer <player> <mob-id> <seconds> <maxSpawns> <onetime/endless> <mindistance> <maxdistance> <message>
+      /mob set randomradius <mob-id> <seconds> <maxSpawns> <minradius> <maxradius>
+      /mob set randomworld <mob-id> <seconds> <maxSpawns> <onetime/endless> <message-timer> <message>
+
+      /mob del autospawn <mob-id>
+      /mob del followplayer <player> <mob-id>
+      /mob del randomradius <mob-id>
+      /mob del randomworld <world> <mob-id>
+
+      /mob list autospawn
+      /mob list all
     permission: themob.use
     permission-message: "&cYou do not have permission to use this command."
 
@@ -32,21 +45,97 @@ commands:
 permissions:
 
   # =========================
-  # BASE
+  # ROOT / ADMIN
+  # =========================
+  themob.admin:
+    description: Full access to all TheMob commands and systems
+    default: op
+    children:
+      themob.use: true
+      themob.spawn: true
+      themob.spawn.set: true
+      themob.spawn.delete: true
+      themob.killall: true
+      themob.reload: true
+      themob.list: true
+      themob.stats: true
+      themob.hud.toggle: true
+
+  # =========================
+  # BASE ACCESS
   # =========================
   themob.use:
-    description: Allows usage of /mob base commands
+    description: Allows usage of base /mob command
     default: op
 
   # =========================
-  # SPAWNING
+  # SPAWN – MANUAL
   # =========================
   themob.spawn:
-    description: Allows manual spawning of custom mobs
+    description: Allows spawning custom mobs manually (/mob spawn)
     default: op
 
+  # =========================
+  # SPAWN – AUTOSPAWN MANAGEMENT
+  # =========================
   themob.spawn.set:
-    description: Allows creating and deleting auto-spawn entries
+    description: Allows creating and modifying all auto spawn types
+    default: op
+    children:
+      themob.spawn.set.autospawn: true
+      themob.spawn.set.followplayer: true
+      themob.spawn.set.randomradius: true
+      themob.spawn.set.randomworld: true
+
+  themob.spawn.set.autospawn:
+    description: Allows creating FIXED_POINT autospawns
+    default: op
+
+  themob.spawn.set.followplayer:
+    description: Allows creating FOLLOW_PLAYER spawns
+    default: op
+
+  themob.spawn.set.randomradius:
+    description: Allows creating RANDOM_RADIUS spawns
+    default: op
+
+  themob.spawn.set.randomworld:
+    description: Allows creating RANDOM_WORLD spawns
+    default: op
+
+  # =========================
+  # SPAWN – DELETE
+  # =========================
+  themob.spawn.delete:
+    description: Allows deleting auto spawns
+    default: op
+    children:
+      themob.spawn.delete.autospawn: true
+      themob.spawn.delete.followplayer: true
+      themob.spawn.delete.randomradius: true
+      themob.spawn.delete.randomworld: true
+
+  themob.spawn.delete.autospawn:
+    description: Allows deleting FIXED_POINT autospawns
+    default: op
+
+  themob.spawn.delete.followplayer:
+    description: Allows deleting FOLLOW_PLAYER spawns
+    default: op
+
+  themob.spawn.delete.randomradius:
+    description: Allows deleting RANDOM_RADIUS spawns
+    default: op
+
+  themob.spawn.delete.randomworld:
+    description: Allows deleting RANDOM_WORLD spawns
+    default: op
+
+  # =========================
+  # LIST / INFO
+  # =========================
+  themob.list:
+    description: Allows listing all registered spawns (/mob list)
     default: op
 
   # =========================
@@ -61,7 +150,14 @@ permissions:
     default: op
 
   # =========================
-  # PLAYER
+  # HUD / UI
+  # =========================
+  themob.hud.toggle:
+    description: Allows toggling the navigation HUD
+    default: true
+
+  # =========================
+  # PLAYER FEATURES
   # =========================
   themob.stats:
     description: Allows opening the stats menu

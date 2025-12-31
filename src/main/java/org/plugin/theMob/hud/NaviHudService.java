@@ -1,5 +1,6 @@
 package org.plugin.theMob.hud;
-
+import org.bukkit.boss.KeyedBossBar;
+import org.bukkit.NamespacedKey;
 import org.bukkit.*;
 import org.bukkit.boss.*;
 import org.bukkit.entity.Player;
@@ -27,6 +28,9 @@ public final class NaviHudService {
 
     private final Map<String, BarColor> colors;
     private final Map<UUID, BossBar> hudBars = new HashMap<>();
+    public static final NamespacedKey HUD_KEY =
+            new NamespacedKey("themob", "navihud");
+
 
     private BukkitRunnable task;
 
@@ -86,14 +90,24 @@ public final class NaviHudService {
     }
 
     public void shutdown() {
-        if (task != null) task.cancel();
-        task = null;
 
-        for (BossBar bar : hudBars.values()) {
-            bar.removeAll();
+        if (task != null) {
+            task.cancel();
+            task = null;
         }
+
+        Iterator<KeyedBossBar> it = Bukkit.getBossBars();
+        while (it.hasNext()) {
+            KeyedBossBar bar = it.next();
+            if (HUD_KEY.equals(bar.getKey())) {
+                bar.removeAll();
+            }
+        }
+
         hudBars.clear();
     }
+
+
     private void tick() {
 
         for (Player p : Bukkit.getOnlinePlayers()) {
@@ -150,6 +164,7 @@ public final class NaviHudService {
     }
     private BossBar createHudBar(Player p) {
         BossBar bar = Bukkit.createBossBar(
+                HUD_KEY,
                 "",
                 BarColor.WHITE,
                 BarStyle.SOLID
@@ -158,6 +173,8 @@ public final class NaviHudService {
         bar.addPlayer(p);
         return bar;
     }
+
+
 
     private void removeHud(Player p) {
         BossBar bar = hudBars.remove(p.getUniqueId());

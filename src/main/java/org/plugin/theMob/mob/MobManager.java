@@ -14,6 +14,7 @@ import org.plugin.theMob.core.ConfigService;
 import org.plugin.theMob.core.KeyRegistry;
 import org.plugin.theMob.mob.spawn.MobSpawnService;
 import org.plugin.theMob.ui.MobHealthDisplay;
+import org.plugin.theMob.mob.spawn.AutoSpawnManager;
 
 import java.util.*;
 
@@ -26,6 +27,7 @@ public final class MobManager {
     private MobDropEngine dropEngine;
     private MobHealthDisplay healthDisplay;
     private MobSpawnService spawnService;
+    private AutoSpawnManager autoSpawn;
 
     private final Map<String, FileConfiguration> mobConfigs = new HashMap<>();
     private final Map<String, BossTemplate> bossTemplates = new HashMap<>();
@@ -34,6 +36,9 @@ public final class MobManager {
         this.plugin = plugin;
         this.configs = configs;
         this.keys = keys;
+    }
+    public void setAutoSpawnManager(AutoSpawnManager autoSpawn) {
+        this.autoSpawn = autoSpawn;
     }
 
     public void reloadFromConfigs() {
@@ -147,16 +152,18 @@ public final class MobManager {
     }
 
     public void killAll() {
-        int removed = 0;
-        for (World world : Bukkit.getWorlds()) {
-            for (LivingEntity entity : world.getLivingEntities()) {
-                if (!isCustomMob(entity)) continue;
-                entity.remove();
-                removed++;
-            }
+
+        if (autoSpawn != null) {
+            autoSpawn.onKillAll();
         }
 
+        for (World world : Bukkit.getWorlds()) {
+            for (LivingEntity entity : world.getLivingEntities()) {
+                if (!isCustomMob(entity)) continue; // bewusst remove(), kein DeathEvent
+            }
+        }
     }
+
 
     public void setSpawnService(MobSpawnService spawnService) {
         this.spawnService = spawnService;
@@ -176,6 +183,27 @@ public final class MobManager {
         if (mobId == null) return null;
 
         return bossTemplates.get(mobId.toLowerCase(Locale.ROOT));
+    }
+    public void hardReset() {
+
+        for (World world : Bukkit.getWorlds()) {
+            for (LivingEntity entity : world.getLivingEntities()) {
+                if (!isCustomMob(entity)) continue;
+                entity.remove(); // kein DeathEvent
+            }
+        }
+
+        if (autoSpawn != null) {
+            autoSpawn.onKillAll();
+        }
+
+        spawnService = null;
+        dropEngine = null;
+        healthDisplay = null;
+        autoSpawn = null;
+    }
+    public AutoSpawnManager getAutoSpawnManager() {
+        return autoSpawn;
     }
 
 

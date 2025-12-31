@@ -2,6 +2,7 @@ package org.plugin.theMob;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.boss.KeyedBossBar;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.entity.Player;
 import org.bukkit.event.HandlerList;
@@ -36,6 +37,10 @@ import org.plugin.theMob.player.stats.menu.StatsMenuService;
 import org.plugin.theMob.spawn.SpawnController;
 import org.plugin.theMob.ui.MobHealthDisplay;
 
+import java.util.Iterator;
+
+import static org.plugin.theMob.hud.NaviHudService.HUD_KEY;
+
 public final class TheMob extends JavaPlugin {
 
     private ConfigService configService;
@@ -68,11 +73,11 @@ public final class TheMob extends JavaPlugin {
     @Override
     public void onEnable() {
         saveDefaultConfig();
+        cleanupStaleHudBars();
 
         configService = new ConfigService(this);
         configService.ensureFoldersAndDefaults();
         configService.reloadAll();
-
         keys = new KeyRegistry(this);
         ticks = new TickScheduler(this);
 
@@ -141,7 +146,7 @@ public final class TheMob extends JavaPlugin {
                 "plugin.navigation-hud.enabled",
                 true
         );
-
+        mobManager.setAutoSpawnManager(autoSpawnManager);
         if (hudEnabled) {
             hud = new NaviHudService(
                     this,
@@ -180,86 +185,26 @@ public final class TheMob extends JavaPlugin {
 
     @Override
     public void onDisable() {
-        try {
-            if (spawnController != null) spawnController.stop();
-            if (ticks != null) ticks.shutdown();
-
-            if (phaseController != null) {
-                for (var boss : phaseController.activeBosses()) {
-                    phaseController.onBossDeath(boss);
-                }
-            }
-
-
-            if (bossActionEngine != null) {
-                bossActionEngine.shutdown();
-            }
-
-            if (hud != null) hud.shutdown();
-            if (bossBars != null) bossBars.shutdown();
-
-        } finally {
-            HandlerList.unregisterAll(this);
-        }
-        if (autoSpawnManager != null) autoSpawnManager.stop();
-        if (bossLocks != null) bossLocks.clearAll();
-        if (bossActionEngine != null) bossActionEngine.shutdown();
-        if (bossBars != null) bossBars.shutdown();
-
-
-
-        getLogger().info("[TheMob] Disabled cleanly (arena + bosses + weather reset).");
+        hardShutdown();
+        getLogger().info("[TheMob] Disabled cleanly.");
     }
 
 
+
+
     public void reloadPlugin() {
-        getLogger().info("[TheMob] Reloading...");
-
-        try {
-            if (bossActionEngine != null) {
-                bossActionEngine.shutdown();
-            }
-            if (spawnController != null) {
-                spawnController.stop();
-            }
-            spawnController = null;
-            autoSpawnManager = null;
-
-            if (hud != null) {
-                hud.shutdown();
-                hud = null;
-            }
-
-            if (bossBars != null) {
-                bossBars.shutdown();
-                bossBars = null;
-            }
-
-            if (ticks != null) {
-                ticks.shutdown();
-                ticks = new TickScheduler(this);
-            }
-
-            if (playerBars != null) {
-                playerBars.clearAll();
-            }
-
-            HandlerList.unregisterAll(this);
-
-        } catch (Throwable t) {
-            getLogger().severe("[TheMob] Error during reload shutdown!");
-            t.printStackTrace();
-        }
-
+        getLogger().info("[TheMob] Reloading (hard reset)...");
+        cleanupStaleHudBars();
+        hardShutdown();
         reloadConfig();
         configService.reloadAll();
+
+        ticks = new TickScheduler(this);
+
         mobManager.reloadFromConfigs();
 
         healthDisplay = new MobHealthDisplay(this, mobManager);
         mobManager.setHealthDisplay(healthDisplay);
-
-        playerStatCache = new PlayerStatCache(this);
-        statsMenu = new StatsMenuService(this, playerStatCache);
 
         playerBars = new PlayerBarCoordinator();
 
@@ -280,6 +225,7 @@ public final class TheMob extends JavaPlugin {
                 mobManager,
                 phaseController
         );
+
         MobSpawnService spawnService = new MobSpawnService(
                 this,
                 mobManager,
@@ -289,6 +235,7 @@ public final class TheMob extends JavaPlugin {
                 phaseController
         );
         mobManager.setSpawnService(spawnService);
+
         bossLocks = new BossLockService();
 
         autoSpawnManager = new AutoSpawnManager(
@@ -305,23 +252,22 @@ public final class TheMob extends JavaPlugin {
         );
         spawnController.start();
 
+        mobManager.setAutoSpawnManager(autoSpawnManager);
+
         boolean hudEnabled = getConfig().getBoolean(
                 "plugin.navigation-hud.enabled",
                 true
         );
 
         if (hudEnabled) {
-            hud = new NaviHudService(
-                    this,
-                    mobManager
-            );
+            hud = new NaviHudService(this, mobManager);
             hud.start();
-
             Bukkit.getPluginManager().registerEvents(
                     new NaviHudListener(hud),
                     this
             );
         }
+
         registerAllListeners();
         registerCommands();
 
@@ -334,7 +280,60 @@ public final class TheMob extends JavaPlugin {
                 this
         );
 
-        getLogger().info("[TheMob] Reload complete.");
+        getLogger().info("[TheMob] Reload complete (full restart behavior).");
+    }
+
+    private void hardShutdown() {
+        try {
+            if (spawnController != null) {
+                spawnController.stop();
+                spawnController = null;
+            }
+            if (mobManager != null) {
+                mobManager.hardReset();
+            }
+
+            if (autoSpawnManager != null) {
+                autoSpawnManager.stop();
+                autoSpawnManager = null;
+            }
+
+            if (hud != null) {
+                hud.shutdown();
+                hud = null;
+            }
+
+            if (bossBars != null) {
+                bossBars.shutdown();
+                bossBars = null;
+            }
+
+            if (bossActionEngine != null) {
+                bossActionEngine.shutdown();
+                bossActionEngine = null;
+            }
+
+            if (bossLocks != null) {
+                bossLocks.clearAll();
+                bossLocks = null;
+            }
+
+            if (playerBars != null) {
+                playerBars.clearAll();
+                playerBars = null;
+            }
+
+            if (ticks != null) {
+                ticks.shutdown();
+                ticks = null;
+            }
+
+        } catch (Throwable t) {
+            getLogger().severe("[TheMob] HARD SHUTDOWN FAILED");
+            t.printStackTrace();
+        } finally {
+            HandlerList.unregisterAll(this);
+        }
     }
 
     private void registerAllListeners() {
@@ -373,11 +372,11 @@ public final class TheMob extends JavaPlugin {
                 this
         );
 
-        Bukkit.getPluginManager().registerEvents(
-                spawnController,
-                this
-        );
+        if (spawnController != null) {
+            Bukkit.getPluginManager().registerEvents(spawnController, this);
+        }
     }
+
 
     private void registerCommands() {
         PluginCommand mob = getCommand("mob");
@@ -407,6 +406,19 @@ public final class TheMob extends JavaPlugin {
         }
         return nearest;
     }
+
+    private void cleanupStaleHudBars() {
+        Iterator<KeyedBossBar> it = Bukkit.getBossBars();
+        while (it.hasNext()) {
+            KeyedBossBar bar = it.next();
+            if (HUD_KEY.equals(bar.getKey())
+                    || BossBarService.BOSSBAR_KEY.equals(bar.getKey())) {
+                bar.removeAll();
+            }
+        }
+    }
+
+
     public BossPhaseController bossPhases() {
         return phaseController;
     }

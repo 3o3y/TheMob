@@ -7,7 +7,6 @@ import org.bukkit.attribute.Attribute;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.LivingEntity;
-import org.bukkit.entity.Zombie;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 import org.plugin.theMob.boss.BossTemplate;
@@ -56,7 +55,9 @@ public final class MobSpawnService {
 
         EntityType type;
         try {
-            type = EntityType.valueOf(cfg.getString("base-type").toUpperCase(Locale.ROOT));
+            type = EntityType.valueOf(
+                    cfg.getString("base-type").toUpperCase(Locale.ROOT)
+            );
         } catch (Exception e) {
             return null;
         }
@@ -72,21 +73,44 @@ public final class MobSpawnService {
             mob = (LivingEntity) loc.getWorld().spawnEntity(loc, type);
         }
 
+        // =========================
+        // STATS
+        // =========================
         if (cfg.contains("stats.scale")) {
-            double scale = Math.max(0.25, Math.min(5.0, cfg.getDouble("stats.scale", 1.0)));
+            double scale = Math.max(
+                    0.25,
+                    Math.min(5.0, cfg.getDouble("stats.scale", 1.0))
+            );
             var attr = mob.getAttribute(Attribute.SCALE);
-            if (attr != null && scale != 1.0) attr.setBaseValue(scale);
+            if (attr != null && scale != 1.0) {
+                attr.setBaseValue(scale);
+            }
         }
 
-        mob.getPersistentDataContainer().set(keys.MOB_ID, PersistentDataType.STRING, mobId);
-        mob.getPersistentDataContainer().set(keys.IS_BOSS, PersistentDataType.INTEGER, isBoss ? 1 : 0);
+        mob.getPersistentDataContainer().set(
+                keys.MOB_ID,
+                PersistentDataType.STRING,
+                mobId
+        );
+
+        mob.getPersistentDataContainer().set(
+                keys.IS_BOSS,
+                PersistentDataType.INTEGER,
+                isBoss ? 1 : 0
+        );
 
         String name = ChatColor.translateAlternateColorCodes(
-                '&', cfg.getString("name", type.name())
+                '&',
+                cfg.getString("name", type.name())
         );
-        mob.getPersistentDataContainer().set(keys.BASE_NAME, PersistentDataType.STRING, name);
 
-        boolean isAutoSpawn = spawnId != null && spawnId.contains("@");
+        mob.getPersistentDataContainer().set(
+                keys.BASE_NAME,
+                PersistentDataType.STRING,
+                name
+        );
+
+        boolean isAutoSpawn = spawnId != null;
 
         mob.getPersistentDataContainer().set(
                 keys.SPAWN_TYPE,
@@ -111,13 +135,22 @@ public final class MobSpawnService {
             }
         }
 
-        if (healthDisplay != null) healthDisplay.onSpawn(mob);
+        if (healthDisplay != null) {
+            healthDisplay.onSpawn(mob);
+        }
 
+        // =========================
+        // BOSS LOGIC (FILTER IM SERVICE)
+        // =========================
         if (isBoss) {
             BossTemplate tpl = mobs.bossTemplate(mobId);
             Bukkit.getScheduler().runTask(plugin, () -> {
                 if (!mob.isValid()) return;
-                if (bossBars != null) bossBars.registerBoss(mob);
+
+                if (bossBars != null) {
+                    bossBars.registerBoss(mob);
+                }
+
                 if (tpl != null && phaseController != null) {
                     phaseController.onBossSpawn(mob, tpl);
                 }

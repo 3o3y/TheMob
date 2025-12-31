@@ -8,37 +8,90 @@
 # 🔒 AFK farming is PREVENTED by design.
 # 🔁 Spawns only reset when players leave and return.
 #
+# Default spawn-type is FIXED_POINT.
+# Other types are OPTIONAL and opt-in.
+#
 # =========================================================
 
-spawns: []
+spawns:
 
+  # -------------------------------------------------------
+  # BASIC EXAMPLE – FIXED_POINT
+  # -------------------------------------------------------
+  #
+  # Spawns mobs at a fixed location.
+  # This is the DEFAULT and recommended starting point.
+  #
+  # - type: FIXED_POINT
+  #   mobId: zombie_lv1
+  #   intervalSeconds: 10
+  #   maxSpawns: 5
+  #   mode: ENDLESS
+  #   world: world
+  #   x: 0
+  #   y: 64
+  #   z: 0
+  #
+# =========================================================
+# OPTIONAL SPAWN TYPES (disabled by default)
+# =========================================================
+#
+# FOLLOW_PLAYER
+# - Spawns mobs around a specific player
+# - Player is injected by command (/mob set followplayer)
+# - NEVER creates BossBars
+#
+# - type: FOLLOW_PLAYER
+#   mobId: pig_lvl_1
+#   intervalSeconds: 10
+#   maxSpawns: 3
+#   mode: ENDLESS
+#   player: "{player}"
+#   minDistance: 6
+#   maxDistance: 24
+#   message: "&4You feel something following you, {player}..."
+#
 # ---------------------------------------------------------
-# Example AutoSpawn
+# RANDOM_RADIUS
+# - Spawns randomly around a base point
+#
+# - type: RANDOM_RADIUS
+#   mobId: sheep_lvl_5
+#   intervalSeconds: 30
+#   maxSpawns: 3
+#   mode: ENDLESS
+#   world: world
+#   x: 100
+#   y: 64
+#   z: -50
+#   minRadius: 8
+#   maxRadius: 24
+#
 # ---------------------------------------------------------
-# - mobId: skeleton_normal        # Mob config ID (from /mobs/)
-#   world: world                  # World name
-#   x: 37.23                      # Spawn location
-#   y: 24.0
-#   z: -2.31
-#   enabled: true                 # Enable / disable this spawn
-#   intervalSeconds: 10           # Spawn check interval
-#   maxSpawns: 5                  # Max mobs PER WAVE
-#   # ---------------------------------------------
-#   # Arena Presence Detection (ANTI-AFK)
-#   # ---------------------------------------------
+# RANDOM_WORLD
+# - Spawns anywhere within the world border
+#
+# - type: RANDOM_WORLD
+#   mobId: zombie_lv3
+#   intervalSeconds: 60
+#   maxSpawns: 1
+#   mode: ONETIME
+#   world: world
+#   messageIntervalSeconds: 30
+#   message: "&cA dark presence roams the world..."
+#
+# =========================================================
+# NOTES
+# =========================================================
+#
+# mode:
+#   - ENDLESS  → respawns after arena reset
+#   - ONETIME  → removed after death, NOT saved
+#
+# All spawns are:
+# ✔ reload-safe
+# ✔ restart-safe
+# ✔ AFK-exploit safe
+#
+# =========================================================
 arenaRadiusChunks: 2          # NEW in v1.2
-#
-#   # Player must be inside this chunk radius
-#   # for the spawn to be active.
-#
-#   # 0 = 1x1 Chunk  (16x16 blocks)
-#   # 1 = 3x3 Chunks (48x48 blocks)
-#   # 2 = 5x5 Chunks (80x80 blocks)   ← Recommended
-#   # 3 = 7x7 Chunks (112x112 blocks)
-#
-#   # ❌ Standing AFK does NOT create new mobs
-#   # ❌ Killing faster does NOT increase spawns
-#   # ✅ New wave only starts after players leave
-#   #    the arena and return after ~30 seconds
-#
-# ---------------------------------------------------------
