@@ -220,10 +220,10 @@ phases:                               #This will make your Mob as a Boss Mob
       gravity: true                   # true = normal gravity, false = floating
       levitation: 0                   # Levitation potion level
       slow-falling: false             # Enables slow falling
-# ===== WORLD EFFECTS (GLOBAL – USE CAREFULLY) =====
+# ===== WORLD EFFECTS (NOT GLOBAL - NO EFFECTS ON MOBS) =====
     world:
       weather: THUNDER                   # NONE | CLEAR | RAIN | THUNDER
-      time: NIGHT                      # NONE | DAY | NIGHT
+      time: NIGHT                      # NONE | DAY | NIGHT | NOON | MIDNIGHT | SUNRISE | SUNSET
   # =====================================================
   phase2:
     hp-range: "75-50"

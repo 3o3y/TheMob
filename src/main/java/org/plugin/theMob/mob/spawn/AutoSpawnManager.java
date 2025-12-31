@@ -44,8 +44,6 @@ public final class AutoSpawnManager {
         this.bossLocks = bossLocks;
     }
 
-    /* ================= API ================= */
-
     public void start() {
         if (started) return;
         started = true;
@@ -86,8 +84,6 @@ public final class AutoSpawnManager {
         hotArenas.remove(spawnId);
         coldSince.remove(spawnId);
     }
-
-    /* ================= CORE ================= */
 
     private void tick() {
         long now = Bukkit.getCurrentTick();
@@ -163,8 +159,6 @@ public final class AutoSpawnManager {
         }
     }
 
-    /* ================= SAFETY ================= */
-
     private void hardKillAll(String spawnId) {
         SpawnPoint sp = points.get(spawnId);
         if (sp == null) return;
@@ -217,8 +211,6 @@ public final class AutoSpawnManager {
         }
     }
 
-    /* ================= LISTENER HOOKS ================= */
-
     public void onMobDeath(LivingEntity mob) {
         String spawnId = mob.getPersistentDataContainer().get(
                 keys.AUTO_SPAWN_ID,
@@ -231,7 +223,6 @@ public final class AutoSpawnManager {
             set.remove(mob.getUniqueId());
         }
 
-        // 🔥 WICHTIG: Spawn-Slot wieder freigeben
         spawnedTotal.computeIfPresent(spawnId, (k, v) -> Math.max(0, v - 1));
     }
 

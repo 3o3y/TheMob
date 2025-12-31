@@ -137,18 +137,24 @@ public final class BossActionEngine implements Listener {
             String w = activeWeather.trim().toUpperCase(Locale.ROOT);
             switch (w) {
                 case "CLEAR" -> p.setPlayerWeather(WeatherType.CLEAR);
-                case "RAIN", "THUNDER" -> p.setPlayerWeather(WeatherType.DOWNFALL);
-                default -> { /* ignore */ }
+                case "RAIN" -> p.setPlayerWeather(WeatherType.DOWNFALL);
+                case "THUNDER" -> p.setPlayerWeather(WeatherType.DOWNFALL);
+                case "NONE" -> p.resetPlayerWeather();
             }
+
         }
 
         if (activeTime != null) {
             String t = activeTime.trim().toUpperCase(Locale.ROOT);
             switch (t) {
                 case "DAY" -> p.setPlayerTime(1000L, false);
+                case "NOON" -> p.setPlayerTime(6000L, false);
+                case "SUNSET" -> p.setPlayerTime(12000L, false);
                 case "NIGHT" -> p.setPlayerTime(13000L, false);
-                default -> { /* ignore */ }
+                case "MIDNIGHT" -> p.setPlayerTime(18000L, false);
+                case "NONE" -> p.resetPlayerTime();
             }
+
         }
 
         affectedPlayers.add(p.getUniqueId());
