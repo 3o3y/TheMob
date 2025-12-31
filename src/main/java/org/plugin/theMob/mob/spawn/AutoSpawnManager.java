@@ -1,9 +1,9 @@
 package org.plugin.theMob.mob.spawn;
 
 import org.bukkit.Bukkit;
+import org.bukkit.Chunk;
 import org.bukkit.Location;
 import org.bukkit.World;
-import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.persistence.PersistentDataType;
@@ -33,108 +33,97 @@ public final class AutoSpawnManager {
 
     private final Set<String> hotArenas = ConcurrentHashMap.newKeySet();
     private final Map<String, Long> coldSince = new ConcurrentHashMap<>();
+    private final Map<String, Set<Chunk>> forcedChunks = new ConcurrentHashMap<>();
 
     private boolean started;
 
-    public AutoSpawnManager(
-            TheMob plugin,
-            MobManager mobs,
-            KeyRegistry keys,
-            BossLockService bossLocks
-    ) {
+    public AutoSpawnManager(TheMob plugin, MobManager mobs, KeyRegistry keys, BossLockService bossLocks) {
         this.plugin = plugin;
         this.mobs = mobs;
         this.keys = keys;
         this.bossLocks = bossLocks;
     }
 
+    /* ================= API ================= */
+
     public void start() {
         if (started) return;
         started = true;
 
         new BukkitRunnable() {
-            @Override
-            public void run() {
-                tick();
-            }
+            @Override public void run() { tick(); }
         }.runTaskTimer(plugin, 20L, 20L);
     }
 
     public void stop() {
-        points.keySet().forEach(this::hardReset);
+        for (String id : points.keySet()) {
+            hardKillAll(id);
+            releaseArenaChunks(id);
+        }
         points.clear();
         alive.clear();
         spawnedTotal.clear();
         lastSpawnTick.clear();
         hotArenas.clear();
         coldSince.clear();
+        forcedChunks.clear();
         started = false;
     }
 
     public void register(SpawnPoint sp) {
-        String id = sp.spawnId();
-
-        points.put(id, sp);
-        alive.put(id, ConcurrentHashMap.newKeySet());
-
-        hardKillAll(id);
-
-        spawnedTotal.put(id, 0);
-        lastSpawnTick.put(id, 0L);
-        hotArenas.remove(id);
-        coldSince.remove(id);
+        points.put(sp.spawnId(), sp);
+        alive.put(sp.spawnId(), ConcurrentHashMap.newKeySet());
+        hardKillAll(sp.spawnId());
     }
 
-    public void unregister(String id) {
-        hardKillAll(id);
-
-        points.remove(id);
-        alive.remove(id);
-        spawnedTotal.remove(id);
-        lastSpawnTick.remove(id);
-        hotArenas.remove(id);
-        coldSince.remove(id);
+    public void unregister(String spawnId) {
+        hardKillAll(spawnId);
+        releaseArenaChunks(spawnId);
+        points.remove(spawnId);
+        alive.remove(spawnId);
+        spawnedTotal.remove(spawnId);
+        lastSpawnTick.remove(spawnId);
+        hotArenas.remove(spawnId);
+        coldSince.remove(spawnId);
     }
+
+    /* ================= CORE ================= */
 
     private void tick() {
         long now = Bukkit.getCurrentTick();
 
         for (SpawnPoint sp : points.values()) {
             String id = sp.spawnId();
-            if (sp.baseLocation() == null || sp.baseLocation().getWorld() == null) continue;
+            if (sp.baseLocation() == null) continue;
 
             boolean hotNow = isHot(sp);
             boolean wasHot = hotArenas.contains(id);
 
-            // 🔥 RE-ENTER → IMMER HARD RESET + KILL ALL
             if (hotNow && !wasHot) {
                 hardKillAll(id);
+                forceLoadArenaChunks(sp);
                 hotArenas.add(id);
                 coldSince.remove(id);
             }
 
-            // ❄ Leave arena
             if (!hotNow && wasHot) {
                 hotArenas.remove(id);
                 coldSince.put(id, now);
             }
 
-            // ❄ Cold expired (failsafe)
-            if (!hotNow && coldSince.containsKey(id)) {
-                if (now - coldSince.get(id) >= COLD_TICKS) {
-                    hardKillAll(id);
-                    coldSince.remove(id);
-                }
+            if (!hotNow && coldSince.containsKey(id)
+                    && now - coldSince.get(id) >= COLD_TICKS) {
+                hardKillAll(id);
+                releaseArenaChunks(id);
+                coldSince.remove(id);
             }
 
-            // 🔁 Spawning
             if (hotNow) {
                 int spawned = spawnedTotal.getOrDefault(id, 0);
-                if (spawned < sp.maxSpawns()) {
-                    if (now - lastSpawnTick.getOrDefault(id, 0L)
-                            >= sp.intervalSeconds() * 20L) {
-                        spawnOne(sp, id, now);
-                    }
+                if (spawned < sp.maxSpawns()
+                        && now - lastSpawnTick.getOrDefault(id, 0L)
+                        >= sp.intervalSeconds() * 20L) {
+                    spawnOne(sp, id, now);
                 }
             }
         }
@@ -142,8 +131,7 @@ public final class AutoSpawnManager {
 
     private boolean isHot(SpawnPoint sp) {
         for (Player p : sp.baseLocation().getWorld().getPlayers()) {
-            if (!p.isOnline() || p.isDead()) continue;
-            if (sp.isInsideArena(p.getLocation())) return true;
+            if (!p.isDead() && sp.isInsideArena(p.getLocation())) return true;
         }
         return false;
     }
@@ -152,8 +140,8 @@ public final class AutoSpawnManager {
         LivingEntity mob = mobs.spawnCustomMob(sp.mobId(), id, sp.baseLocation());
         if (mob == null) return;
 
-        mob.setRemoveWhenFarAway(false);
         mob.setPersistent(true);
+        mob.setRemoveWhenFarAway(false);
 
         mob.getPersistentDataContainer().set(
                 keys.AUTO_SPAWN_ID,
@@ -164,7 +152,7 @@ public final class AutoSpawnManager {
         alive.computeIfAbsent(id, k -> ConcurrentHashMap.newKeySet())
                 .add(mob.getUniqueId());
 
-        spawnedTotal.put(id, spawnedTotal.get(id) + 1);
+        spawnedTotal.put(id, spawnedTotal.getOrDefault(id, 0) + 1);
         lastSpawnTick.put(id, now);
 
         if (mobs.isBoss(mob)) {
@@ -175,41 +163,24 @@ public final class AutoSpawnManager {
         }
     }
 
-    // 💀 ABSOLUTER KILL-ALL (NUR TheMob-Entities)
+    /* ================= SAFETY ================= */
+
     private void hardKillAll(String spawnId) {
         SpawnPoint sp = points.get(spawnId);
-        if (sp == null || sp.baseLocation() == null) return;
+        if (sp == null) return;
 
-        Location center = sp.baseLocation();
-        World world = center.getWorld();
-        if (world == null) return;
+        World w = sp.baseLocation().getWorld();
+        if (w == null) return;
 
-        int baseCx = center.getBlockX() >> 4;
-        int baseCz = center.getBlockZ() >> 4;
-        int radius = sp.arenaRadiusChunks();
-
-        int killed = 0;
-
-        for (LivingEntity e : world.getLivingEntities()) {
-
-            // 🚫 NIEMALS SPIELER
+        for (LivingEntity e : w.getLivingEntities()) {
             if (e instanceof Player) continue;
 
             String id = e.getPersistentDataContainer().get(
                     keys.AUTO_SPAWN_ID,
                     PersistentDataType.STRING
             );
-
-            // 🔒 Nur Mobs, die zu UNS gehören
-            if (!spawnId.equals(id)) continue;
-
-            int ecx = e.getLocation().getBlockX() >> 4;
-            int ecz = e.getLocation().getBlockZ() >> 4;
-
-            if (Math.abs(ecx - baseCx) <= radius
-                    && Math.abs(ecz - baseCz) <= radius) {
+            if (spawnId.equals(id)) {
                 e.remove();
-                killed++;
             }
         }
 
@@ -217,16 +188,38 @@ public final class AutoSpawnManager {
         bossLocks.release(spawnId);
         spawnedTotal.put(spawnId, 0);
         lastSpawnTick.put(spawnId, 0L);
-
-        plugin.getLogger().info(
-                "[TheMob] HARD KILL-ALL spawnId=" + spawnId + " killed=" + killed
-        );
     }
 
+    private void forceLoadArenaChunks(SpawnPoint sp) {
+        Set<Chunk> set = new HashSet<>();
+        Location c = sp.baseLocation();
+        World w = c.getWorld();
+        int r = sp.arenaRadiusChunks();
+
+        int cx = c.getBlockX() >> 4;
+        int cz = c.getBlockZ() >> 4;
+
+        for (int x = -r; x <= r; x++) {
+            for (int z = -r; z <= r; z++) {
+                Chunk chunk = w.getChunkAt(cx + x, cz + z);
+                chunk.addPluginChunkTicket(plugin);
+                set.add(chunk);
+            }
+        }
+        forcedChunks.put(sp.spawnId(), set);
+    }
+
+    private void releaseArenaChunks(String spawnId) {
+        Set<Chunk> set = forcedChunks.remove(spawnId);
+        if (set == null) return;
+        for (Chunk c : set) {
+            c.removePluginChunkTicket(plugin);
+        }
+    }
+
+    /* ================= LISTENER HOOKS ================= */
 
     public void onMobDeath(LivingEntity mob) {
-        if (mob == null) return;
-
         String spawnId = mob.getPersistentDataContainer().get(
                 keys.AUTO_SPAWN_ID,
                 PersistentDataType.STRING
@@ -237,11 +230,13 @@ public final class AutoSpawnManager {
         if (set != null) {
             set.remove(mob.getUniqueId());
         }
+
+        // 🔥 WICHTIG: Spawn-Slot wieder freigeben
+        spawnedTotal.computeIfPresent(spawnId, (k, v) -> Math.max(0, v - 1));
     }
 
-    public void releaseBossLock(LivingEntity mob) {
-        if (mob == null) return;
 
+    public void releaseBossLock(LivingEntity mob) {
         String spawnId = mob.getPersistentDataContainer().get(
                 keys.AUTO_SPAWN_ID,
                 PersistentDataType.STRING
@@ -250,8 +245,12 @@ public final class AutoSpawnManager {
             bossLocks.release(spawnId);
         }
     }
-    private void hardReset(String spawnId) {
-        hardKillAll(spawnId);
-    }
 
+    public boolean isBossInHotArena(LivingEntity boss) {
+        String id = boss.getPersistentDataContainer().get(
+                keys.AUTO_SPAWN_ID,
+                PersistentDataType.STRING
+        );
+        return id != null && hotArenas.contains(id);
+    }
 }

@@ -48,9 +48,20 @@ public final class MobVisualService {
             @Override
             public void run() {
 
-                if (!mob.isValid() || mob.isDead()) {
+                // ❌ Mob endgültig tot → Task beenden
+                if (mob.isDead()) {
                     if (visual != null) visual.remove();
                     cancel();
+                    return;
+                }
+
+                // ⚠ Chunk unloaded → Mob temporär invalid → warten, NICHT canceln
+                if (!mob.isValid()) {
+                    if (visual != null) {
+                        visual.remove();
+                        visual = null;
+                        active = false;
+                    }
                     return;
                 }
 
@@ -70,7 +81,11 @@ public final class MobVisualService {
                                     EntityType.ITEM_DISPLAY
                             );
                             d.setItemStack(new ItemStack(mat));
-                            d.getPersistentDataContainer().set(keys.VISUAL_HEAD, PersistentDataType.INTEGER, 1);
+                            d.getPersistentDataContainer().set(
+                                    keys.VISUAL_HEAD,
+                                    PersistentDataType.INTEGER,
+                                    1
+                            );
                             visual = d;
                         } else {
                             ArmorStand as = (ArmorStand) mob.getWorld().spawnEntity(
@@ -82,7 +97,11 @@ public final class MobVisualService {
                             as.setGravity(false);
                             as.setSmall(true);
                             as.setHelmet(SkullUtil.fromBase64(texture));
-                            as.getPersistentDataContainer().set(keys.VISUAL_HEAD, PersistentDataType.INTEGER, 1);
+                            as.getPersistentDataContainer().set(
+                                    keys.VISUAL_HEAD,
+                                    PersistentDataType.INTEGER,
+                                    1
+                            );
                             visual = as;
                         }
                     }
