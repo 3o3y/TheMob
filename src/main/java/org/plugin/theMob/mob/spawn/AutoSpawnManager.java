@@ -19,7 +19,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public final class AutoSpawnManager {
 
-    private static final long COLD_TICKS = 20L * 60L; // 60s
+    private static final long COLD_TICKS = 20L * 60L;
 
     private final TheMob plugin;
     private final MobManager mobs;
@@ -31,7 +31,6 @@ public final class AutoSpawnManager {
     private final Map<String, Integer> spawnedTotal = new ConcurrentHashMap<>();
     private final Map<String, Long> lastSpawnTick = new ConcurrentHashMap<>();
 
-    // 🔥 Zustand
     private final Set<String> hotArenas = ConcurrentHashMap.newKeySet();
     private final Map<String, Long> coldSince = new ConcurrentHashMap<>();
 
@@ -78,8 +77,7 @@ public final class AutoSpawnManager {
         points.put(id, sp);
         alive.put(id, ConcurrentHashMap.newKeySet());
 
-        killArenaMobs(id);
-        hardReset(id);
+        hardKillAll(id);
 
         spawnedTotal.put(id, 0);
         lastSpawnTick.put(id, 0L);
@@ -88,8 +86,7 @@ public final class AutoSpawnManager {
     }
 
     public void unregister(String id) {
-        hardReset(id);
-        killArenaMobs(id);
+        hardKillAll(id);
 
         points.remove(id);
         alive.remove(id);
@@ -109,28 +106,23 @@ public final class AutoSpawnManager {
             boolean hotNow = isHot(sp);
             boolean wasHot = hotArenas.contains(id);
 
-            // 🔥 Eintritt → neuer Hot-Cycle
+            // 🔥 RE-ENTER → IMMER HARD RESET + KILL ALL
             if (hotNow && !wasHot) {
-                if (coldSince.containsKey(id) && now - coldSince.get(id) >= COLD_TICKS) {
-                    hardReset(id);
-                    killArenaMobs(id);
-                }
-
+                hardKillAll(id);
                 hotArenas.add(id);
                 coldSince.remove(id);
             }
 
-            // ❄ Austritt → Cold starten
+            // ❄ Leave arena
             if (!hotNow && wasHot) {
                 hotArenas.remove(id);
                 coldSince.put(id, now);
             }
 
-            // ❄ Cold abgelaufen → Arena resetten
+            // ❄ Cold expired (failsafe)
             if (!hotNow && coldSince.containsKey(id)) {
                 if (now - coldSince.get(id) >= COLD_TICKS) {
-                    hardReset(id);
-                    killArenaMobs(id);
+                    hardKillAll(id);
                     coldSince.remove(id);
                 }
             }
@@ -163,8 +155,11 @@ public final class AutoSpawnManager {
         mob.setRemoveWhenFarAway(false);
         mob.setPersistent(true);
 
-        mob.getPersistentDataContainer().set(keys.AUTO_SPAWN_ID,
-                PersistentDataType.STRING, id);
+        mob.getPersistentDataContainer().set(
+                keys.AUTO_SPAWN_ID,
+                PersistentDataType.STRING,
+                id
+        );
 
         alive.computeIfAbsent(id, k -> ConcurrentHashMap.newKeySet())
                 .add(mob.getUniqueId());
@@ -180,24 +175,8 @@ public final class AutoSpawnManager {
         }
     }
 
-    private void hardReset(String id) {
-        Set<UUID> set = alive.get(id);
-        if (set != null) {
-            for (UUID uuid : set) {
-                for (World w : Bukkit.getWorlds()) {
-                    Entity e = w.getEntity(uuid);
-                    if (e instanceof LivingEntity le) le.remove();
-                }
-            }
-            set.clear();
-        }
-
-        bossLocks.release(id);
-        spawnedTotal.put(id, 0);
-        lastSpawnTick.put(id, 0L);
-    }
-
-    public void killArenaMobs(String spawnId) {
+    // 💀 ABSOLUTER KILL-ALL (NUR TheMob-Entities)
+    private void hardKillAll(String spawnId) {
         SpawnPoint sp = points.get(spawnId);
         if (sp == null || sp.baseLocation() == null) return;
 
@@ -209,22 +188,42 @@ public final class AutoSpawnManager {
         int baseCz = center.getBlockZ() >> 4;
         int radius = sp.arenaRadiusChunks();
 
+        int killed = 0;
+
         for (LivingEntity e : world.getLivingEntities()) {
+
+            // 🚫 NIEMALS SPIELER
+            if (e instanceof Player) continue;
+
             String id = e.getPersistentDataContainer().get(
-                    keys.AUTO_SPAWN_ID, PersistentDataType.STRING);
+                    keys.AUTO_SPAWN_ID,
+                    PersistentDataType.STRING
+            );
+
+            // 🔒 Nur Mobs, die zu UNS gehören
+            if (!spawnId.equals(id)) continue;
 
             int ecx = e.getLocation().getBlockX() >> 4;
             int ecz = e.getLocation().getBlockZ() >> 4;
 
-            if (spawnId.equals(id)
-                    || (Math.abs(ecx - baseCx) <= radius && Math.abs(ecz - baseCz) <= radius)) {
+            if (Math.abs(ecx - baseCx) <= radius
+                    && Math.abs(ecz - baseCz) <= radius) {
                 e.remove();
+                killed++;
             }
         }
 
         alive.computeIfAbsent(spawnId, k -> ConcurrentHashMap.newKeySet()).clear();
         bossLocks.release(spawnId);
+        spawnedTotal.put(spawnId, 0);
+        lastSpawnTick.put(spawnId, 0L);
+
+        plugin.getLogger().info(
+                "[TheMob] HARD KILL-ALL spawnId=" + spawnId + " killed=" + killed
+        );
     }
+
+
     public void onMobDeath(LivingEntity mob) {
         if (mob == null) return;
 
@@ -250,6 +249,9 @@ public final class AutoSpawnManager {
         if (spawnId != null) {
             bossLocks.release(spawnId);
         }
+    }
+    private void hardReset(String spawnId) {
+        hardKillAll(spawnId);
     }
 
 }
