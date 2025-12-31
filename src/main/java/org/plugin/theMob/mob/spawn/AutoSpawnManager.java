@@ -2,6 +2,7 @@ package org.plugin.theMob.mob.spawn;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.World;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
@@ -86,6 +87,8 @@ public final class AutoSpawnManager {
 
     public void unregister(String id) {
         hardReset(id);
+        killArenaMobs(id);
+
         points.remove(id);
         alive.remove(id);
         lastHotTick.remove(id);
@@ -107,12 +110,19 @@ public final class AutoSpawnManager {
             boolean hotNow = isHot(sp);
             boolean wasHot = hotArenas.contains(id);
 
+            // ===============================
+            // ENTER ARENA (NEW HOT CYCLE)
+            // ===============================
             if (hotNow && !wasHot) {
+                killArenaMobs(id);              // 🔥 garantiert sauberer Start
                 hotArenas.add(id);
-                lastHotTick.put(id, now);
+                lastHotTick.remove(id);         // ❗ alten Cold-Timer löschen
                 notifyPlayerEnter(sp);
             }
 
+            // ===============================
+            // ACTIVE HOT → SPAWNING
+            // ===============================
             if (hotNow) {
                 int spawned = spawnedTotal.getOrDefault(id, 0);
                 if (spawned < sp.maxSpawns()) {
@@ -123,26 +133,29 @@ public final class AutoSpawnManager {
                 }
             }
 
-            if (!hotNow && wasHot) {
-
-                // 🔥 START COLD TIMER ONCE (on leave)
-                lastHotTick.putIfAbsent(id, now);
+            // ===============================
+            // LEAVE ARENA → START COLD TIMER (ONCE)
+            // ===============================
+            if (!hotNow && wasHot && !lastHotTick.containsKey(id)) {
+                lastHotTick.put(id, now); // ⏱ Start 60s timer
             }
 
+            // ===============================
+            // COLD TIMER EXPIRED → HARD RESET
+            // ===============================
             if (!hotNow && wasHot) {
-                long lastHot = lastHotTick.get(id);
-
-                if (now - lastHot >= COLD_TICKS) {
+                long leftAt = lastHotTick.get(id);
+                if (now - leftAt >= COLD_TICKS) {
                     hotArenas.remove(id);
                     lastHotTick.remove(id);
+
                     hardReset(id);
+                    killArenaMobs(id);
                 }
             }
-
-
-
         }
     }
+
 
     // HOT CHECK
 
@@ -184,7 +197,6 @@ public final class AutoSpawnManager {
 
         if (mobs.isBoss(mob)) {
             bossLocks.register(id, mob);
-            lastHotTick.put(id, now);
 
             Bukkit.getScheduler().runTask(plugin, () ->
                     plugin.bossPhases().onBossSpawn(
@@ -283,6 +295,48 @@ public final class AutoSpawnManager {
         if (spawnId != null) {
             bossLocks.release(spawnId);
         }
+    }
+    // =====================================================
+// HARD ARENA CLEANUP (REGIONAL KILL)
+// =====================================================
+    public void killArenaMobs(String spawnId) {
+        SpawnPoint sp = points.get(spawnId);
+        if (sp == null) return;
+
+        Location base = sp.baseLocation();
+        if (base == null || base.getWorld() == null) return;
+
+        World world = base.getWorld();
+
+        int killed = 0;
+
+        for (LivingEntity e : world.getLivingEntities()) {
+            if (!mobs.isCustomMob(e)) continue;
+
+            String id = e.getPersistentDataContainer().get(
+                    keys.AUTO_SPAWN_ID,
+                    PersistentDataType.STRING
+            );
+
+            if (id == null || !id.equals(spawnId)) continue;
+
+            if (!sp.isInsideArena(e.getLocation())) continue;
+
+            e.remove();
+            killed++;
+        }
+
+        // 🔥 STATE RESET
+        Set<UUID> set = alive.get(spawnId);
+        if (set != null) set.clear();
+
+        spawnedTotal.put(spawnId, 0);
+        lastSpawnTick.put(spawnId, 0L);
+        bossLocks.release(spawnId);
+
+        plugin.getLogger().info(
+                "[TheMob] Arena cleanup: spawnId=" + spawnId + " killed=" + killed
+        );
     }
 
 }
