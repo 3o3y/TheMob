@@ -76,8 +76,6 @@ public final class MobListener implements Listener {
         if (mobs.isBoss(mob)) {
             bossActions.onBossDeath(mob);
             bossBars.unregisterBoss(mob);
-
-            // 🔥 KRITISCH: BossLock freigeben
             autoSpawn.releaseBossLock(mob);
         }
 
@@ -109,9 +107,5 @@ public final class MobListener implements Listener {
         // CORE DEATH HANDLING
         // =========================================
         mobs.onMobDeath(mob, e);
-
-        if (mobs.isBoss(mob) && bossBars != null) {
-            bossBars.unregisterBoss(mob);
-        }
     }
 }

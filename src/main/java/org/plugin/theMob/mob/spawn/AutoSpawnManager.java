@@ -73,17 +73,29 @@ public final class AutoSpawnManager {
         started = false;
     }
 
-    // REGISTRATION
-
     public void register(SpawnPoint sp) {
         String id = sp.spawnId();
+
         points.put(id, sp);
         alive.put(id, ConcurrentHashMap.newKeySet());
+
+        // 🔥 FINAL HARD CLEANUP: remove ALL custom mobs inside arena
+        Location base = sp.baseLocation();
+        if (base != null && base.getWorld() != null) {
+            World w = base.getWorld();
+            for (LivingEntity e : w.getLivingEntities()) {
+                if (!mobs.isCustomMob(e)) continue;
+                if (!sp.isInsideArena(e.getLocation())) continue;
+                e.remove();
+            }
+        }
+
         lastHotTick.remove(id);
         lastSpawnTick.put(id, 0L);
         spawnedTotal.put(id, 0);
         hotArenas.remove(id);
     }
+
 
     public void unregister(String id) {
         hardReset(id);
@@ -303,40 +315,47 @@ public final class AutoSpawnManager {
         SpawnPoint sp = points.get(spawnId);
         if (sp == null) return;
 
-        Location base = sp.baseLocation();
-        if (base == null || base.getWorld() == null) return;
-
-        World world = base.getWorld();
-
         int killed = 0;
 
-        for (LivingEntity e : world.getLivingEntities()) {
-            if (!mobs.isCustomMob(e)) continue;
-
-            String id = e.getPersistentDataContainer().get(
-                    keys.AUTO_SPAWN_ID,
-                    PersistentDataType.STRING
-            );
-
-            if (id == null || !id.equals(spawnId)) continue;
-
-            if (!sp.isInsideArena(e.getLocation())) continue;
-
-            e.remove();
-            killed++;
+        // 1️⃣ UUID-basierter Cleanup (primär)
+        Set<UUID> set = alive.get(spawnId);
+        if (set != null) {
+            for (UUID uuid : new HashSet<>(set)) {
+                for (World w : Bukkit.getWorlds()) {
+                    Entity e = w.getEntity(uuid);
+                    if (e instanceof LivingEntity le) {
+                        le.remove();
+                        killed++;
+                    }
+                }
+            }
+            set.clear();
         }
 
-        // 🔥 STATE RESET
-        Set<UUID> set = alive.get(spawnId);
-        if (set != null) set.clear();
+        // 2️⃣ Fallback: Scan World nach AUTO_SPAWN_ID
+        World world = sp.baseLocation() != null ? sp.baseLocation().getWorld() : null;
+        if (world != null) {
+            for (LivingEntity e : world.getLivingEntities()) {
+                String id = e.getPersistentDataContainer().get(
+                        keys.AUTO_SPAWN_ID,
+                        PersistentDataType.STRING
+                );
+                if (spawnId.equals(id)) {
+                    e.remove();
+                    killed++;
+                }
+            }
+        }
 
         spawnedTotal.put(spawnId, 0);
         lastSpawnTick.put(spawnId, 0L);
         bossLocks.release(spawnId);
 
         plugin.getLogger().info(
-                "[TheMob] Arena cleanup: spawnId=" + spawnId + " killed=" + killed
+                "[TheMob] Arena cleanup (hybrid): spawnId=" + spawnId + " killed=" + killed
         );
     }
+
+
 
 }

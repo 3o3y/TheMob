@@ -78,21 +78,6 @@ public final class MobDropEngine {
             dropList(cfg.getMapList("legendary-drops"), mob);
         }
 
-        // =========================================
-        // DEATH COMMANDS
-        // =========================================
-        String id = mobs.mobIdOf(mob);
-        String killer = mob.getKiller() != null
-                ? mob.getKiller().getName()
-                : "console";
-
-        for (String cmd : cfg.getStringList("death-commands")) {
-            Bukkit.dispatchCommand(
-                    Bukkit.getConsoleSender(),
-                    cmd.replace("{mob}", id != null ? id : "unknown")
-                            .replace("{player}", killer)
-            );
-        }
     }
 
     private void dropList(List<Map<?, ?>> list, LivingEntity mob) {
