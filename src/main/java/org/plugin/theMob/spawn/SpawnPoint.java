@@ -43,10 +43,6 @@ public final class SpawnPoint {
         }
     }
 
-    // =====================================================
-    // BASIC DATA
-    // =====================================================
-
     public String spawnId() {
         return mobId + "@" + worldName + ":" + x + "," + y + "," + z;
     }
@@ -58,18 +54,10 @@ public final class SpawnPoint {
     public boolean enabled() { return enabled; }
     public int arenaRadiusChunks() { return arenaRadiusChunks; }
 
-    // =====================================================
-    // LOCATION
-    // =====================================================
-
     public Location baseLocation() {
         World w = Bukkit.getWorld(worldName);
         return w == null ? null : new Location(w, x + 0.5, y, z + 0.5);
     }
-
-    // =====================================================
-    // ARENA CHECK (ANTI-AFK, CHUNK-BASIERT)
-    // =====================================================
 
     public boolean isInsideArena(Location loc) {
         if (loc == null || loc.getWorld() == null) return false;

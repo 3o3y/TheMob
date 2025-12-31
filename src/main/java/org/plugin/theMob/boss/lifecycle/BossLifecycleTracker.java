@@ -36,9 +36,6 @@ public final class BossLifecycleTracker {
         this.phases = phases;
     }
 
-    // ----------------------------
-    // spawn → move → fight → death
-    // ----------------------------
     public void onSpawn(LivingEntity mob) {
         if (mob == null) return;
         if (!mobs.isBoss(mob)) return;
@@ -54,7 +51,6 @@ public final class BossLifecycleTracker {
     }
 
     public void onMoveTick() {
-        // hardening: remove invalid/dead safely; refresh bars if needed
         tracked.removeIf(id -> {
             var e = Bukkit.getEntity(id);
             if (!(e instanceof LivingEntity boss)) return true;
@@ -65,7 +61,6 @@ public final class BossLifecycleTracker {
                 });
                 return true;
             }
-            // mark dirty so BossBarService refreshes title/progress
             bars.markDirty(boss);
             return false;
         });

@@ -73,11 +73,6 @@ public final class NaviHudService {
                 "EMPTY", BarColor.valueOf(cfg.getString("plugin.navigation-hud.colors.empty", "WHITE"))
         );
     }
-
-    // -------------------------------------------------------
-    // Lifecycle
-    // -------------------------------------------------------
-
     public void start() {
         if (!enabled || task != null) return;
 
@@ -99,11 +94,6 @@ public final class NaviHudService {
         }
         hudBars.clear();
     }
-
-    // -------------------------------------------------------
-    // Main Tick
-    // -------------------------------------------------------
-
     private void tick() {
 
         for (Player p : Bukkit.getOnlinePlayers()) {
@@ -158,11 +148,6 @@ public final class NaviHudService {
             bar.setColor(colors.get(target.type().name()));
         }
     }
-
-    // -------------------------------------------------------
-    // HUD ONLY (❗ DOES NOT TOUCH BOSS BARS)
-    // -------------------------------------------------------
-
     private BossBar createHudBar(Player p) {
         BossBar bar = Bukkit.createBossBar(
                 "",

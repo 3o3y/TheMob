@@ -1,4 +1,3 @@
-// src/main/java/org/plugin/theMob/boss/phase/BossPhaseController.java
 package org.plugin.theMob.boss.phase;
 
 import org.bukkit.entity.LivingEntity;
@@ -33,9 +32,6 @@ public final class BossPhaseController {
         this.bars = bars;
     }
 
-    // =====================================================
-    // SPAWN
-    // =====================================================
     public void onBossSpawn(LivingEntity boss, BossTemplate template) {
         if (boss == null || template == null) return;
 
@@ -49,32 +45,23 @@ public final class BossPhaseController {
 
         lastPhase.put(id, phase);
 
-        // ✅ Phase beim Spawn anzeigen
         if (bars != null) {
             bars.setPhaseTitle(boss, phase.title());
             bars.markDirty(boss);
         }
 
-        // 🔥 Phase-Enter (ActionBar / Effects / World)
         actionEngine.onPhaseEnter(boss, phase);
     }
 
-    // =====================================================
-    // PLAYER ENTER ARENA (NEU)
-    // =====================================================
     public void onPlayerEnterArena(Player player, LivingEntity boss) {
         if (player == null || boss == null) return;
 
         BossPhase phase = lastPhase.get(boss.getUniqueId());
         if (phase == null) return;
 
-        // ✅ Aktuelle Phase erneut anzeigen
         showPhaseTitleToPlayer(player, phase);
     }
 
-    // =====================================================
-    // UPDATE (HP CHANGE)
-    // =====================================================
     public void onBossUpdate(LivingEntity boss) {
         if (boss == null) return;
 
@@ -104,9 +91,6 @@ public final class BossPhaseController {
         if (bars != null) bars.markDirty(boss);
     }
 
-    // =====================================================
-    // DEATH
-    // =====================================================
     public void onBossDeath(LivingEntity boss) {
         if (boss == null) return;
 
@@ -127,9 +111,6 @@ public final class BossPhaseController {
         }
     }
 
-    // =====================================================
-    // ACCESS
-    // =====================================================
     public BossPhase currentPhase(LivingEntity boss) {
         if (boss == null) return null;
         return lastPhase.get(boss.getUniqueId());
@@ -148,9 +129,6 @@ public final class BossPhaseController {
                 .toList();
     }
 
-    // =====================================================
-    // VISUALS
-    // =====================================================
     private void showPhaseTitle(LivingEntity boss, BossPhase phase) {
         for (Player p : boss.getWorld().getPlayers()) {
             if (p.getLocation().distanceSquared(boss.getLocation()) > 30 * 30) continue;

@@ -14,7 +14,6 @@ public final class PlayerStatCache {
     public PlayerStatCache(TheMob plugin) {
         this.plugin = plugin;
     }
-// API
     public Map<String, Double> get(Player p) {
         return cache.computeIfAbsent(p, this::compute);
     }
@@ -24,7 +23,6 @@ public final class PlayerStatCache {
     public void invalidate(Player p) {
         cache.remove(p);
     }
-// COMPUTE
     private Map<String, Double> compute(Player p) {
         Map<String, Double> stats = new HashMap<>();
         add(stats, p.getInventory().getHelmet());
@@ -33,11 +31,9 @@ public final class PlayerStatCache {
         add(stats, p.getInventory().getBoots());
         add(stats, p.getInventory().getItemInMainHand());
         add(stats, p.getInventory().getItemInOffHand());
-// NORMALIZATION
         double bonusHealth = stats.getOrDefault("health", 0.0);
         stats.put("bonus_health", bonusHealth);
         stats.put("health", 20.0 + bonusHealth); // TOTAL health for menu
-// Crit multiplier default
         stats.putIfAbsent("crit_multiplier", 1.0);
         return stats;
     }

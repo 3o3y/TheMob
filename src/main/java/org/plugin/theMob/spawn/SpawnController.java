@@ -27,10 +27,6 @@ public final class SpawnController implements Listener {
         this.configs = plugin.configs();
     }
 
-    // =====================================================
-    // LIFECYCLE
-    // =====================================================
-
     public void start() {
         loadFromConfig();
         auto.start();
@@ -41,10 +37,6 @@ public final class SpawnController implements Listener {
         registry.clear();
         auto.stop();
     }
-
-    // =====================================================
-    // COMMAND API
-    // =====================================================
 
     public boolean startAutoSpawn(
             String mobId,
@@ -113,10 +105,6 @@ public final class SpawnController implements Listener {
 
         return list;
     }
-
-    // =====================================================
-    // CONFIG LOAD / SAVE
-    // =====================================================
 
     @SuppressWarnings("unchecked")
     private void loadFromConfig() {
@@ -189,10 +177,6 @@ public final class SpawnController implements Listener {
         cfg.set("spawns", out);
         configs.saveAutoSpawn();
     }
-
-    // =====================================================
-    // DTO
-    // =====================================================
 
     public record AutoSpawnInfo(
             String mobId,

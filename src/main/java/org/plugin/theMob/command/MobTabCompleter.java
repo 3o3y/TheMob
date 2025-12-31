@@ -24,7 +24,6 @@ public final class MobTabCompleter implements TabCompleter {
             String[] args
     ) {
 
-        // /mob <sub>
         if (args.length == 1) {
             String prefix = args[0].toLowerCase();
             return List.of(
@@ -34,18 +33,16 @@ public final class MobTabCompleter implements TabCompleter {
                             "del",
                             "killall",
                             "reload",
-                            "toggle" // ✅ NEU
+                            "toggle"
                     ).stream()
                     .filter(s -> s.startsWith(prefix))
                     .toList();
         }
 
-        // /mob toggle <option>
         if (args.length == 2 && args[0].equalsIgnoreCase("toggle")) {
             return List.of("hud");
         }
 
-        // /mob spawn <mob-id>
         if (args.length == 2 && args[0].equalsIgnoreCase("spawn")) {
             String prefix = args[1].toLowerCase();
             return mobs.registeredIds().stream()
@@ -54,7 +51,6 @@ public final class MobTabCompleter implements TabCompleter {
                     .toList();
         }
 
-        // /mob autospawn <mob-id>
         if (args.length == 2 && args[0].equalsIgnoreCase("autospawn")) {
             String prefix = args[1].toLowerCase();
             return mobs.registeredIds().stream()
@@ -63,27 +59,22 @@ public final class MobTabCompleter implements TabCompleter {
                     .toList();
         }
 
-        // /mob list <type>
         if (args.length == 2 && args[0].equalsIgnoreCase("list")) {
             return List.of("autospawn");
         }
 
-        // /mob autospawn <mob-id> <interval>
         if (args.length == 3 && args[0].equalsIgnoreCase("autospawn")) {
             return List.of("10", "60", "300", "600");
         }
 
-        // /mob autospawn <mob-id> <interval> <maxAlive>
         if (args.length == 4 && args[0].equalsIgnoreCase("autospawn")) {
             return List.of("1", "3", "5", "10");
         }
 
-        // /mob del <type>
         if (args.length == 2 && args[0].equalsIgnoreCase("del")) {
             return List.of("autospawn");
         }
 
-        // /mob del autospawn <mob-id>
         if (args.length == 3
                 && args[0].equalsIgnoreCase("del")
                 && args[1].equalsIgnoreCase("autospawn")) {

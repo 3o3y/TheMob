@@ -19,7 +19,6 @@ public final class BossCombatListener implements Listener {
         this.mobs = mobs;
         this.phases = phases;
     }
-
     @EventHandler(ignoreCancelled = true)
     public void onCombat(EntityDamageByEntityEvent event) {
         if (!(event.getDamager() instanceof LivingEntity boss)) return;
@@ -33,11 +32,9 @@ public final class BossCombatListener implements Listener {
 
         double damage = event.getDamage();
 
-        // Damage dealt multiplier (boss outgoing)
         double dealMul = combat.getDouble("deal-damage-multiplier", 1.0);
         damage *= dealMul;
 
-        // Crit
         int critChance = combat.getInt("crit-chance", 0);
         double critMul = combat.getDouble("crit-multiplier", 0);
 
@@ -47,7 +44,6 @@ public final class BossCombatListener implements Listener {
 
         event.setDamage(damage);
 
-        // Lifesteal
         double lifesteal = combat.getDouble("lifesteal", 0);
         if (lifesteal > 0) {
             double heal = damage * (lifesteal / 100.0);

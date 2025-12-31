@@ -16,7 +16,6 @@ public final class BossImmunityListener implements Listener {
         this.mobs = mobs;
         this.phases = phases;
     }
-
     @EventHandler(ignoreCancelled = true)
     public void onDamage(EntityDamageEvent event) {
         if (!(event.getEntity() instanceof LivingEntity boss)) return;

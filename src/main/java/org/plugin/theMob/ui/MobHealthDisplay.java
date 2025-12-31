@@ -1,4 +1,3 @@
-// src/main/java/org/plugin/theMob/ui/MobHealthDisplay.java
 package org.plugin.theMob.ui;
 
 import org.bukkit.Bukkit;
@@ -17,10 +16,6 @@ import java.util.UUID;
 
 public final class MobHealthDisplay {
 
-    // v1.1 rule:
-    // <= 20 blocks: NAME
-    // <= 10 blocks: NAME + HEALTH
-    // never through walls/floors
     private static final double NAME_RANGE = 14.0;
     private static final double FULL_RANGE = 7.0;
     private static final double NAME_RANGE_SQ = NAME_RANGE * NAME_RANGE;
@@ -79,7 +74,6 @@ public final class MobHealthDisplay {
     }
 
     private void startMoveUpdater() {
-        // move hardening: refresh visibility/format periodically (lightweight)
         moveTask = new BukkitRunnable() {
             @Override
             public void run() {

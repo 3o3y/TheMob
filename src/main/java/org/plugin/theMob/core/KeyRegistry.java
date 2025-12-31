@@ -8,29 +8,14 @@ import java.util.Map;
 
 public final class KeyRegistry {
 
-    // =========================
-    // CORE MOB TAGS
-    // =========================
     public final NamespacedKey MOB_ID;
     public final NamespacedKey BASE_NAME;
     public final NamespacedKey IS_BOSS;
     public final NamespacedKey NO_DROPS;
     public final NamespacedKey VISUAL_HEAD;
-
-    // =========================
-    // SPAWN META
-    // =========================
-    public final NamespacedKey SPAWN_TYPE;        // STRING: MANUAL | AUTOSPAWN
-    public final NamespacedKey AUTO_SPAWN_ID;     // STRING: spawnPointId
-
-    // =========================
-    // BOSS META
-    // =========================
-    public final NamespacedKey BOSS_SPAWN_TIME;   // LONG (ms)
-
-    // =========================
-    // STATS
-    // =========================
+    public final NamespacedKey SPAWN_TYPE;
+    public final NamespacedKey AUTO_SPAWN_ID;
+    public final NamespacedKey BOSS_SPAWN_TIME;
     public final NamespacedKey DAMAGE;
     public final NamespacedKey EXTRA_DAMAGE;
     public final NamespacedKey CRIT;
@@ -49,21 +34,14 @@ public final class KeyRegistry {
 
     public KeyRegistry(Plugin plugin) {
 
-        // CORE
         MOB_ID = new NamespacedKey(plugin, "mob_id");
         BASE_NAME = new NamespacedKey(plugin, "base_name");
         IS_BOSS = new NamespacedKey(plugin, "is_boss");
         NO_DROPS = new NamespacedKey(plugin, "no_drops");
         VISUAL_HEAD = new NamespacedKey(plugin, "visual_head");
-
-        // SPAWN META
         SPAWN_TYPE    = new NamespacedKey(plugin, "spawn_type");
         AUTO_SPAWN_ID = new NamespacedKey(plugin, "auto_spawn_id");
-
-        // BOSS META
         BOSS_SPAWN_TIME = new NamespacedKey(plugin, "boss_spawn_time");
-
-        // STATS
         DAMAGE = new NamespacedKey(plugin, "damage");
         EXTRA_DAMAGE = new NamespacedKey(plugin, "extra_damage");
         CRIT = new NamespacedKey(plugin, "crit");

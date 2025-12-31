@@ -24,9 +24,6 @@ public final class ConfigService {
     private volatile FileConfiguration statsCfg;
     private volatile Map<String, FileConfiguration> mobConfigs = Map.of();
 
-    // =====================================================
-    // DEFAULT MOB YMLS (shipped with plugin JAR)
-    // =====================================================
     private static final List<String> DEFAULT_MOBS = List.of(
             "mob_template.yml",
             "boss_template.yml",
@@ -40,9 +37,6 @@ public final class ConfigService {
         this.plugin = plugin;
     }
 
-    // =====================================================
-    // INIT
-    // =====================================================
     public void ensureFoldersAndDefaults() {
         plugin.getDataFolder().mkdirs();
 
@@ -72,9 +66,6 @@ public final class ConfigService {
         }
     }
 
-    // =====================================================
-    // RELOAD ENTRY
-    // =====================================================
     public void reloadAll() {
         installZipPacks();   // 🔥 AUTO ZIP LOADER
         reloadAutoSpawn();
@@ -82,9 +73,6 @@ public final class ConfigService {
         reloadMobsValidated();
     }
 
-    // =====================================================
-    // AUTO ZIP INSTALLER (ROBUST)
-    // =====================================================
     private void installZipPacks() {
         File[] zips = mobsFolder.listFiles((d, n) -> n.toLowerCase(Locale.ROOT).endsWith(".zip"));
         if (zips == null || zips.length == 0) return;
@@ -103,12 +91,10 @@ public final class ConfigService {
 
                     String rel;
 
-                    // Case 1: ZIP contains mobs/ root
                     int idx = name.indexOf("mobs/");
                     if (idx != -1) {
                         rel = name.substring(idx + 5);
                     }
-                    // Case 2: ZIP without mobs/ root (fallback)
                     else {
                         rel = name;
                     }
@@ -131,7 +117,6 @@ public final class ConfigService {
                 continue;
             }
 
-            // Move ZIP to .installed
             File target = new File(installedZipFolder, zip.getName());
             if (!zip.renameTo(target)) {
                 plugin.getLogger().warning(
@@ -151,9 +136,6 @@ public final class ConfigService {
         }
     }
 
-    // =====================================================
-    // RELOAD PARTS
-    // =====================================================
     public void reloadAutoSpawn() {
         autoSpawnCfg = YamlConfiguration.loadConfiguration(autoSpawnFile);
         if (!autoSpawnCfg.isList("spawns")) autoSpawnCfg.set("spawns", List.of());
@@ -163,9 +145,6 @@ public final class ConfigService {
         statsCfg = YamlConfiguration.loadConfiguration(statsFile);
     }
 
-    // =====================================================
-    // MOB LOADER (rekursiv + validation)
-    // =====================================================
     public void reloadMobsValidated() {
         List<File> files = new ArrayList<>(256);
         collectYmlFilesRecursive(mobsFolder, files);
@@ -245,9 +224,6 @@ public final class ConfigService {
         return rp.toLowerCase(Locale.ROOT);
     }
 
-    // =====================================================
-    // SAVE
-    // =====================================================
     public void saveAutoSpawn() {
         if (autoSpawnCfg == null) return;
         try {
@@ -259,9 +235,6 @@ public final class ConfigService {
         }
     }
 
-    // =====================================================
-    // GETTERS
-    // =====================================================
     public Map<String, FileConfiguration> mobConfigs() { return mobConfigs; }
     public FileConfiguration autoSpawn() { return autoSpawnCfg; }
     public FileConfiguration stats() { return statsCfg; }

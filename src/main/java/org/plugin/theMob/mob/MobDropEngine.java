@@ -30,10 +30,6 @@ public final class MobDropEngine {
 
     public void handleDeath(LivingEntity mob, EntityDeathEvent event) {
         if (mobs == null || mob == null || event == null) return;
-
-        // =========================================
-        // 🔒 DROP GUARD (PREVENT DOUBLE LOOT)
-        // =========================================
         if (mob.getPersistentDataContainer().has(
                 mobs.keys().DROPS_DONE,
                 PersistentDataType.INTEGER
@@ -45,10 +41,6 @@ public final class MobDropEngine {
                 PersistentDataType.INTEGER,
                 1
         );
-
-        // =========================================
-        // NO DROPS FLAG
-        // =========================================
         Integer noDrops = mob.getPersistentDataContainer()
                 .get(mobs.keys().NO_DROPS, PersistentDataType.INTEGER);
         if (noDrops != null && noDrops == 1) {
@@ -59,21 +51,9 @@ public final class MobDropEngine {
 
         FileConfiguration cfg = mobs.mobConfigOf(mob);
         if (cfg == null) return;
-
-        // =========================================
-        // OVERRIDE VANILLA DROPS
-        // =========================================
         event.getDrops().clear();
         event.setDroppedExp(0);
-
-        // =========================================
-        // NORMAL DROPS
-        // =========================================
         dropList(cfg.getMapList("drops"), mob);
-
-        // =========================================
-        // BOSS LEGENDARY DROPS
-        // =========================================
         if (mobs.isBoss(mob) && cfg.getBoolean("opdrop", false)) {
             dropList(cfg.getMapList("legendary-drops"), mob);
         }

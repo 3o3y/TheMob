@@ -20,12 +20,12 @@ public final class DamageContext {
     private boolean cancelled;
     private boolean crit;
     private double lifestealPercent;
-    private double dealKnockback;            // optional (Phase 3+)
-    private double receiveMultiplier = 1.0;  // boss phase receive-damage-multiplier
-    private BossTemplate bossTemplate;        // optional
-    private BossPhase bossPhase;              // optional
+    private double dealKnockback;
+    private double receiveMultiplier = 1.0;
+    private BossTemplate bossTemplate;
+    private BossPhase bossPhase;
     private final Map<String, Double> weaponStats = new HashMap<>();
-    private Map<String, Double> playerTotals = Collections.emptyMap(); // from cache
+    private Map<String, Double> playerTotals = Collections.emptyMap();
     public DamageContext(EntityDamageByEntityEvent event, Player attacker, LivingEntity victim) {
         this.event = event;
         this.attacker = attacker;

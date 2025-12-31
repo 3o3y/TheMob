@@ -1,4 +1,3 @@
-// src/main/java/org/plugin/theMob/core/context/PlayerBarCoordinator.java
 package org.plugin.theMob.core.context;
 
 import org.bukkit.boss.BossBar;

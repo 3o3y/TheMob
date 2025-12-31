@@ -28,9 +28,6 @@ public final class MobCommand implements CommandExecutor {
             return true;
         }
 
-        // =====================================================
-// /mob toggle hud
-// =====================================================
         if (args[0].equalsIgnoreCase("toggle")
                 && args.length >= 2
                 && args[1].equalsIgnoreCase("hud")) {
@@ -49,10 +46,6 @@ public final class MobCommand implements CommandExecutor {
             return true;
         }
 
-
-        // =====================================================
-        // /mob reload
-        // =====================================================
         if (args[0].equalsIgnoreCase("reload")) {
             if (!sender.hasPermission("themob.reload")) {
                 sender.sendMessage("§cNo permission.");
@@ -63,9 +56,6 @@ public final class MobCommand implements CommandExecutor {
             return true;
         }
 
-        // =====================================================
-        // /mob spawn <mob-id>   ✅ MANUAL ONLY
-        // =====================================================
         if (args[0].equalsIgnoreCase("spawn")) {
             if (!(sender instanceof Player p)) {
                 sender.sendMessage("§cOnly players can spawn mobs.");
@@ -85,7 +75,7 @@ public final class MobCommand implements CommandExecutor {
 
             mobs.spawnCustomMob(
                     id,
-                    null, // 🔥 KRITISCH: NULL = MANUAL
+                    null,
                     p.getLocation().add(
                             p.getLocation().getDirection().normalize().multiply(2)
                     )
@@ -95,9 +85,6 @@ public final class MobCommand implements CommandExecutor {
             return true;
         }
 
-        // =====================================================
-        // /mob autospawn <id> <seconds> <max>
-        // =====================================================
         if (args[0].equalsIgnoreCase("autospawn")) {
             if (!(sender instanceof Player p)) {
                 sender.sendMessage("§cOnly players can use this command.");
@@ -145,9 +132,6 @@ public final class MobCommand implements CommandExecutor {
             return true;
         }
 
-        // =====================================================
-        // /mob list autospawn
-        // =====================================================
         if (args[0].equalsIgnoreCase("list")
                 && args.length >= 2
                 && args[1].equalsIgnoreCase("autospawn")) {
@@ -174,9 +158,6 @@ public final class MobCommand implements CommandExecutor {
             return true;
         }
 
-        // =====================================================
-        // /mob del autospawn <id>
-        // =====================================================
         if (args[0].equalsIgnoreCase("del")
                 && args.length >= 3
                 && args[1].equalsIgnoreCase("autospawn")) {
@@ -196,9 +177,6 @@ public final class MobCommand implements CommandExecutor {
             return true;
         }
 
-        // =====================================================
-        // /mob killall
-        // =====================================================
         if (args[0].equalsIgnoreCase("killall")) {
             if (!sender.hasPermission("themob.killall")) {
                 sender.sendMessage("§cNo permission.");

@@ -13,6 +13,5 @@ public final class AggressiveBehavior implements BossBehavior {
 
     @Override
     public void tick(LivingEntity boss, BossPhase phase) {
-        // Vanilla AI does everything
     }
 }

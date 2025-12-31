@@ -11,11 +11,6 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class BossLockService {
 
     private final Map<String, UUID> activeBossBySpawn = new ConcurrentHashMap<>();
-
-    // =====================================================
-    // LOCK
-    // =====================================================
-
     public boolean hasBoss(String spawnId) {
         UUID id = activeBossBySpawn.get(spawnId);
         if (id == null) return false;
@@ -38,11 +33,6 @@ public final class BossLockService {
             activeBossBySpawn.remove(spawnId);
         }
     }
-
-    // =====================================================
-    // HARD RESET (Reload safe)
-    // =====================================================
-
     public void clearAll() {
         for (UUID id : activeBossBySpawn.values()) {
             LivingEntity e = find(id);

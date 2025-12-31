@@ -20,7 +20,6 @@ public final class BossBehaviorController {
             BossPhaseController phases
     ) {
 
-        // Core modes
         register(new org.plugin.theMob.boss.behavior.core.AggressiveBehavior());
         register(new org.plugin.theMob.boss.behavior.core.PassiveBehavior());
         register(new org.plugin.theMob.boss.behavior.core.FleeBehavior());

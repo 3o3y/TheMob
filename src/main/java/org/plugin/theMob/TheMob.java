@@ -72,9 +72,6 @@ public final class TheMob extends JavaPlugin {
     public void onEnable() {
         saveDefaultConfig();
 
-        // =========================
-        // CONFIGS / CORE
-        // =========================
         configService = new ConfigService(this);
         configService.ensureFoldersAndDefaults();
         configService.reloadAll();
@@ -82,15 +79,9 @@ public final class TheMob extends JavaPlugin {
         keys = new KeyRegistry(this);
         ticks = new TickScheduler(this);
 
-        // =========================
-        // MOB MANAGER
-        // =========================
         mobManager = new MobManager(this, configService, keys);
         mobManager.reloadFromConfigs();
 
-        // =========================
-        // ITEMS / DROPS
-        // =========================
         itemBuilder = new ItemBuilderFromConfig(this);
         loreRenderer = new ItemLoreRenderer();
         itemStatReader = new ItemStatReader(this);
@@ -99,15 +90,9 @@ public final class TheMob extends JavaPlugin {
         dropEngine.bind(mobManager);
         mobManager.setDropEngine(dropEngine);
 
-        // =========================
-        // UI (HEALTH)
-        // =========================
         healthDisplay = new MobHealthDisplay(this, mobManager);
         mobManager.setHealthDisplay(healthDisplay);
 
-        // =========================
-        // BOSS SYSTEM
-        // =========================
         playerBars = new PlayerBarCoordinator();
 
         bossActionEngine = new BossActionEngine(this);
@@ -128,9 +113,6 @@ public final class TheMob extends JavaPlugin {
                 phaseController
         );
 
-        // =========================
-        // SPAWN SYSTEM  ✅ FIXED
-        // =========================
         MobSpawnService spawnService = new MobSpawnService(
                 this,
                 mobManager,
@@ -158,9 +140,6 @@ public final class TheMob extends JavaPlugin {
         );
         spawnController.start();
 
-        // =========================
-        // HUD
-        // =========================
         boolean hudEnabled = getConfig().getBoolean(
                 "plugin.navigation-hud.enabled",
                 true
@@ -179,15 +158,9 @@ public final class TheMob extends JavaPlugin {
             );
         }
 
-        // =========================
-        // STATS / MENU
-        // =========================
         playerStatCache = new PlayerStatCache(this);
         statsMenu = new StatsMenuService(this, playerStatCache);
 
-        // =========================
-        // LISTENERS / COMMANDS
-        // =========================
         registerAllListeners();
         registerCommands();
 
@@ -211,11 +184,9 @@ public final class TheMob extends JavaPlugin {
     @Override
     public void onDisable() {
         try {
-            // 🔴 STOP GAME LOGIC FIRST
             if (spawnController != null) spawnController.stop();
             if (ticks != null) ticks.shutdown();
 
-            // 🔴 BOSS PHASES CLEANUP (triggers onPhaseLeave)
             if (phaseController != null) {
                 for (var boss : phaseController.activeBosses()) {
                     phaseController.onBossDeath(boss);
@@ -223,12 +194,10 @@ public final class TheMob extends JavaPlugin {
             }
 
 
-            // 🔴 ARENA WEATHER / TIME RESET
             if (bossActionEngine != null) {
                 bossActionEngine.shutdown();
             }
 
-            // 🔴 UI CLEANUP
             if (hud != null) hud.shutdown();
             if (bossBars != null) bossBars.shutdown();
 
@@ -285,26 +254,16 @@ public final class TheMob extends JavaPlugin {
             t.printStackTrace();
         }
 
-        // =========================
-        // RELOAD CONFIGS + MANAGERS
-        // =========================
         reloadConfig();
         configService.reloadAll();
         mobManager.reloadFromConfigs();
 
-        // Recreate UI service (health display references mobManager)
         healthDisplay = new MobHealthDisplay(this, mobManager);
         mobManager.setHealthDisplay(healthDisplay);
 
-        // =========================
-        // REBUILD STATS (✅ sonst NPE in listeners)
-        // =========================
         playerStatCache = new PlayerStatCache(this);
         statsMenu = new StatsMenuService(this, playerStatCache);
 
-        // =========================
-        // REBUILD BOSS SYSTEM
-        // =========================
         playerBars = new PlayerBarCoordinator();
 
         bossActionEngine = new BossActionEngine(this);
@@ -324,10 +283,6 @@ public final class TheMob extends JavaPlugin {
                 mobManager,
                 phaseController
         );
-
-        // =========================
-        // REBUILD SPAWN SYSTEM
-        // =========================
         MobSpawnService spawnService = new MobSpawnService(
                 this,
                 mobManager,
@@ -353,9 +308,6 @@ public final class TheMob extends JavaPlugin {
         );
         spawnController.start();
 
-        // =========================
-        // HUD
-        // =========================
         boolean hudEnabled = getConfig().getBoolean(
                 "plugin.navigation-hud.enabled",
                 true
@@ -373,10 +325,6 @@ public final class TheMob extends JavaPlugin {
                     this
             );
         }
-
-        // =========================
-        // LISTENERS / COMMANDS
-        // =========================
         registerAllListeners();
         registerCommands();
 

@@ -72,14 +72,12 @@ public final class MobSpawnService {
             mob = (LivingEntity) loc.getWorld().spawnEntity(loc, type);
         }
 
-        // SCALE
         if (cfg.contains("stats.scale")) {
             double scale = Math.max(0.25, Math.min(5.0, cfg.getDouble("stats.scale", 1.0)));
             var attr = mob.getAttribute(Attribute.SCALE);
             if (attr != null && scale != 1.0) attr.setBaseValue(scale);
         }
 
-        // CORE META
         mob.getPersistentDataContainer().set(keys.MOB_ID, PersistentDataType.STRING, mobId);
         mob.getPersistentDataContainer().set(keys.IS_BOSS, PersistentDataType.INTEGER, isBoss ? 1 : 0);
 
@@ -88,7 +86,6 @@ public final class MobSpawnService {
         );
         mob.getPersistentDataContainer().set(keys.BASE_NAME, PersistentDataType.STRING, name);
 
-        // ✅ SPAWN META (FIX)
         boolean isAutoSpawn = spawnId != null && spawnId.contains("@");
 
         mob.getPersistentDataContainer().set(
@@ -105,7 +102,6 @@ public final class MobSpawnService {
             );
         }
 
-        // HEALTH
         if (cfg.contains("stats.health.max")) {
             double max = cfg.getDouble("stats.health.max");
             var attr = mob.getAttribute(Attribute.MAX_HEALTH);
@@ -117,7 +113,6 @@ public final class MobSpawnService {
 
         if (healthDisplay != null) healthDisplay.onSpawn(mob);
 
-        // BOSS SYSTEM
         if (isBoss) {
             BossTemplate tpl = mobs.bossTemplate(mobId);
             Bukkit.getScheduler().runTask(plugin, () -> {
@@ -129,7 +124,6 @@ public final class MobSpawnService {
             });
         }
 
-        // VISUAL
         if (cfg.contains("visual.helmet.type")) {
             MobVisualService.attachVisual(plugin, mob, cfg, keys);
         }

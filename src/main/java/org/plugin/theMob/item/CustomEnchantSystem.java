@@ -17,7 +17,6 @@ public final class CustomEnchantSystem {
     public CustomEnchantSystem(Plugin plugin) {
         this.plugin = plugin;
     }
-// COLLECT ALL NUMERIC STATS (INT + DOUBLE SAFE)
     public Map<String, Double> collect(ItemMeta meta) {
         Map<String, Double> stats = new HashMap<>();
         PersistentDataContainer pdc = meta.getPersistentDataContainer();
@@ -34,7 +33,6 @@ public final class CustomEnchantSystem {
         }
         return stats;
     }
-// TRIGGER (OPTIONAL)
     public void trigger(Player p,
                         LivingEntity target,
                         Map<String, Double> stats,

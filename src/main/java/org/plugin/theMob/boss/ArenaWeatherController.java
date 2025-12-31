@@ -22,9 +22,6 @@ public final class ArenaWeatherController implements Listener {
         this.plugin = plugin;
     }
 
-    // =====================================================
-    // APPLY (called by BossActionEngine)
-    // =====================================================
     public void applyToPlayer(Player p, String weather, String time) {
         if (weather != null) {
             switch (weather.toUpperCase()) {
@@ -43,18 +40,12 @@ public final class ArenaWeatherController implements Listener {
         affectedPlayers.add(p.getUniqueId());
     }
 
-    // =====================================================
-    // RESET
-    // =====================================================
     public void reset(Player p) {
         p.resetPlayerWeather();
         p.resetPlayerTime();
         affectedPlayers.remove(p.getUniqueId());
     }
 
-    // =====================================================
-    // FAILSAFE EVENTS
-    // =====================================================
     @EventHandler
     public void onQuit(PlayerQuitEvent e) {
         reset(e.getPlayer());

@@ -34,7 +34,6 @@ public final class ItemBuilderFromConfig {
         ItemMeta meta = item.getItemMeta();
         if (meta == null) return item;
         List<Component> lore = new ArrayList<>();
-// NAME
         Object name = cfg.get("name");
         if (name instanceof List<?> list && !list.isEmpty()) {
             meta.displayName(Component.text(cc(list.get(0).toString())));
@@ -45,7 +44,6 @@ public final class ItemBuilderFromConfig {
         } else if (name instanceof String s) {
             meta.displayName(Component.text(cc(s)));
         }
-// FLAVOR LORE
         Object loreObj = cfg.get("lore");
         if (loreObj instanceof List<?> list) {
             for (Object o : list) {
@@ -55,7 +53,6 @@ public final class ItemBuilderFromConfig {
         if (!lore.isEmpty()) {
             meta.lore(lore);
         }
-// ENCHANTS
         Object enchants = cfg.get("enchants");
         if (enchants instanceof Map<?, ?> map) {
             for (var e : map.entrySet()) {
@@ -67,14 +64,12 @@ public final class ItemBuilderFromConfig {
                 }
             }
         }
-// ATTRIBUTES
         Object attrs = cfg.get("attributes");
         if (attrs instanceof Map<?, ?> map) {
             for (var e : map.entrySet()) {
                 applyAttribute(meta, e.getKey().toString(), e.getValue());
             }
         }
-// CUSTOM STATS (DOUBLE ONLY)
         Object stats = cfg.get("stats");
         if (stats instanceof Map<?, ?> map) {
             for (var e : map.entrySet()) {
@@ -88,7 +83,6 @@ public final class ItemBuilderFromConfig {
         item.setItemMeta(meta);
         return item;
     }
-// HELPERS
     private void applyAttribute(ItemMeta meta, String key, Object val) {
         Attribute attr = switch (key.toLowerCase()) {
             case "armor" -> Attribute.ARMOR;

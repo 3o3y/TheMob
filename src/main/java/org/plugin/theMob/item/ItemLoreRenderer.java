@@ -24,11 +24,9 @@ public final class ItemLoreRenderer {
             return;
         }
         List<Component> lore = new ArrayList<>();
-// EXISTING LORE (FLAVOR)
         if (meta.lore() != null) {
             lore.addAll(meta.lore());
         }
-// PROPERTIES
         lore.add(Component.empty());
         lore.add(cc("&bProperties:"));
         add(meta, lore, "damage", "Damage", "+");
@@ -38,7 +36,6 @@ public final class ItemLoreRenderer {
         add(meta, lore, "armor", "Armor", "+");
         add(meta, lore, "health", "Health", "+");
         add(meta, lore, "defense", "Defense", "+");
-// ENCHANTMENTS
         if (!meta.getEnchants().isEmpty()) {
             lore.add(Component.empty());
             lore.add(cc("&dEnchantments:"));
@@ -59,7 +56,6 @@ public final class ItemLoreRenderer {
         );
         item.setItemMeta(meta);
     }
-// HELPERS
     private void add(ItemMeta meta, List<Component> lore,
                      String key, String label, String prefix) {
         add(meta, lore, key, label, prefix, "");

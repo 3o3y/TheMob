@@ -33,7 +33,6 @@ public final class MobRadarResolver {
         this.ignoreNamed = ignoreNamed;
     }
 
-    // 🔑 Öffentlich für HUD-Progress
     public double getRadius() {
         return radius;
     }

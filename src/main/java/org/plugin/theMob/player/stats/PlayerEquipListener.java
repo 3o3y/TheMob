@@ -22,7 +22,6 @@ public final class PlayerEquipListener implements Listener {
         this.plugin = plugin;
         this.cache = cache;
     }
-// EQUIP EVENTS
     @EventHandler(ignoreCancelled = true)
     public void onInvClick(InventoryClickEvent e) {
         if (e.getWhoClicked() instanceof Player p) {
@@ -44,29 +43,23 @@ public final class PlayerEquipListener implements Listener {
     public void onQuit(PlayerQuitEvent e) {
         cache.invalidate(e.getPlayer());
     }
-// APPLY
     private void recompute(Player p) {
         cache.recompute(p);
         applyAttributes(p, cache.get(p));
     }
     private void applyAttributes(Player p, Map<String, Double> stats) {
-// HEALTH
         double totalHealth = stats.getOrDefault("health", 20.0);
         set(p, Attribute.MAX_HEALTH, totalHealth);
-// ARMOR / DEFENSE
         set(p, Attribute.ARMOR, stats.getOrDefault("armor", 0.0));
         set(p, Attribute.ARMOR_TOUGHNESS, stats.getOrDefault("defense", 0.0));
-// MOVEMENT
         double baseMoveSpeed = 0.1;
         set(p, Attribute.MOVEMENT_SPEED,
                 baseMoveSpeed + stats.getOrDefault("movement_speed", 0.0)
         );
-// ATTACK SPEED
         double baseAttackSpeed = 4.0;
         set(p, Attribute.ATTACK_SPEED,
                 baseAttackSpeed + stats.getOrDefault("attack_speed", 0.0)
         );
-// OTHER
         set(p, Attribute.KNOCKBACK_RESISTANCE,
                 stats.getOrDefault("knockback_resistance", 0.0)
         );

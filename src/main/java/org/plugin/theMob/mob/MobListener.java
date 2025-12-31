@@ -46,15 +46,7 @@ public final class MobListener implements Listener {
         LivingEntity mob = e.getEntity();
 
         if (!mobs.isCustomMob(mob)) return;
-
-        // =========================================
-        // 🔁 AUTOSPAWN LIFECYCLE CLEANUP (KRITISCH)
-        // =========================================
         autoSpawn.onMobDeath(mob);
-
-        // =========================================
-        // 🔥 VISUAL CLEANUP (FLOATING HEAD)
-        // =========================================
         if (mobs.isBoss(mob)) {
             for (Entity nearby : mob.getWorld().getNearbyEntities(
                     mob.getLocation(),
@@ -70,19 +62,12 @@ public final class MobListener implements Listener {
             }
         }
 
-        // =========================================
-        // 🌍 WORLD RESTORE
-        // =========================================
         if (mobs.isBoss(mob)) {
             bossActions.onBossDeath(mob);
             bossBars.unregisterBoss(mob);
             autoSpawn.releaseBossLock(mob);
         }
 
-
-        // =========================================
-        // 💀 DEATH COMMANDS (WITH PLACEHOLDERS)
-        // =========================================
         List<String> deathCommands = mobs.getDeathCommands(mob);
         if (deathCommands != null && !deathCommands.isEmpty()) {
 
@@ -103,9 +88,6 @@ public final class MobListener implements Listener {
             }
         }
 
-        // =========================================
-        // CORE DEATH HANDLING
-        // =========================================
         mobs.onMobDeath(mob, e);
     }
 }

@@ -35,9 +35,6 @@ public final class MobManager {
         this.configs = configs;
         this.keys = keys;
     }
-    // =====================================================
-    // INIT / RELOAD
-    // =====================================================
 
     public void reloadFromConfigs() {
         mobConfigs.clear();
@@ -56,9 +53,6 @@ public final class MobManager {
                         " mob configs | bosses=" + bossTemplates.size()
         );
     }
-    // =====================================================
-    // SPAWN
-    // =====================================================
 
     public LivingEntity spawnCustomMob(String mobId, String spawnId, Location loc) {
         if (spawnService == null) {
@@ -67,9 +61,7 @@ public final class MobManager {
         }
         return spawnService.spawn(mobId, spawnId, loc);
     }
-    // =====================================================
-    // LOOKUPS
-    // =====================================================
+
     public String baseNameOf(LivingEntity e) {
         if (e == null) return null;
         return e.getPersistentDataContainer()
@@ -129,9 +121,6 @@ public final class MobManager {
     public KeyRegistry keys() {
         return keys;
     }
-    // =====================================================
-    // DEATH COMMANDS
-    // =====================================================
 
     public List<String> getDeathCommands(LivingEntity mob) {
         if (mob == null) return List.of();
@@ -148,10 +137,6 @@ public final class MobManager {
         return list != null ? list : List.of();
     }
 
-    // =====================================================
-    // DEATH HANDLING
-    // =====================================================
-
     public void onMobDeath(LivingEntity mob, EntityDeathEvent e) {
         if (dropEngine != null) {
             dropEngine.handleDeath(mob, e);
@@ -160,9 +145,6 @@ public final class MobManager {
             healthDisplay.onDeath(mob);
         }
     }
-    // =====================================================
-    // ADMIN
-    // =====================================================
 
     public void killAll() {
         int removed = 0;
@@ -175,9 +157,6 @@ public final class MobManager {
         }
 
     }
-    // =====================================================
-    // SETTERS
-    // =====================================================
 
     public void setSpawnService(MobSpawnService spawnService) {
         this.spawnService = spawnService;

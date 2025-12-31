@@ -29,19 +29,13 @@ public final class BossActionEngine implements Listener {
     private final TheMob plugin;
     private final Random rnd = new Random();
 
-    // Players currently under "boss weather station" effects
     private final Set<UUID> affectedPlayers = ConcurrentHashMap.newKeySet();
 
-    // 🔴 ACTIVE WEATHER STATION (one active boss arena at a time)
     private LivingEntity activeBoss;
     private double activeRadius = 0.0;
-    private String activeWeather; // CLEAR / RAIN / THUNDER
-    private String activeTime;    // DAY / NIGHT
-
-    // ✅ Boss snapshots so phase buffs don't stack forever + we can restore base values
+    private String activeWeather;
+    private String activeTime;
     private final Map<UUID, BossSnapshot> bossSnapshots = new ConcurrentHashMap<>();
-
-    // Optional failsafe tick (re-apply / reset) so it works even without movement
     private BukkitRunnable stationTask;
 
     public BossActionEngine(TheMob plugin) {
@@ -58,9 +52,6 @@ public final class BossActionEngine implements Listener {
         stationTask.runTaskTimer(plugin, 20L, 20L); // every 1s
     }
 
-    // =====================================================
-    // GETTERS
-    // =====================================================
     public LivingEntity getActiveBoss() {
         return activeBoss;
     }
@@ -69,24 +60,17 @@ public final class BossActionEngine implements Listener {
         return activeRadius;
     }
 
-    // =====================================================
-    // PHASE ENTER
-    // =====================================================
     public void onPhaseEnter(LivingEntity boss, BossPhase phase) {
         if (boss == null || phase == null || !boss.isValid()) return;
 
-        // Ensure snapshot exists (prevents stacking attributes across phases)
         ensureSnapshot(boss);
-
         ConfigurationSection cfg = phase.cfg();
         if (cfg == null) return;
-
         applyAttributes(boss, cfg.getConfigurationSection("buffs"));
         applyAbilities(boss, cfg.getConfigurationSection("abilities"));
         applyEffects(boss, cfg.getConfigurationSection("effects"));
         applyPhysics(boss, cfg.getConfigurationSection("physics"));
 
-        // Boss = weather station (updates station config per phase)
         applyWorldStationConfig(boss, cfg.getConfigurationSection("world"));
 
         ConfigurationSection onEnter = cfg.getConfigurationSection("on-enter");
@@ -101,17 +85,10 @@ public final class BossActionEngine implements Listener {
         }
     }
 
-    // =====================================================
-    // PHASE LEAVE
-    // =====================================================
     public void onPhaseLeave(LivingEntity boss, BossPhase phase) {
         if (boss == null || !boss.isValid()) return;
-        // bewusst kein hard reset hier
     }
 
-    // =====================================================
-    // BOSS DEATH / DESPAWN
-    // =====================================================
     public void onBossDeath(LivingEntity boss) {
         clearWeatherStation();
         if (boss != null) {
@@ -119,9 +96,6 @@ public final class BossActionEngine implements Listener {
         }
     }
 
-    // =====================================================
-    // WEATHER STATION CONFIG (player-local only)
-    // =====================================================
     private void applyWorldStationConfig(LivingEntity boss, ConfigurationSection cfg) {
         if (boss == null || !boss.isValid()) return;
 
@@ -203,9 +177,6 @@ public final class BossActionEngine implements Listener {
         activeTime = null;
     }
 
-    // =====================================================
-    // FAILSAFE TICK
-    // =====================================================
     private void tickWeatherStation() {
         LivingEntity boss = activeBoss;
         if (boss == null) return;
@@ -233,9 +204,6 @@ public final class BossActionEngine implements Listener {
         }
     }
 
-    // =====================================================
-    // EVENTS
-    // =====================================================
     @EventHandler
     public void onQuit(PlayerQuitEvent e) {
         resetPlayer(e.getPlayer());
@@ -274,9 +242,6 @@ public final class BossActionEngine implements Listener {
         }
     }
 
-    // =====================================================
-    // SNAPSHOT
-    // =====================================================
     private void ensureSnapshot(LivingEntity boss) {
         UUID id = boss.getUniqueId();
         bossSnapshots.computeIfAbsent(id, k -> BossSnapshot.capture(boss));
@@ -299,9 +264,6 @@ public final class BossActionEngine implements Listener {
         return null;
     }
 
-    // =====================================================
-    // ATTRIBUTES / EFFECTS
-    // =====================================================
     private void applyAttributes(LivingEntity boss, ConfigurationSection cfg) {
         if (cfg == null) return;
 
@@ -363,9 +325,6 @@ public final class BossActionEngine implements Listener {
         if (cfg != null) boss.setGravity(cfg.getBoolean("gravity", true));
     }
 
-    // =====================================================
-    // MINIONS
-    // =====================================================
     private void runSummonMinionsOnce(
             LivingEntity boss,
             BossPhase phase,
@@ -424,16 +383,12 @@ public final class BossActionEngine implements Listener {
         }
     }
 
-    // =====================================================
-    // ON-ENTER EFFECTS  (Particles/Sound + NEW Message)
-    // =====================================================
     private void runOnEnterEffects(LivingEntity boss, ConfigurationSection onEnter) {
         ConfigurationSection effects = onEnter.getConfigurationSection("effects");
         if (effects == null) return;
 
         Location loc = boss.getLocation().clone().add(0, 1, 0);
 
-        // Particles
         ConfigurationSection particles = effects.getConfigurationSection("particles");
         if (particles != null) {
             try {
@@ -450,7 +405,6 @@ public final class BossActionEngine implements Listener {
             } catch (Exception ignored) {}
         }
 
-        // Sound
         ConfigurationSection sound = effects.getConfigurationSection("sound");
         if (sound != null) {
             try {
@@ -463,7 +417,6 @@ public final class BossActionEngine implements Listener {
             } catch (Exception ignored) {}
         }
 
-        // ✅ Message (ACTIONBAR / TITLE / CHAT)
         ConfigurationSection msg = effects.getConfigurationSection("message");
         if (msg != null) {
             sendPhaseEnterMessage(boss, msg);
@@ -476,11 +429,9 @@ public final class BossActionEngine implements Listener {
         String audience = msg.getString("audience", "NEARBY").toUpperCase(Locale.ROOT);
         double radius = msg.getDouble("radius", activeRadius > 0.0 ? activeRadius : 32.0);
 
-        // resolve targets
         Collection<Player> targets = resolveAudience(boss, audience, radius);
         if (targets.isEmpty()) return;
 
-        // TITLE
         if (type.equals("TITLE")) {
             String rawTitle = msg.getString("title", "");
             String rawSubtitle = msg.getString("subtitle", "");
@@ -504,7 +455,6 @@ public final class BossActionEngine implements Listener {
             return;
         }
 
-        // CHAT
         if (type.equals("CHAT")) {
             String raw = msg.getString("text", "");
             if (raw.isEmpty()) return;
@@ -518,10 +468,8 @@ public final class BossActionEngine implements Listener {
             return;
         }
 
-        // ACTIONBAR (default)
         String raw = msg.getString("text", "");
         if (raw.isEmpty()) {
-            // fallback if someone uses TITLE-style keys
             String t = msg.getString("title", "");
             String s = msg.getString("subtitle", "");
             raw = (t + (s.isEmpty() ? "" : " §7" + s)).trim();
@@ -551,7 +499,6 @@ public final class BossActionEngine implements Listener {
                 return new ArrayList<>(w.getPlayers());
             }
             case "STATION" -> {
-                // Nur Spieler, die aktuell im WeatherStation Radius sind (falls aktiv)
                 if (activeBoss != null && activeBoss.isValid() && activeBoss.getUniqueId().equals(boss.getUniqueId()) && activeRadius > 0.0) {
                     List<Player> out = new ArrayList<>();
                     for (UUID id : affectedPlayers) {
@@ -560,11 +507,9 @@ public final class BossActionEngine implements Listener {
                     }
                     return out;
                 }
-                // Fallback: NEARBY
             }
         }
 
-        // NEARBY (default)
         double r2 = Math.max(0.0, radius);
         r2 = r2 * r2;
 
@@ -583,9 +528,6 @@ public final class BossActionEngine implements Listener {
         return ChatColor.translateAlternateColorCodes('&', s);
     }
 
-    // =====================================================
-    // HARD RESET (reload / restart safe)
-    // =====================================================
     public void shutdown() {
         clearWeatherStation();
 
@@ -598,9 +540,6 @@ public final class BossActionEngine implements Listener {
         activeBoss = null;
     }
 
-    // =====================================================
-    // SNAPSHOT RECORD
-    // =====================================================
     private record BossSnapshot(Map<Attribute, Double> bases) {
 
         static BossSnapshot capture(LivingEntity e) {
