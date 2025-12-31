@@ -1771,7 +1771,6 @@ diff --git a/src/main/java/org/plugin/theMob/spawn/SpawnController.java b/src/ma
 +    public void stop() {
          for (SpawnPoint sp : registry.values()) {
 -            schedule(sp);
-+            auto.unregister(sp.spawnId());
          }
 +        registry.clear();
 +        auto.stop();

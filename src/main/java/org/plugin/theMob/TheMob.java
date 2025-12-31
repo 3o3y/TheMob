@@ -413,7 +413,8 @@ public final class TheMob extends JavaPlugin {
                 healthDisplay,
                 bossBars,
                 bossActionEngine,
-                keys
+                keys,
+                autoSpawnManager
         );
         Bukkit.getPluginManager().registerEvents(mobListener, this);
 
@@ -461,5 +462,9 @@ public final class TheMob extends JavaPlugin {
         }
         return nearest;
     }
+    public BossPhaseController bossPhases() {
+        return phaseController;
+    }
+
 
 }

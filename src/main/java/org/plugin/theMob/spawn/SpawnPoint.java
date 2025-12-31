@@ -24,7 +24,8 @@ public final class SpawnPoint {
             int x, int y, int z,
             int intervalSeconds,
             int maxSpawns,
-            boolean enabled
+            boolean enabled,
+            Integer arenaRadiusChunks // ✅ aus YAML
     ) {
         this.mobId = Objects.requireNonNull(mobId).toLowerCase();
         this.worldName = Objects.requireNonNull(worldName);
@@ -34,7 +35,12 @@ public final class SpawnPoint {
         this.intervalSeconds = Math.max(1, intervalSeconds);
         this.maxSpawns = Math.max(1, maxSpawns);
         this.enabled = enabled;
-        this.arenaRadiusChunks = DEFAULT_ARENA_RADIUS_CHUNKS;
+
+        if (arenaRadiusChunks == null) {
+            this.arenaRadiusChunks = DEFAULT_ARENA_RADIUS_CHUNKS;
+        } else {
+            this.arenaRadiusChunks = Math.max(0, arenaRadiusChunks);
+        }
     }
 
     // =====================================================
@@ -62,7 +68,7 @@ public final class SpawnPoint {
     }
 
     // =====================================================
-    // ARENA CHECK (🔥 WICHTIG!)
+    // ARENA CHECK (ANTI-AFK, CHUNK-BASIERT)
     // =====================================================
 
     public boolean isInsideArena(Location loc) {

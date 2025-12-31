@@ -14,6 +14,7 @@ import org.plugin.theMob.boss.BossActionEngine;
 import org.plugin.theMob.boss.Placeholder;
 import org.plugin.theMob.boss.bar.BossBarService;
 import org.plugin.theMob.core.KeyRegistry;
+import org.plugin.theMob.mob.spawn.AutoSpawnManager;
 
 import java.util.List;
 
@@ -23,18 +24,21 @@ public final class MobListener implements Listener {
     private final BossBarService bossBars;
     private final BossActionEngine bossActions;
     private final KeyRegistry keys;
+    private final AutoSpawnManager autoSpawn; // ✅ NEU
 
     public MobListener(
             MobManager mobs,
             org.plugin.theMob.ui.MobHealthDisplay ignored,
             BossBarService bossBars,
             BossActionEngine bossActions,
-            KeyRegistry keys
+            KeyRegistry keys,
+            AutoSpawnManager autoSpawn // ✅ NEU
     ) {
         this.mobs = mobs;
         this.bossBars = bossBars;
         this.bossActions = bossActions;
         this.keys = keys;
+        this.autoSpawn = autoSpawn;
     }
 
     @EventHandler
@@ -42,6 +46,11 @@ public final class MobListener implements Listener {
         LivingEntity mob = e.getEntity();
 
         if (!mobs.isCustomMob(mob)) return;
+
+        // =========================================
+        // 🔁 AUTOSPAWN LIFECYCLE CLEANUP (KRITISCH)
+        // =========================================
+        autoSpawn.onMobDeath(mob);
 
         // =========================================
         // 🔥 VISUAL CLEANUP (FLOATING HEAD)
@@ -66,7 +75,12 @@ public final class MobListener implements Listener {
         // =========================================
         if (mobs.isBoss(mob)) {
             bossActions.onBossDeath(mob);
+            bossBars.unregisterBoss(mob);
+
+            // 🔥 KRITISCH: BossLock freigeben
+            autoSpawn.releaseBossLock(mob);
         }
+
 
         // =========================================
         // 💀 DEATH COMMANDS (WITH PLACEHOLDERS)
@@ -100,6 +114,4 @@ public final class MobListener implements Listener {
             bossBars.unregisterBoss(mob);
         }
     }
-
-
 }

@@ -43,13 +43,20 @@ public final class SpawnController implements Listener {
     }
 
     // =====================================================
-    // COMMAND API (WIRD VON MobCommand BENUTZT)
+    // COMMAND API
     // =====================================================
 
-    public boolean startAutoSpawn(String mobId, Location loc, int intervalSeconds, int maxSpawns) {
+    public boolean startAutoSpawn(
+            String mobId,
+            Location loc,
+            int intervalSeconds,
+            int maxSpawns
+    ) {
         if (mobId == null || mobId.isBlank()) return false;
         if (loc == null || loc.getWorld() == null) return false;
         if (!mobs.mobExists(mobId)) return false;
+
+        int arenaChunks = 2; // default for command-created spawns
 
         SpawnPoint sp = new SpawnPoint(
                 mobId,
@@ -59,7 +66,8 @@ public final class SpawnController implements Listener {
                 loc.getBlockZ(),
                 intervalSeconds,
                 maxSpawns,
-                true
+                true,
+                arenaChunks
         );
 
         registry.put(sp.spawnId(), sp);
@@ -98,7 +106,8 @@ public final class SpawnController implements Listener {
                     l.getBlockY(),
                     l.getBlockZ(),
                     sp.intervalSeconds(),
-                    sp.maxSpawns()
+                    sp.maxSpawns(),
+                    sp.arenaRadiusChunks()
             ));
         }
 
@@ -132,6 +141,8 @@ public final class SpawnController implements Listener {
                 int maxSpawns = (int) raw.get("maxSpawns");
 
                 boolean enabled = (boolean) raw.getOrDefault("enabled", true);
+                int arenaChunks = (int) raw.getOrDefault("arenaRadiusChunks", 2);
+
                 if (!enabled || !mobs.mobExists(mobId)) continue;
 
                 SpawnPoint sp = new SpawnPoint(
@@ -140,7 +151,8 @@ public final class SpawnController implements Listener {
                         x, y, z,
                         interval,
                         maxSpawns,
-                        true
+                        true,
+                        arenaChunks
                 );
 
                 registry.put(sp.spawnId(), sp);
@@ -168,7 +180,9 @@ public final class SpawnController implements Listener {
             map.put("z", l.getBlockZ());
             map.put("intervalSeconds", sp.intervalSeconds());
             map.put("maxSpawns", sp.maxSpawns());
+            map.put("arenaRadiusChunks", sp.arenaRadiusChunks());
             map.put("enabled", true);
+
             out.add(map);
         }
 
@@ -177,7 +191,7 @@ public final class SpawnController implements Listener {
     }
 
     // =====================================================
-    // DTO (WIRD VON MobCommand GENUTZT)
+    // DTO
     // =====================================================
 
     public record AutoSpawnInfo(
@@ -187,6 +201,7 @@ public final class SpawnController implements Listener {
             int y,
             int z,
             int intervalSeconds,
-            int maxSpawns
+            int maxSpawns,
+            int arenaRadiusChunks
     ) {}
 }

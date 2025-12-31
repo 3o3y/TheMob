@@ -49,13 +49,27 @@ public final class BossPhaseController {
 
         lastPhase.put(id, phase);
 
-        if (bars != null) bars.setPhaseTitle(boss, phase.title());
-        if (isPhaseVisible(phase.id())) showPhaseTitle(boss, phase);
+        // ✅ Phase beim Spawn anzeigen
+        if (bars != null) {
+            bars.setPhaseTitle(boss, phase.title());
+            bars.markDirty(boss);
+        }
 
-        // 🔥 Effects + Weather + Sound → BossActionEngine
+        // 🔥 Phase-Enter (ActionBar / Effects / World)
         actionEngine.onPhaseEnter(boss, phase);
+    }
 
-        if (bars != null) bars.markDirty(boss);
+    // =====================================================
+    // PLAYER ENTER ARENA (NEU)
+    // =====================================================
+    public void onPlayerEnterArena(Player player, LivingEntity boss) {
+        if (player == null || boss == null) return;
+
+        BossPhase phase = lastPhase.get(boss.getUniqueId());
+        if (phase == null) return;
+
+        // ✅ Aktuelle Phase erneut anzeigen
+        showPhaseTitleToPlayer(player, phase);
     }
 
     // =====================================================
@@ -82,7 +96,7 @@ public final class BossPhaseController {
             lastPhase.put(id, next);
 
             if (bars != null) bars.setPhaseTitle(boss, next.title());
-            if (isPhaseVisible(next.id())) showPhaseTitle(boss, next);
+            showPhaseTitle(boss, next);
 
             actionEngine.onPhaseEnter(boss, next);
         }
@@ -135,24 +149,19 @@ public final class BossPhaseController {
     }
 
     // =====================================================
-    // VISUALS (NO SOUND!)
+    // VISUALS
     // =====================================================
-    private boolean isPhaseVisible(String phaseId) {
-        return phaseId != null && !phaseId.equalsIgnoreCase("phase1");
-    }
-
     private void showPhaseTitle(LivingEntity boss, BossPhase phase) {
-        String title = phase.id().equalsIgnoreCase("phase4")
-                ? "§4§lLAST PHASE"
-                : "§c§l" + phase.title();
-
-        String subtitle = phase.id().equalsIgnoreCase("phase4")
-                ? "§c§lKILL THE BOSS!!!"
-                : "§7Boss phase changed";
-
         for (Player p : boss.getWorld().getPlayers()) {
             if (p.getLocation().distanceSquared(boss.getLocation()) > 30 * 30) continue;
-            p.sendTitle(title, subtitle, 10, 40, 10);
+            showPhaseTitleToPlayer(p, phase);
         }
+    }
+
+    private void showPhaseTitleToPlayer(Player player, BossPhase phase) {
+        String title = "§c§l" + phase.title();
+        String subtitle = "§7Boss phase";
+
+        player.sendTitle(title, subtitle, 10, 40, 10);
     }
 }

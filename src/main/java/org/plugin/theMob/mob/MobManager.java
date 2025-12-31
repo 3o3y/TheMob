@@ -190,4 +190,14 @@ public final class MobManager {
     public void setHealthDisplay(MobHealthDisplay display) {
         this.healthDisplay = display;
     }
+    public BossTemplate getBossTemplate(LivingEntity boss) {
+        if (boss == null) return null;
+
+        String mobId = mobIdOf(boss);
+        if (mobId == null) return null;
+
+        return bossTemplates.get(mobId.toLowerCase(Locale.ROOT));
+    }
+
+
 }

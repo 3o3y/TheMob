@@ -26,7 +26,7 @@ spawns: []
 #   # ---------------------------------------------
 #   # Arena Presence Detection (ANTI-AFK)
 #   # ---------------------------------------------
-#   arenaRadiusChunks: 2          # NEW in v1.2
+arenaRadiusChunks: 2          # NEW in v1.2
 #
 #   # Player must be inside this chunk radius
 #   # for the spawn to be active.
