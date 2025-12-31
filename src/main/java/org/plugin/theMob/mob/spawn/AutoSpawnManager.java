@@ -28,6 +28,8 @@ public final class AutoSpawnManager {
 
     private final Map<String, SpawnPoint> points = new ConcurrentHashMap<>();
     private final Map<String, Set<UUID>> alive = new ConcurrentHashMap<>();
+
+    // 🔒 RAID COUNTER (ever spawned)
     private final Map<String, Integer> spawnedTotal = new ConcurrentHashMap<>();
     private final Map<String, Long> lastSpawnTick = new ConcurrentHashMap<>();
 
@@ -115,8 +117,10 @@ public final class AutoSpawnManager {
             }
 
             if (hotNow) {
-                int spawned = spawnedTotal.getOrDefault(id, 0);
-                if (spawned < sp.maxSpawns()
+                int spawnedEver = spawnedTotal.getOrDefault(id, 0);
+
+                // 🔒 RAID LIMIT: no respawn after limit
+                if (spawnedEver < sp.maxSpawns()
                         && now - lastSpawnTick.getOrDefault(id, 0L)
                         >= sp.intervalSeconds() * 20L) {
                     spawnOne(sp, id, now);
@@ -148,6 +152,7 @@ public final class AutoSpawnManager {
         alive.computeIfAbsent(id, k -> ConcurrentHashMap.newKeySet())
                 .add(mob.getUniqueId());
 
+        // 🔒 increment ONCE
         spawnedTotal.put(id, spawnedTotal.getOrDefault(id, 0) + 1);
         lastSpawnTick.put(id, now);
 
@@ -179,9 +184,11 @@ public final class AutoSpawnManager {
         }
 
         alive.computeIfAbsent(spawnId, k -> ConcurrentHashMap.newKeySet()).clear();
-        bossLocks.release(spawnId);
+
+        // 🔁 RESET RAID
         spawnedTotal.put(spawnId, 0);
         lastSpawnTick.put(spawnId, 0L);
+        bossLocks.release(spawnId);
     }
 
     private void forceLoadArenaChunks(SpawnPoint sp) {
@@ -223,9 +230,8 @@ public final class AutoSpawnManager {
             set.remove(mob.getUniqueId());
         }
 
-        spawnedTotal.computeIfPresent(spawnId, (k, v) -> Math.max(0, v - 1));
+        // ❌ KEIN spawnedTotal-- !!
     }
-
 
     public void releaseBossLock(LivingEntity mob) {
         String spawnId = mob.getPersistentDataContainer().get(
