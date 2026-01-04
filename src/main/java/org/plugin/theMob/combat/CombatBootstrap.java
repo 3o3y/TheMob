@@ -28,7 +28,6 @@ public final class CombatBootstrap {
         PluginManager pm = Bukkit.getPluginManager();
         pm.registerEvents(listener, plugin);
 
-        // Optional command: "combatdebug"
         if (plugin.getCommand("combatdebug") != null) {
             plugin.getCommand("combatdebug").setExecutor(new CombatDebugCommand(debug));
         }

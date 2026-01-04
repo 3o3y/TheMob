@@ -84,8 +84,6 @@ public final class MobSpawnService {
 
         // =========================
         // ARMOR SEED (CRITICAL FIX)
-        // - sorgt dafür, dass der Damage-Event-Pfad (inkl. DamageNumbers)
-        //   auf allen Entities stabil feuert (auch bei 0 Armor)
         // =========================
         AttributeInstance armor = mob.getAttribute(Attribute.ARMOR);
         if (armor != null && armor.getBaseValue() <= 0.0) {

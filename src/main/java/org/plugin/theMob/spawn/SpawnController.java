@@ -433,7 +433,7 @@ public final class SpawnController implements Listener {
         }
 
         if (removed) {
-            saveToConfig(); // speichert nur ENDLESS
+            saveToConfig();
         }
 
         return removed;

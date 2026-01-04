@@ -23,11 +23,7 @@ public final class StatsCommand implements CommandExecutor {
             sender.sendMessage("Only players can use this command.");
             return true;
         }
-
-        // ✅ FORCE STAT RECALC
         cache.invalidate(p);
-
-        // open menu with fresh stats
         menu.open(p);
         return true;
     }

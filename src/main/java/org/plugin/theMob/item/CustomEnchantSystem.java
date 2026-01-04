@@ -36,15 +36,9 @@ public final class CustomEnchantSystem {
         return stats;
     }
 
-    /**
-     * v1.5 Hook: wird nach finalem Damage aufgerufen.
-     * Hier kannst du später "on-hit" Procs, DoTs, Chains usw. reinbauen.
-     */
+
     public void trigger(Player p, LivingEntity target, Map<String, Double> stats, double finalDamage) {
         if (p == null || target == null || stats == null) return;
 
-        // Example placeholders (safe/no-op by default):
-        // double bleedChance = stats.getOrDefault("bleed_chance", 0.0);
-        // double stunChance  = stats.getOrDefault("stun_chance", 0.0);
     }
 }

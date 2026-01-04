@@ -68,7 +68,6 @@ public final class PlayerEquipListener implements Listener {
     private double vanillaWeaponBase(Player p) {
         ItemStack it = p.getInventory().getItemInMainHand();
 
-        // 👊 Faust = nie 0 Schaden
         if (it == null || it.getType().isAir()) {
             return 1.0;
         }
@@ -128,8 +127,8 @@ public final class PlayerEquipListener implements Listener {
             // =========================
             // SPECIAL WEAPONS
             // =========================
-            case TRIDENT -> 8.0;          // Wurf + Nahkampf
-            case MACE -> 7.0;             // Base ohne Fall-Multiplier
+            case TRIDENT -> 8.0;
+            case MACE -> 7.0;
 
             // =========================
             // FALLBACK

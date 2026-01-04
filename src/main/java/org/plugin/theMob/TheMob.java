@@ -277,8 +277,6 @@ public final class TheMob extends JavaPlugin {
                 ticks = null;
             }
 
-            // combat/customEnchants/playerStatCache/statsMenu brauchen keinen “shutdown”,
-            // werden durch HandlerList.unregisterAll + neue Instanzen ersetzt.
 
         } catch (Throwable t) {
             getLogger().severe("[TheMob] HARD SHUTDOWN FAILED");

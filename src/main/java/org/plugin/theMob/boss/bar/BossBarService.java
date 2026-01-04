@@ -79,7 +79,7 @@ public final class BossBarService implements Listener {
     }
 
     // =====================================================
-    // PUBLIC API (FEHLTE BEI DIR)
+    // PUBLIC API
     // =====================================================
 
     public void registerBoss(LivingEntity boss) {

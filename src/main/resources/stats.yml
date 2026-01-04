@@ -1,47 +1,77 @@
 # =========================================================
 #  Player Stats Menu Configuration
-#  Status: In Development
+#  Plugin: TheMob
+#  Status: Production Ready (PvE Balanced)
 # =========================================================
 #
-#  This menu defines the player stats overview GUI.
-#  Each stat entry is fully configurable and optional.
+#  This file controls:
+#   • The in-game player stats GUI
+#   • Stat display layout (icons, slots, names)
+#   • Stat progression via tier systems (Lv1–Lv10)
 #
-#  You can:
-#   • Reorder stats via slot
-#   • Disable stats by removing entries
-#   • Change icons, names and value paths
+#  This file is designed for SERVER ADMINS.
+#  You can safely tweak values without touching code.
 #
-#  Slot range: 0–53 (6 rows)
+# ---------------------------------------------------------
+#  GENERAL RULES
+# ---------------------------------------------------------
+#  • Slots range from 0–53 (6 rows inventory)
+#  • Removing a stat entry disables it completely
+#  • Tier arrays define how stats scale per level
+#  • Tier index = stat level (Lv1 = index 0)
 # =========================================================
 
+
+# =========================================================
+#  STATS MENU (GUI)
+# =========================================================
 menu:
-  # Title shown at the top of the inventory
+
+  # Title shown at the top of the stats inventory
   title: "Your Stats"
 
   # Inventory size (must be multiple of 9)
+  # 54 = 6 rows (recommended)
   size: 54
+
+
+# =========================================================
+#  STATS DEFINITIONS
+# =========================================================
+#
+#  Each stat entry defines:
+#   • Display name
+#   • Inventory slot
+#   • Value path (current value)
+#   • Level path (current stat level)
+#   • Next path (value for next level)
+#   • Icon material
+#
+#  You can reorder stats by changing the slot.
+# =========================================================
 
 stats:
 
   # -------------------------------------------------------
-  # Base Health
+  # BASE HEALTH
   # -------------------------------------------------------
-  # Represents the player's core health pool.
-  # Usually increased via leveling or gear.
+  # Represents the player's base maximum health.
+  # This is the foundation of survivability.
   #
   health:
     name: "❤ Health"
     slot: 0
-    value-path: "player.health"          # Current stat value
-    level-path: "player.level.health"    # Current stat level
-    next-path: "player.next.health"      # Value required for next level
+    value-path: "player.health"
+    level-path: "player.level.health"
+    next-path: "player.next.health"
     icon: "HEART_OF_THE_SEA"
 
+
   # -------------------------------------------------------
-  # Bonus Health
+  # BONUS HEALTH
   # -------------------------------------------------------
-  # Additional health on top of base health.
-  # Often granted by perks, items or buffs.
+  # Extra health added on top of base health.
+  # Usually granted by items, perks or buffs.
   #
   bonus_health:
     name: "❤+ Health+"
@@ -51,9 +81,13 @@ stats:
     next-path: "player.next.health"
     icon: "GOLDEN_APPLE"
 
+
   # -------------------------------------------------------
-  # Armor (Vanilla-style damage reduction)
+  # ARMOR (VANILLA ARMOR POINTS)
   # -------------------------------------------------------
+  # Works exactly like vanilla armor.
+  # Strong mitigation – values above 20 are NOT recommended.
+  #
   armor:
     name: "⛨ Defense"
     slot: 45
@@ -62,11 +96,12 @@ stats:
     next-path: "player.next.armor"
     icon: "SHIELD"
 
+
   # -------------------------------------------------------
-  # Advanced Defense
+  # ADVANCED DEFENSE (RPG)
   # -------------------------------------------------------
-  # Non-vanilla damage mitigation (RPG-style).
-  # Can be used for custom formulas.
+  # Custom RPG-style defense.
+  # Uses diminishing returns in combat formulas.
   #
   defense:
     name: "⛨+ Defense+"
@@ -76,9 +111,13 @@ stats:
     next-path: "player.next.defense"
     icon: "NETHERITE_SCRAP"
 
+
   # -------------------------------------------------------
-  # Base Damage
+  # BASE DAMAGE
   # -------------------------------------------------------
+  # Flat damage added to vanilla weapon damage.
+  # Core offensive stat.
+  #
   damage:
     name: "⚔ Damage"
     slot: 5
@@ -87,9 +126,13 @@ stats:
     next-path: "player.next.damage"
     icon: "DIAMOND"
 
+
   # -------------------------------------------------------
-  # Extra Damage (additive bonus)
+  # EXTRA DAMAGE (ADDITIVE)
   # -------------------------------------------------------
+  # Additional flat damage added AFTER base damage.
+  # Keep this lower than base damage to avoid burst meta.
+  #
   extra_damage:
     name: "⚔ Extra Dmg"
     slot: 8
@@ -98,9 +141,13 @@ stats:
     next-path: "player.next.extra_damage"
     icon: "ANVIL"
 
+
   # -------------------------------------------------------
-  # Critical Hit Chance
+  # CRITICAL HIT CHANCE
   # -------------------------------------------------------
+  # Chance (in %) to deal a critical hit.
+  # Internally normalized (e.g. 30 = 30%).
+  #
   crit_chance:
     name: "✨ Crit Chance"
     slot: 43
@@ -109,21 +156,27 @@ stats:
     next-path: "player.next.crit"
     icon: "AMETHYST_SHARD"
 
+
   # -------------------------------------------------------
-  # Critical Damage Multiplier
+  # CRITICAL DAMAGE MULTIPLIER
   # -------------------------------------------------------
+  # Increases damage when a crit occurs.
+  # Values are interpreted as percentage.
+  #
   crit_multiplier:
-    name: "✨ Crit Multiplicator"
+    name: "✨ Crit Multiplier"
     slot: 53
     value-path: "player.crit_multiplier"
     level-path: "player.level.crit_multiplier"
     next-path: "player.next.crit_multiplier"
     icon: "GLOWSTONE_DUST"
 
+
   # -------------------------------------------------------
-  # Lifesteal
+  # LIFESTEAL
   # -------------------------------------------------------
   # Converts a percentage of dealt damage into health.
+  # Hard capped in combat config (recommended ≤ 35%).
   #
   lifesteal:
     name: "⚡ Lifesteal"
@@ -133,9 +186,13 @@ stats:
     next-path: "player.next.lifesteal"
     icon: "NETHER_WART"
 
+
   # -------------------------------------------------------
-  # Movement Speed
+  # MOVEMENT SPEED
   # -------------------------------------------------------
+  # Adds to vanilla movement speed.
+  # Small values have big gameplay impact.
+  #
   movement_speed:
     name: "🩸 Move Speed"
     slot: 20
@@ -144,9 +201,13 @@ stats:
     next-path: "player.next.movement_speed"
     icon: "DIAMOND_BOOTS"
 
+
   # -------------------------------------------------------
-  # Attack Speed
+  # ATTACK SPEED
   # -------------------------------------------------------
+  # Adds to vanilla attack speed.
+  # High values drastically increase DPS.
+  #
   attack_speed:
     name: "⚡ Attack Speed"
     slot: 24
@@ -155,10 +216,11 @@ stats:
     next-path: "player.next.attack_speed"
     icon: "WIND_CHARGE"
 
+
   # -------------------------------------------------------
-  # Luck
+  # LUCK
   # -------------------------------------------------------
-  # Influences drop chances, rolls and RNG-based systems.
+  # Influences drops, RNG rolls and special events.
   #
   luck:
     name: "🍀 Luck"
@@ -168,9 +230,13 @@ stats:
     next-path: "player.next.luck"
     icon: "RABBIT_FOOT"
 
+
   # -------------------------------------------------------
-  # Knockback Resistance
+  # KNOCKBACK RESISTANCE
   # -------------------------------------------------------
+  # Range: 0.0 – 1.0
+  # 1.0 = immune to knockback
+  #
   knockback_resistance:
     name: "🛑 Knockback Res."
     slot: 33
@@ -181,155 +247,182 @@ stats:
 
 
 # =========================================================
-#  Status Tier System
+#  STAT TIER SYSTEM (LEVEL 1–10)
 # =========================================================
 #
-#  Each tier array defines progression breakpoints.
-#  Index = level, value = stat increase at that level.
-#
-#  You can:
-#   • Add more tiers for longer progression
-#   • Reduce tiers for shorter servers
-#   • Fine-tune balance per stat
+#  Tier arrays define how stats scale per level.
+#  • Index 0 = Level 1
+#  • Index 9 = Level 10
 #
 #  IMPORTANT:
-#  Tier count should match your max stat level.
+#  All tier arrays should have the SAME length.
 # =========================================================
 
 status_system:
 
-  # Health tiers (total max health)
+  # -------------------------------------------------------
+  # HEALTH TIERS (TOTAL MAX HEALTH)
+  # -------------------------------------------------------
   health_tiers:
-    - 10
-    - 16
-    - 22
-    - 30
+    - 20   # Lv1 (Vanilla)
+    - 24
+    - 28
+    - 32
+    - 36
     - 40
-    - 55
-    - 67
-    - 73
-    - 81
-    - 93
+    - 44
+    - 48
+    - 52
+    - 56   # Lv10
 
-  # Armor tiers (vanilla-style armor points)
+
+  # -------------------------------------------------------
+  # ARMOR TIERS (VANILLA ARMOR POINTS)
+  # -------------------------------------------------------
   armor_tiers:
+    - 2
+    - 4
+    - 6
+    - 8
+    - 10
+    - 12
+    - 14
+    - 16
+    - 18
+    - 20
+
+
+  # -------------------------------------------------------
+  # BASE DAMAGE TIERS
+  # -------------------------------------------------------
+  damage_tiers:
+    - 2
+    - 4
+    - 6
+    - 9
+    - 12
+    - 15
+    - 18
+    - 22
+    - 26
+    - 30
+
+
+  # -------------------------------------------------------
+  # EXTRA DAMAGE TIERS (ADDITIVE)
+  # -------------------------------------------------------
+  extra_damage_tiers:
+    - 1
+    - 2
+    - 3
     - 5
+    - 7
+    - 9
+    - 12
+    - 15
+    - 18
+    - 22
+
+
+  # -------------------------------------------------------
+  # CRITICAL HIT CHANCE TIERS (%)
+  # -------------------------------------------------------
+  crit_tiers:
+    - 5
+    - 8
     - 12
     - 16
-    - 21
-    - 27
-    - 36
-    - 41
-    - 57
-    - 66
-    - 79
-
-  # Base damage tiers
-  damage_tiers:
-    - 7
-    - 13
-    - 19
-    - 27
-    - 36
-    - 42
-    - 56
-    - 69
-    - 74
-    - 85
-
-  # Extra damage tiers (additive bonus)
-  extra_damage_tiers:
-    - 5
-    - 10
-    - 15
-    - 25
-    - 36
-    - 47
-    - 58
-    - 69
-    - 80
-    - 90
-
-  # Critical hit chance tiers (%)
-  crit_tiers:
-    - 7
-    - 14
-    - 21
+    - 22
     - 28
     - 35
     - 42
-    - 49
-    - 56
-    - 63
-    - 70
+    - 50
+    - 60
 
-  # Critical damage multiplier tiers (%)
+
+  # -------------------------------------------------------
+  # CRITICAL DAMAGE MULTIPLIER TIERS (%)
+  # -------------------------------------------------------
   crit_multiplier_tiers:
     - 10
     - 20
     - 30
     - 40
-    - 50
-    - 60
+    - 55
     - 70
-    - 80
     - 90
-    - 100
+    - 115
+    - 145
+    - 180
 
-  # Lifesteal tiers (%)
+
+  # -------------------------------------------------------
+  # LIFESTEAL TIERS (%)
+  # -------------------------------------------------------
   lifesteal_tiers:
-    - 5
+    - 2
+    - 4
+    - 6
+    - 8
     - 10
-    - 15
+    - 13
+    - 16
     - 20
     - 25
     - 30
-    - 35
-    - 40
-    - 45
-    - 50
 
-  # Advanced defense tiers
+
+  # -------------------------------------------------------
+  # ADVANCED DEFENSE TIERS
+  # -------------------------------------------------------
   defense_tiers:
-    - 3
-    - 8
-    - 15
-    - 24
-    - 32
-    - 40
-    - 50
-    - 59
-    - 64
-    - 71
+    - 5
+    - 10
+    - 16
+    - 22
+    - 30
+    - 38
+    - 47
+    - 57
+    - 68
     - 80
 
-  # Movement speed tiers (added to base speed)
+
+  # -------------------------------------------------------
+  # MOVEMENT SPEED TIERS
+  # -------------------------------------------------------
   movement_speed_tiers:
     - 0.01
+    - 0.015
     - 0.02
+    - 0.025
     - 0.03
+    - 0.035
     - 0.04
+    - 0.045
     - 0.05
-    - 0.06
-    - 0.07
-    - 0.08
-    - 0.09
-    - 0.10
+    - 0.055
 
-  # Attack speed tiers
+
+  # -------------------------------------------------------
+  # ATTACK SPEED TIERS
+  # -------------------------------------------------------
   attack_speed_tiers:
-    - 0.5
-    - 1.0
-    - 1.5
+    - 0.3
+    - 0.6
+    - 0.9
+    - 1.2
+    - 1.6
     - 2.0
-    - 2.5
-    - 3.0
-    - 3.5
-    - 4.0
-    - 4.5
-    - 5.0
+    - 2.4
+    - 2.8
+    - 3.2
+    - 3.6
 
-  # Knockback resistance tiers (0.0–1.0)
+
+  # -------------------------------------------------------
+  # KNOCKBACK RESISTANCE TIERS (0.0 – 1.0)
+  # -------------------------------------------------------
   knockback_resistance_tiers:
     - 0.05
     - 0.10
@@ -342,7 +435,10 @@ status_system:
     - 0.80
     - 0.90
 
-  # Luck tiers (flat value)
+
+  # -------------------------------------------------------
+  # LUCK TIERS (FLAT VALUE)
+  # -------------------------------------------------------
   luck_tiers:
     - 1
     - 2

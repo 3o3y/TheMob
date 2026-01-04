@@ -33,11 +33,9 @@ public final class DamageCalculator {
         Map<String, String> dbg = new LinkedHashMap<>();
 
         // ---- Base (vanilla feel) ----
-        // Use vanilla event base as baseline, then add RPG stats on top.
         double base = vanillaBaseDamage;
         double addDamage = stats.getOrDefault("damage", 0.0) + stats.getOrDefault("extra_damage", 0.0);
 
-        // If your server wants full RPG override, set combat.override_vanilla=true
         boolean overrideVanilla = combatCfg != null && combatCfg.getBoolean("override_vanilla", false);
         if (overrideVanilla) base = 0.0;
 
@@ -80,7 +78,6 @@ public final class DamageCalculator {
         // ---- Conditional effects (execute/enrage) ----
         double conditionalMult = 1.0;
 
-        // Execute: more damage if target low hp
         double execThreshold = combatCfg != null ? combatCfg.getDouble("conditional.execute.threshold", 0.20) : 0.20;
         double execMult = combatCfg != null ? combatCfg.getDouble("conditional.execute.multiplier", 1.25) : 1.25;
 
@@ -89,7 +86,6 @@ public final class DamageCalculator {
 
         if (execute) conditionalMult *= execMult;
 
-        // Enrage: if target has PDC/metadata marker
         boolean enraged = target.getScoreboardTags().contains("themob_enraged");
         double enrageMult = combatCfg != null ? combatCfg.getDouble("conditional.enrage.multiplier", 1.15) : 1.15;
         if (enraged) conditionalMult *= enrageMult;
@@ -101,15 +97,11 @@ public final class DamageCalculator {
         dbg.put("EnrageActive", String.valueOf(enraged));
         dbg.put("ConditionalMultiplier", trim(conditionalMult));
 
-        // ---- Defense / mitigation (light vanilla feel) ----
-        // Keep vanilla armor behavior (MC already applies it), so we only apply *RPG defense* softly.
-        // You can disable this by setting combat.defense.enabled=false
         boolean defenseEnabled = combatCfg == null || combatCfg.getBoolean("defense.enabled", true);
         double defense = stats.getOrDefault("defense", 0.0);
 
         double afterDefense = afterConditional;
         if (defenseEnabled && defense > 0) {
-            // Soft diminishing returns: 0..infty -> 0..~80% reduction
             double maxReduction = combatCfg != null ? combatCfg.getDouble("defense.max_reduction", 0.60) : 0.60;
             double k = combatCfg != null ? combatCfg.getDouble("defense.k", 200.0) : 200.0;
             double reduction = clamp(defense / (defense + k), 0.0, maxReduction);
@@ -152,16 +144,13 @@ public final class DamageCalculator {
 
     private double normalizePercent(double v) {
         if (v <= 0) return 0.0;
-        // If user stores "10" meaning 10%, convert to 0.10
         if (v > 1.0) return v / 100.0;
         return v;
     }
 
     private double normalizeCritMultiplier(double v) {
         if (v <= 0) return 1.0;
-        // If stored as "50" meaning +50% crit dmg => 1.5
         if (v > 3.0) return 1.0 + (v / 100.0);
-        // If stored as "1.5" already multiplier
         return v;
     }
 
