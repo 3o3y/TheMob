@@ -3,7 +3,6 @@ package org.plugin.theMob.item;
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
-import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
@@ -14,12 +13,15 @@ import java.util.Map;
 public final class CustomEnchantSystem {
 
     private final Plugin plugin;
+
     public CustomEnchantSystem(Plugin plugin) {
         this.plugin = plugin;
     }
-    public Map<String, Double> collect(ItemMeta meta) {
+
+    public Map<String, Double> collect(org.bukkit.inventory.meta.ItemMeta meta) {
         Map<String, Double> stats = new HashMap<>();
         PersistentDataContainer pdc = meta.getPersistentDataContainer();
+
         for (NamespacedKey key : pdc.getKeys()) {
             if (pdc.has(key, PersistentDataType.DOUBLE)) {
                 Double v = pdc.get(key, PersistentDataType.DOUBLE);
@@ -33,9 +35,16 @@ public final class CustomEnchantSystem {
         }
         return stats;
     }
-    public void trigger(Player p,
-                        LivingEntity target,
-                        Map<String, Double> stats,
-                        double damage) {
+
+    /**
+     * v1.5 Hook: wird nach finalem Damage aufgerufen.
+     * Hier kannst du später "on-hit" Procs, DoTs, Chains usw. reinbauen.
+     */
+    public void trigger(Player p, LivingEntity target, Map<String, Double> stats, double finalDamage) {
+        if (p == null || target == null || stats == null) return;
+
+        // Example placeholders (safe/no-op by default):
+        // double bleedChance = stats.getOrDefault("bleed_chance", 0.0);
+        // double stunChance  = stats.getOrDefault("stun_chance", 0.0);
     }
 }

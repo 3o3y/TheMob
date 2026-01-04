@@ -12,6 +12,10 @@ import org.plugin.theMob.boss.bar.BossBarService;
 import org.plugin.theMob.boss.behavior.BossBehaviorController;
 import org.plugin.theMob.boss.phase.BossPhaseController;
 import org.plugin.theMob.boss.phase.BossPhaseResolver;
+import org.plugin.theMob.combat.CombatBootstrap;
+import org.plugin.theMob.combat.CombatDebugService;
+import org.plugin.theMob.combat.DamageCalculator;
+import org.plugin.theMob.combat.MobMultiplierService;
 import org.plugin.theMob.command.MobCommand;
 import org.plugin.theMob.command.MobTabCompleter;
 import org.plugin.theMob.command.StatsCommand;
@@ -22,6 +26,7 @@ import org.plugin.theMob.core.context.PlayerBarCoordinator;
 import org.plugin.theMob.hud.NaviHudListener;
 import org.plugin.theMob.hud.NaviHudService;
 import org.plugin.theMob.hud.compass.CompassRenderer;
+import org.plugin.theMob.item.CustomEnchantSystem;
 import org.plugin.theMob.item.ItemBuilderFromConfig;
 import org.plugin.theMob.item.ItemLoreRenderer;
 import org.plugin.theMob.item.ItemStatReader;
@@ -42,6 +47,15 @@ import java.util.Iterator;
 import static org.plugin.theMob.hud.NaviHudService.HUD_KEY;
 
 public final class TheMob extends JavaPlugin {
+
+
+    // v1.5 Combat
+    private CombatBootstrap combat;
+    private CombatDebugService combatDebug;
+    private DamageCalculator damageCalculator;
+    private MobMultiplierService mobMultipliers;
+    private CustomEnchantSystem customEnchants;
+
 
     private ConfigService configService;
     private KeyRegistry keys;
@@ -78,6 +92,7 @@ public final class TheMob extends JavaPlugin {
         configService = new ConfigService(this);
         configService.ensureFoldersAndDefaults();
         configService.reloadAll();
+
         keys = new KeyRegistry(this);
         ticks = new TickScheduler(this);
 
@@ -134,7 +149,6 @@ public final class TheMob extends JavaPlugin {
                 bossLocks
         );
 
-
         spawnController = new SpawnController(
                 this,
                 mobManager,
@@ -142,25 +156,34 @@ public final class TheMob extends JavaPlugin {
         );
         spawnController.start();
 
+        mobManager.setAutoSpawnManager(autoSpawnManager);
+
         boolean hudEnabled = getConfig().getBoolean(
                 "plugin.navigation-hud.enabled",
                 true
         );
-        mobManager.setAutoSpawnManager(autoSpawnManager);
-        if (hudEnabled) {
-            hud = new NaviHudService(
-                    this,
-                    mobManager
-            );
-            hud.start();
 
+        if (hudEnabled) {
+            hud = new NaviHudService(this, mobManager);
+            hud.start();
             Bukkit.getPluginManager().registerEvents(
                     new NaviHudListener(hud),
                     this
             );
         }
 
+        // =========================
+        // v1.5 Combat INIT (ONCE)
+        // =========================
         playerStatCache = new PlayerStatCache(this);
+        customEnchants = new CustomEnchantSystem(this);
+
+        combat = new CombatBootstrap(this);
+        combat.enable(playerStatCache, customEnchants);
+
+        // =========================
+        // Stats
+        // =========================
         statsMenu = new StatsMenuService(this, playerStatCache);
 
         registerAllListeners();
@@ -168,7 +191,7 @@ public final class TheMob extends JavaPlugin {
 
         PluginCommand stats = getCommand("stats");
         if (stats != null) {
-            stats.setExecutor(new StatsCommand(statsMenu));
+            stats.setExecutor(new StatsCommand(statsMenu, playerStatCache));
         }
 
         Bukkit.getPluginManager().registerEvents(
@@ -176,12 +199,14 @@ public final class TheMob extends JavaPlugin {
                 this
         );
         Bukkit.getPluginManager().registerEvents(
-                new BossCombatListener(mobManager, phaseController),
+                new BossCombatListener(this, mobManager, phaseController),
                 this
         );
 
+
         getLogger().info("[TheMob] Enabled.");
     }
+
 
     @Override
     public void onDisable() {
@@ -194,8 +219,10 @@ public final class TheMob extends JavaPlugin {
 
     public void reloadPlugin() {
         getLogger().info("[TheMob] Reloading (hard reset)...");
+
         cleanupStaleHudBars();
         hardShutdown();
+
         reloadConfig();
         configService.reloadAll();
 
@@ -276,12 +303,22 @@ public final class TheMob extends JavaPlugin {
                 this
         );
         Bukkit.getPluginManager().registerEvents(
-                new BossCombatListener(mobManager, phaseController),
+                new BossCombatListener(this, mobManager, phaseController),
                 this
         );
 
+
+        // =========================
+        // v1.5 Combat RE-INIT (ONLY HERE)
+        // =========================
+        customEnchants = new CustomEnchantSystem(this);
+
+        combat = new CombatBootstrap(this);
+        combat.enable(playerStatCache, customEnchants);
+
         getLogger().info("[TheMob] Reload complete (full restart behavior).");
     }
+
 
     private void hardShutdown() {
         try {
@@ -337,15 +374,6 @@ public final class TheMob extends JavaPlugin {
     }
 
     private void registerAllListeners() {
-
-        Bukkit.getPluginManager().registerEvents(
-                new org.plugin.theMob.combat.CombatListener(
-                        this,
-                        mobManager,
-                        new org.plugin.theMob.player.stats.PlayerStatCacheAdapter(playerStatCache)
-                ),
-                this
-        );
 
         Bukkit.getPluginManager().registerEvents(
                 new BossBarListenerAdapter(mobManager, phaseController),
