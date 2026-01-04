@@ -79,9 +79,8 @@ public final class BossBarService implements Listener {
     }
 
     // =====================================================
-    // PUBLIC API (FEHLTE BEI DIR)
+    // PUBLIC API
     // =====================================================
-
     public void registerBoss(LivingEntity boss) {
         if (boss == null || !mobs.isBoss(boss)) return;
         if (isFollowPlayerMob(boss)) return;
@@ -91,30 +90,25 @@ public final class BossBarService implements Listener {
     }
 
     public void unregisterBoss(LivingEntity boss) {
-        if (boss == null) return;
-        removeBoss(boss.getUniqueId());
+        if (boss != null) removeBoss(boss.getUniqueId());
     }
 
     public void setPhaseTitle(LivingEntity boss, String title) {
         if (boss == null) return;
 
         UUID id = boss.getUniqueId();
-        if (title == null || title.isBlank()) {
-            phaseTitle.remove(id);
-        } else {
-            phaseTitle.put(id, title);
-        }
+        if (title == null || title.isBlank()) phaseTitle.remove(id);
+        else phaseTitle.put(id, title);
+
         dirty.add(id);
     }
 
     public void markDirty(LivingEntity boss) {
-        if (boss != null) {
-            dirty.add(boss.getUniqueId());
-        }
+        if (boss != null) dirty.add(boss.getUniqueId());
     }
 
     // =====================================================
-    // RESTORE (Reload / Join)
+    // RESTORE
     // =====================================================
     public void restore() {
         for (World w : Bukkit.getWorlds()) {
@@ -134,21 +128,27 @@ public final class BossBarService implements Listener {
     }
 
     // =====================================================
-    // TICK
+    // TICK (FIXED)
     // =====================================================
     private void tick() {
-        bosses.entrySet().removeIf(e -> {
-            LivingEntity b = e.getValue();
+
+        Iterator<Map.Entry<UUID, LivingEntity>> it = bosses.entrySet().iterator();
+        while (it.hasNext()) {
+            Map.Entry<UUID, LivingEntity> entry = it.next();
+            LivingEntity b = entry.getValue();
+
             if (b == null || !b.isValid() || b.isDead()) {
-                removeBoss(e.getKey());
-                return true;
+                UUID id = entry.getKey();
+                it.remove();                 // ✅ legal
+                dirty.remove(id);
+                phaseTitle.remove(id);
             }
-            return false;
-        });
+        }
 
         for (Player p : Bukkit.getOnlinePlayers()) {
             updatePlayer(p);
         }
+
         dirty.clear();
     }
 

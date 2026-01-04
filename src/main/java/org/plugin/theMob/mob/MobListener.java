@@ -24,7 +24,7 @@ public final class MobListener implements Listener {
     private final BossBarService bossBars;
     private final BossActionEngine bossActions;
     private final KeyRegistry keys;
-    private final AutoSpawnManager autoSpawn; // ✅ NEU
+    private final AutoSpawnManager autoSpawn;
 
     public MobListener(
             MobManager mobs,
@@ -32,7 +32,7 @@ public final class MobListener implements Listener {
             BossBarService bossBars,
             BossActionEngine bossActions,
             KeyRegistry keys,
-            AutoSpawnManager autoSpawn // ✅ NEU
+            AutoSpawnManager autoSpawn
     ) {
         this.mobs = mobs;
         this.bossBars = bossBars;

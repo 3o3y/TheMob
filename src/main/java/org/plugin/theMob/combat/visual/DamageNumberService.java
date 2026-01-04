@@ -32,7 +32,7 @@ public final class DamageNumberService {
         Location loc = target.getLocation().add(0, target.getHeight() + 0.4, 0);
 
         TextDisplay text = world.spawn(loc, TextDisplay.class, td -> {
-            td.setText(format(damage));
+            td.setText(format(damage, crit));
             td.setBillboard(Display.Billboard.CENTER);
             td.setShadowed(true);
             td.setSeeThrough(true);
@@ -40,7 +40,7 @@ public final class DamageNumberService {
             td.setLineWidth(200);
             td.setTextOpacity((byte) 255);
 
-            float scale = crit ? 1.4f : 1.2f;
+            float scale = crit ? 1.7f : 1.2f;
 
             td.setTransformation(new Transformation(
                     new Vector3f(0f, 0f, 0f),
@@ -50,9 +50,8 @@ public final class DamageNumberService {
             ));
         });
 
-
         if (crit) {
-            text.setGlowColorOverride(Color.ORANGE);
+            text.setGlowColorOverride(Color.YELLOW);
         }
 
         new BukkitRunnable() {
@@ -70,8 +69,13 @@ public final class DamageNumberService {
         }.runTaskTimer(plugin, 1L, 1L);
     }
 
-    private static String format(double dmg) {
-        if (dmg >= 100) return "§c" + Math.round(dmg);
-        return "§c" + String.format("%.1f", dmg);
+    private static String format(double dmg, boolean crit) {
+        String value = dmg >= 100
+                ? String.valueOf(Math.round(dmg))
+                : String.format("%.1f", dmg);
+
+        return crit
+                ? "§6✧§e" + value + "§6✧"
+                : "§c" + value;
     }
 }

@@ -6,7 +6,6 @@ public final class TierResolver {
 
     private TierResolver() {}
 
-    /** Tier ist 0-basiert → Anzeige bleibt 0,1,2,3 */
     public static int tier(double value, List<Double> tiers) {
         int tier = 0;
         for (double v : tiers) {

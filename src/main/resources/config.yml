@@ -100,8 +100,6 @@ plugin:
       bats: true
       villagers: true
       named-mobs: false
-
-###
-      #Combat System
-###
-  damage-indicator: true #false wird keine damagae zahl mehr angezeigt bei hit
+combat:
+  crit:
+    max_multiplier: 10.0

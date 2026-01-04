@@ -159,7 +159,7 @@ public final class MobManager {
 
         for (World world : Bukkit.getWorlds()) {
             for (LivingEntity entity : world.getLivingEntities()) {
-                if (!isCustomMob(entity)) continue; // bewusst remove(), kein DeathEvent
+                if (!isCustomMob(entity));
             }
         }
     }
@@ -189,7 +189,7 @@ public final class MobManager {
         for (World world : Bukkit.getWorlds()) {
             for (LivingEntity entity : world.getLivingEntities()) {
                 if (!isCustomMob(entity)) continue;
-                entity.remove(); // kein DeathEvent
+                entity.remove();
             }
         }
 

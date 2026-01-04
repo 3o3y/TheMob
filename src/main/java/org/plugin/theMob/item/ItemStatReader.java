@@ -28,7 +28,6 @@ public final class ItemStatReader {
 
         for (NamespacedKey key : pdc.getKeys()) {
 
-            // ✅ Nur eigene Plugin-Keys lesen
             if (!key.getNamespace().equals(plugin.getName().toLowerCase())
                     && !key.getNamespace().equals("themob")) {
                 continue;

@@ -53,7 +53,6 @@ public final class CombatListener implements Listener {
         ConfigurationSection combatCfg =
                 plugin.getConfig().getConfigurationSection("combat");
 
-        // ✅ VANILLA BASE DAMAGE (Faust + Waffen)
         double vanillaBase = vanillaWeaponBase(attacker);
 
         DamageResult r = calc.calculate(
@@ -64,10 +63,8 @@ public final class CombatListener implements Listener {
                 combatCfg
         );
 
-        // ✅ Vanilla-Pipeline behalten
         e.setDamage(r.finalDamage());
 
-        // ✅ DAMAGE NUMBERS
         boolean showNumbers =
                 combatCfg == null || combatCfg.getBoolean("damage-indicator", true);
 
@@ -80,7 +77,6 @@ public final class CombatListener implements Listener {
             );
         }
 
-        // ✅ LIFESTEAL
         if (r.lifestealAmount() > 0) {
             Bukkit.getScheduler().runTask(plugin,
                     () -> heal(attacker, r.lifestealAmount()));
@@ -101,7 +97,6 @@ public final class CombatListener implements Listener {
     private double vanillaWeaponBase(Player p) {
         ItemStack it = p.getInventory().getItemInMainHand();
 
-        // 👊 Faust = nie 0 Schaden
         if (it == null || it.getType().isAir()) {
             return 1.0;
         }
