@@ -32,43 +32,53 @@ public final class DamageCalculator {
 
         Map<String, String> dbg = new LinkedHashMap<>();
 
-        // ---- Base (vanilla feel) ----
-        // Use vanilla event base as baseline, then add RPG stats on top.
-        double base = vanillaBaseDamage;
-        double addDamage = stats.getOrDefault("damage", 0.0) + stats.getOrDefault("extra_damage", 0.0);
+        double vanilla = Math.max(1.0, vanillaBaseDamage);
 
-        // If your server wants full RPG override, set combat.override_vanilla=true
-        boolean overrideVanilla = combatCfg != null && combatCfg.getBoolean("override_vanilla", false);
-        if (overrideVanilla) base = 0.0;
+        double dmgStat = stats.getOrDefault("damage", 0.0);
+        double extra   = stats.getOrDefault("extra_damage", 0.0);
 
-        double computedBase = Math.max(0.0, base + addDamage);
+        double computedBase = vanilla + dmgStat + extra;
 
-        dbg.put("VanillaBase", trim(vanillaBaseDamage));
-        dbg.put("OverrideVanilla", String.valueOf(overrideVanilla));
-        dbg.put("StatDamage", trim(stats.getOrDefault("damage", 0.0)));
-        dbg.put("ExtraDamage", trim(stats.getOrDefault("extra_damage", 0.0)));
+        dbg.put("VanillaWeapon", trim(vanilla));
+        dbg.put("DamageStat", trim(dmgStat));
+        dbg.put("ExtraDamage", trim(extra));
         dbg.put("ComputedBase", trim(computedBase));
 
-        // ---- Crit (advanced handling) ----
-        double critChanceRaw = stats.getOrDefault("crit", 0.0);
-        double critChance = normalizePercent(critChanceRaw); // 10 -> 0.10, 0.1 -> 0.1
-        critChance = clamp(critChance, 0.0, combatCfg != null ? combatCfg.getDouble("crit.max_chance", 0.75) : 0.75);
+
+
+
+        // =====================================================
+        // CRIT
+        // crit_chance: can be 90 (percent) or 0.90
+        // crit_multiplier: can be 4.3 (mult) OR 330 (percent meaning 4.3x) OR 100 (meaning +100% => 2.0x)
+        // =====================================================
+        double critChanceRaw = stats.getOrDefault("crit_chance", 0.0);
+        double critChance = normalizePercent(critChanceRaw);
+
+        // Default max chance now = 1.0 (so 90% works), unless config sets it lower
+        double maxCritChance = combatCfg != null ? combatCfg.getDouble("crit.max_chance", 1.0) : 1.0;
+        critChance = clamp(critChance, 0.0, maxCritChance);
 
         double critMultRaw = stats.getOrDefault("crit_multiplier", 1.0);
         double critMultiplier = normalizeCritMultiplier(critMultRaw);
-        double critMax = combatCfg != null ? combatCfg.getDouble("crit.max_multiplier", 3.0) : 3.0;
-        critMultiplier = clamp(critMultiplier, 1.0, critMax);
+
+        // Default max multiplier now = 999 (so 4.3 works), unless config sets it lower
+        double maxCritMult = combatCfg != null ? combatCfg.getDouble("crit.max_multiplier", 999.0) : 999.0;
+        critMultiplier = clamp(critMultiplier, 1.0, maxCritMult);
 
         boolean crit = rnd.nextDouble() < critChance;
         double afterCrit = crit ? (computedBase * critMultiplier) : computedBase;
 
         dbg.put("CritChanceRaw", trim(critChanceRaw));
-        dbg.put("CritChance", trim(critChance));
+        dbg.put("CritChanceUsed", trim(critChance));
         dbg.put("CritMultiplierRaw", trim(critMultRaw));
-        dbg.put("CritMultiplier", trim(critMultiplier));
+        dbg.put("CritMultiplierUsed", trim(critMultiplier));
         dbg.put("CritRolled", String.valueOf(crit));
+        dbg.put("AfterCrit", trim(afterCrit));
 
-        // ---- Mob multipliers ----
+        // =====================================================
+        // MOB MULTIPLIER
+        // =====================================================
         double mobMult = multipliers != null ? multipliers.multiplierFor(target, combatCfg) : 1.0;
         mobMult = clamp(mobMult, 0.05, 50.0);
         double afterMob = afterCrit * mobMult;
@@ -76,20 +86,20 @@ public final class DamageCalculator {
         String mobId = multipliers != null ? multipliers.resolveMobId(target) : null;
         dbg.put("MobId", mobId == null ? "-" : mobId);
         dbg.put("MobMultiplier", trim(mobMult));
+        dbg.put("AfterMob", trim(afterMob));
 
-        // ---- Conditional effects (execute/enrage) ----
+        // =====================================================
+        // CONDITIONALS (execute/enrage)
+        // =====================================================
         double conditionalMult = 1.0;
 
-        // Execute: more damage if target low hp
         double execThreshold = combatCfg != null ? combatCfg.getDouble("conditional.execute.threshold", 0.20) : 0.20;
         double execMult = combatCfg != null ? combatCfg.getDouble("conditional.execute.multiplier", 1.25) : 1.25;
 
         double hpPct = healthPct(target);
         boolean execute = hpPct > 0 && hpPct <= execThreshold;
-
         if (execute) conditionalMult *= execMult;
 
-        // Enrage: if target has PDC/metadata marker
         boolean enraged = target.getScoreboardTags().contains("themob_enraged");
         double enrageMult = combatCfg != null ? combatCfg.getDouble("conditional.enrage.multiplier", 1.15) : 1.15;
         if (enraged) conditionalMult *= enrageMult;
@@ -100,16 +110,16 @@ public final class DamageCalculator {
         dbg.put("ExecuteActive", String.valueOf(execute));
         dbg.put("EnrageActive", String.valueOf(enraged));
         dbg.put("ConditionalMultiplier", trim(conditionalMult));
+        dbg.put("AfterConditional", trim(afterConditional));
 
-        // ---- Defense / mitigation (light vanilla feel) ----
-        // Keep vanilla armor behavior (MC already applies it), so we only apply *RPG defense* softly.
-        // You can disable this by setting combat.defense.enabled=false
+        // =====================================================
+        // DEFENSE (optional)
+        // =====================================================
         boolean defenseEnabled = combatCfg == null || combatCfg.getBoolean("defense.enabled", true);
         double defense = stats.getOrDefault("defense", 0.0);
 
         double afterDefense = afterConditional;
         if (defenseEnabled && defense > 0) {
-            // Soft diminishing returns: 0..infty -> 0..~80% reduction
             double maxReduction = combatCfg != null ? combatCfg.getDouble("defense.max_reduction", 0.60) : 0.60;
             double k = combatCfg != null ? combatCfg.getDouble("defense.k", 200.0) : 200.0;
             double reduction = clamp(defense / (defense + k), 0.0, maxReduction);
@@ -121,16 +131,19 @@ public final class DamageCalculator {
             dbg.put("DefenseReduction", "0");
         }
 
-        // ---- Lifesteal normalization ----
+        // =====================================================
+        // LIFESTEAL
+        // =====================================================
         double lifestealRaw = stats.getOrDefault("lifesteal", 0.0);
         double lifestealPct = normalizePercent(lifestealRaw);
+
         double lifestealMax = combatCfg != null ? combatCfg.getDouble("lifesteal.max", 0.35) : 0.35;
         lifestealPct = clamp(lifestealPct, 0.0, lifestealMax);
 
         double lifestealAmount = afterDefense * lifestealPct;
 
         dbg.put("LifestealRaw", trim(lifestealRaw));
-        dbg.put("LifestealPct", trim(lifestealPct));
+        dbg.put("LifestealPctUsed", trim(lifestealPct));
         dbg.put("LifestealAmount", trim(lifestealAmount));
 
         double finalDamage = Math.max(0.0, afterDefense);
@@ -152,17 +165,24 @@ public final class DamageCalculator {
 
     private double normalizePercent(double v) {
         if (v <= 0) return 0.0;
-        // If user stores "10" meaning 10%, convert to 0.10
+        // 90 -> 0.90
         if (v > 1.0) return v / 100.0;
         return v;
     }
 
     private double normalizeCritMultiplier(double v) {
         if (v <= 0) return 1.0;
-        // If stored as "50" meaning +50% crit dmg => 1.5
-        if (v > 3.0) return 1.0 + (v / 100.0);
-        // If stored as "1.5" already multiplier
-        return v;
+
+        // If v is already a multiplier like 4.3 -> use directly
+        if (v >= 1.0 && v <= 50.0) return v;
+
+        // If user stores "330" meaning 330% total => 3.3x
+        if (v > 50.0) return v / 100.0;
+
+        // If user stores "0.5" or "0.2" treat as +% (0.5 -> 1.5x)
+        if (v > 0.0 && v < 1.0) return 1.0 + v;
+
+        return 1.0;
     }
 
     private double healthPct(LivingEntity e) {

@@ -4,6 +4,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.attribute.Attribute;
+import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.LivingEntity;
@@ -74,19 +75,30 @@ public final class MobSpawnService {
         }
 
         // =========================
-        // STATS
+        // SCALE
         // =========================
         if (cfg.contains("stats.scale")) {
             double scale = Math.max(
                     0.25,
                     Math.min(5.0, cfg.getDouble("stats.scale", 1.0))
             );
-            var attr = mob.getAttribute(Attribute.SCALE);
+            AttributeInstance attr = mob.getAttribute(Attribute.SCALE);
             if (attr != null && scale != 1.0) {
                 attr.setBaseValue(scale);
             }
         }
 
+        // =========================
+        // 🔥 ARMOR SEED (CRITICAL FIX)
+        // =========================
+        AttributeInstance armor = mob.getAttribute(Attribute.ARMOR);
+        if (armor != null && armor.getBaseValue() <= 0.0) {
+            armor.setBaseValue(0.01); // activates vanilla damage pipeline
+        }
+
+        // =========================
+        // PERSISTENT DATA
+        // =========================
         mob.getPersistentDataContainer().set(
                 keys.MOB_ID,
                 PersistentDataType.STRING,
@@ -126,11 +138,14 @@ public final class MobSpawnService {
             );
         }
 
+        // =========================
+        // HEALTH
+        // =========================
         if (cfg.contains("stats.health.max")) {
             double max = cfg.getDouble("stats.health.max");
-            var attr = mob.getAttribute(Attribute.MAX_HEALTH);
-            if (attr != null) {
-                attr.setBaseValue(max);
+            AttributeInstance hp = mob.getAttribute(Attribute.MAX_HEALTH);
+            if (hp != null) {
+                hp.setBaseValue(max);
                 mob.setHealth(max);
             }
         }
@@ -140,7 +155,7 @@ public final class MobSpawnService {
         }
 
         // =========================
-        // BOSS LOGIC (FILTER IM SERVICE)
+        // BOSS LOGIC
         // =========================
         if (isBoss) {
             BossTemplate tpl = mobs.bossTemplate(mobId);
@@ -157,6 +172,9 @@ public final class MobSpawnService {
             });
         }
 
+        // =========================
+        // VISUALS
+        // =========================
         if (cfg.contains("visual.helmet.type")) {
             MobVisualService.attachVisual(plugin, mob, cfg, keys);
         }
