@@ -64,7 +64,6 @@ public final class MobListener implements Listener {
 
         if (mobs.isBoss(mob)) {
             bossActions.onBossDeath(mob);
-            bossBars.unregisterBoss(mob);
             autoSpawn.releaseBossLock(mob);
         }
 

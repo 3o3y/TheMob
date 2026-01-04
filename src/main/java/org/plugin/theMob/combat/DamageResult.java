@@ -16,15 +16,16 @@ public record DamageResult(
         Map<String, String> debug
 ) {
     public static DamageResult empty(double vanillaBase) {
+        double v = Math.max(1.0, vanillaBase);
         return new DamageResult(
-                vanillaBase,
-                vanillaBase,
+                v,
+                v,
                 false,
                 0.0,
                 1.0,
                 1.0,
                 1.0,
-                vanillaBase,
+                v,
                 0.0,
                 new LinkedHashMap<>()
         );

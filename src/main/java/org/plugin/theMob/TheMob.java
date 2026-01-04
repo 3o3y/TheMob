@@ -13,9 +13,10 @@ import org.plugin.theMob.boss.behavior.BossBehaviorController;
 import org.plugin.theMob.boss.phase.BossPhaseController;
 import org.plugin.theMob.boss.phase.BossPhaseResolver;
 import org.plugin.theMob.combat.CombatBootstrap;
-import org.plugin.theMob.combat.CombatDebugService;
-import org.plugin.theMob.combat.DamageCalculator;
-import org.plugin.theMob.combat.MobMultiplierService;
+import org.plugin.theMob.item.CustomEnchantSystem;
+import org.plugin.theMob.item.ItemBuilderFromConfig;
+import org.plugin.theMob.item.ItemLoreRenderer;
+import org.plugin.theMob.item.ItemStatReader;
 import org.plugin.theMob.command.MobCommand;
 import org.plugin.theMob.command.MobTabCompleter;
 import org.plugin.theMob.command.StatsCommand;
@@ -25,11 +26,6 @@ import org.plugin.theMob.core.TickScheduler;
 import org.plugin.theMob.core.context.PlayerBarCoordinator;
 import org.plugin.theMob.hud.NaviHudListener;
 import org.plugin.theMob.hud.NaviHudService;
-import org.plugin.theMob.hud.compass.CompassRenderer;
-import org.plugin.theMob.item.CustomEnchantSystem;
-import org.plugin.theMob.item.ItemBuilderFromConfig;
-import org.plugin.theMob.item.ItemLoreRenderer;
-import org.plugin.theMob.item.ItemStatReader;
 import org.plugin.theMob.mob.MobDropEngine;
 import org.plugin.theMob.mob.MobListener;
 import org.plugin.theMob.mob.MobManager;
@@ -48,26 +44,21 @@ import static org.plugin.theMob.hud.NaviHudService.HUD_KEY;
 
 public final class TheMob extends JavaPlugin {
 
-
-    // v1.5 Combat
-    private CombatBootstrap combat;
-    private CombatDebugService combatDebug;
-    private DamageCalculator damageCalculator;
-    private MobMultiplierService mobMultipliers;
-    private CustomEnchantSystem customEnchants;
-
-
+    // Core
     private ConfigService configService;
     private KeyRegistry keys;
     private TickScheduler ticks;
 
+    // Mobs
     private MobManager mobManager;
     private MobHealthDisplay healthDisplay;
     private MobDropEngine dropEngine;
 
+    // Spawn
     private AutoSpawnManager autoSpawnManager;
     private SpawnController spawnController;
 
+    // Boss
     private PlayerBarCoordinator playerBars;
     private BossBarService bossBars;
     private BossPhaseController phaseController;
@@ -75,41 +66,92 @@ public final class TheMob extends JavaPlugin {
     private BossActionEngine bossActionEngine;
     private BossLockService bossLocks;
 
+    // HUD
     private NaviHudService hud;
 
+    // Items / Stats
     private ItemBuilderFromConfig itemBuilder;
     private ItemLoreRenderer loreRenderer;
     private ItemStatReader itemStatReader;
 
+    // Player Stats / Combat
     private PlayerStatCache playerStatCache;
     private StatsMenuService statsMenu;
+    private CombatBootstrap combat;
+    private CustomEnchantSystem customEnchants;
 
     @Override
     public void onEnable() {
         saveDefaultConfig();
         cleanupStaleHudBars();
 
-        configService = new ConfigService(this);
-        configService.ensureFoldersAndDefaults();
+        boot(true);
+
+        getLogger().info("[TheMob] Enabled.");
+    }
+
+    @Override
+    public void onDisable() {
+        hardShutdown();
+        getLogger().info("[TheMob] Disabled cleanly.");
+    }
+
+    // =====================================================
+    // RELOAD
+    // =====================================================
+    public void reloadPlugin() {
+        getLogger().info("[TheMob] Reloading (hard reset) ...");
+
+        cleanupStaleHudBars();
+        hardShutdown();
+
+        reloadConfig();
+        if (configService != null) {
+            configService.reloadAll();
+        }
+
+        boot(false);
+
+        getLogger().info("[TheMob] Reload complete (full restart behavior).");
+    }
+
+    // =====================================================
+    // BOOTSTRAP
+    // =====================================================
+    private void boot(boolean firstEnable) {
+
+        // ---------- Config / Keys / Ticks ----------
+        if (configService == null) {
+            configService = new ConfigService(this);
+            configService.ensureFoldersAndDefaults();
+        }
         configService.reloadAll();
 
-        keys = new KeyRegistry(this);
+        if (keys == null) {
+            keys = new KeyRegistry(this);
+        }
+
         ticks = new TickScheduler(this);
 
+        // ---------- Mob Manager ----------
         mobManager = new MobManager(this, configService, keys);
         mobManager.reloadFromConfigs();
 
+        // ---------- Items ----------
         itemBuilder = new ItemBuilderFromConfig(this);
         loreRenderer = new ItemLoreRenderer();
         itemStatReader = new ItemStatReader(this);
 
+        // ---------- Drops ----------
         dropEngine = new MobDropEngine(itemBuilder);
         dropEngine.bind(mobManager);
         mobManager.setDropEngine(dropEngine);
 
+        // ---------- Health Display ----------
         healthDisplay = new MobHealthDisplay(this, mobManager);
         mobManager.setHealthDisplay(healthDisplay);
 
+        // ---------- Boss: Bars + Phases ----------
         playerBars = new PlayerBarCoordinator();
 
         bossActionEngine = new BossActionEngine(this);
@@ -117,19 +159,14 @@ public final class TheMob extends JavaPlugin {
 
         bossBars = new BossBarService(this, mobManager, playerBars);
         bossBars.start();
+        bossBars.restore();
+        Bukkit.getPluginManager().registerEvents(bossBars, this);
 
-        phaseController = new BossPhaseController(
-                resolver,
-                bossActionEngine,
-                bossBars
-        );
+        phaseController = new BossPhaseController(resolver, bossActionEngine, bossBars);
 
-        behaviorController = new BossBehaviorController(
-                this,
-                mobManager,
-                phaseController
-        );
+        behaviorController = new BossBehaviorController(this, mobManager, phaseController);
 
+        // ---------- Spawn Service ----------
         MobSpawnService spawnService = new MobSpawnService(
                 this,
                 mobManager,
@@ -140,6 +177,7 @@ public final class TheMob extends JavaPlugin {
         );
         mobManager.setSpawnService(spawnService);
 
+        // ---------- Auto Spawn ----------
         bossLocks = new BossLockService();
 
         autoSpawnManager = new AutoSpawnManager(
@@ -149,43 +187,28 @@ public final class TheMob extends JavaPlugin {
                 bossLocks
         );
 
-        spawnController = new SpawnController(
-                this,
-                mobManager,
-                autoSpawnManager
-        );
+        spawnController = new SpawnController(this, mobManager, autoSpawnManager);
         spawnController.start();
 
         mobManager.setAutoSpawnManager(autoSpawnManager);
 
-        boolean hudEnabled = getConfig().getBoolean(
-                "plugin.navigation-hud.enabled",
-                true
-        );
-
+        // ---------- HUD ----------
+        boolean hudEnabled = getConfig().getBoolean("plugin.navigation-hud.enabled", true);
         if (hudEnabled) {
             hud = new NaviHudService(this, mobManager);
             hud.start();
-            Bukkit.getPluginManager().registerEvents(
-                    new NaviHudListener(hud),
-                    this
-            );
+            Bukkit.getPluginManager().registerEvents(new NaviHudListener(hud), this);
         }
 
-        // =========================
-        // v1.5 Combat INIT (ONCE)
-        // =========================
+        // ---------- Player Stats / Combat ----------
         playerStatCache = new PlayerStatCache(this);
-        customEnchants = new CustomEnchantSystem(this);
+        statsMenu = new StatsMenuService(this, playerStatCache);
 
+        customEnchants = new CustomEnchantSystem(this);
         combat = new CombatBootstrap(this);
         combat.enable(playerStatCache, customEnchants);
 
-        // =========================
-        // Stats
-        // =========================
-        statsMenu = new StatsMenuService(this, playerStatCache);
-
+        // ---------- Listeners + Commands ----------
         registerAllListeners();
         registerCommands();
 
@@ -202,132 +225,21 @@ public final class TheMob extends JavaPlugin {
                 new BossCombatListener(this, mobManager, phaseController),
                 this
         );
-
-
-        getLogger().info("[TheMob] Enabled.");
     }
 
-
-    @Override
-    public void onDisable() {
-        hardShutdown();
-        getLogger().info("[TheMob] Disabled cleanly.");
-    }
-
-
-
-
-    public void reloadPlugin() {
-        getLogger().info("[TheMob] Reloading (hard reset)...");
-
-        cleanupStaleHudBars();
-        hardShutdown();
-
-        reloadConfig();
-        configService.reloadAll();
-
-        ticks = new TickScheduler(this);
-
-        mobManager.reloadFromConfigs();
-
-        healthDisplay = new MobHealthDisplay(this, mobManager);
-        mobManager.setHealthDisplay(healthDisplay);
-
-        playerBars = new PlayerBarCoordinator();
-
-        bossActionEngine = new BossActionEngine(this);
-        BossPhaseResolver resolver = new BossPhaseResolver();
-
-        bossBars = new BossBarService(this, mobManager, playerBars);
-        bossBars.start();
-
-        phaseController = new BossPhaseController(
-                resolver,
-                bossActionEngine,
-                bossBars
-        );
-
-        behaviorController = new BossBehaviorController(
-                this,
-                mobManager,
-                phaseController
-        );
-
-        MobSpawnService spawnService = new MobSpawnService(
-                this,
-                mobManager,
-                keys,
-                healthDisplay,
-                bossBars,
-                phaseController
-        );
-        mobManager.setSpawnService(spawnService);
-
-        bossLocks = new BossLockService();
-
-        autoSpawnManager = new AutoSpawnManager(
-                this,
-                mobManager,
-                keys,
-                bossLocks
-        );
-
-        spawnController = new SpawnController(
-                this,
-                mobManager,
-                autoSpawnManager
-        );
-        spawnController.start();
-
-        mobManager.setAutoSpawnManager(autoSpawnManager);
-
-        boolean hudEnabled = getConfig().getBoolean(
-                "plugin.navigation-hud.enabled",
-                true
-        );
-
-        if (hudEnabled) {
-            hud = new NaviHudService(this, mobManager);
-            hud.start();
-            Bukkit.getPluginManager().registerEvents(
-                    new NaviHudListener(hud),
-                    this
-            );
-        }
-
-        registerAllListeners();
-        registerCommands();
-
-        Bukkit.getPluginManager().registerEvents(
-                new BossImmunityListener(mobManager, phaseController),
-                this
-        );
-        Bukkit.getPluginManager().registerEvents(
-                new BossCombatListener(this, mobManager, phaseController),
-                this
-        );
-
-
-        // =========================
-        // v1.5 Combat RE-INIT (ONLY HERE)
-        // =========================
-        customEnchants = new CustomEnchantSystem(this);
-
-        combat = new CombatBootstrap(this);
-        combat.enable(playerStatCache, customEnchants);
-
-        getLogger().info("[TheMob] Reload complete (full restart behavior).");
-    }
-
-
+    // =====================================================
+    // SHUTDOWN
+    // =====================================================
     private void hardShutdown() {
         try {
             if (spawnController != null) {
                 spawnController.stop();
                 spawnController = null;
             }
+
             if (mobManager != null) {
                 mobManager.hardReset();
+                mobManager = null;
             }
 
             if (autoSpawnManager != null) {
@@ -365,6 +277,9 @@ public final class TheMob extends JavaPlugin {
                 ticks = null;
             }
 
+            // combat/customEnchants/playerStatCache/statsMenu brauchen keinen “shutdown”,
+            // werden durch HandlerList.unregisterAll + neue Instanzen ersetzt.
+
         } catch (Throwable t) {
             getLogger().severe("[TheMob] HARD SHUTDOWN FAILED");
             t.printStackTrace();
@@ -373,6 +288,9 @@ public final class TheMob extends JavaPlugin {
         }
     }
 
+    // =====================================================
+    // LISTENERS / COMMANDS
+    // =====================================================
     private void registerAllListeners() {
 
         Bukkit.getPluginManager().registerEvents(
@@ -380,15 +298,17 @@ public final class TheMob extends JavaPlugin {
                 this
         );
 
-        MobListener mobListener = new MobListener(
-                mobManager,
-                healthDisplay,
-                bossBars,
-                bossActionEngine,
-                keys,
-                autoSpawnManager
+        Bukkit.getPluginManager().registerEvents(
+                new MobListener(
+                        mobManager,
+                        healthDisplay,
+                        bossBars,
+                        bossActionEngine,
+                        keys,
+                        autoSpawnManager
+                ),
+                this
         );
-        Bukkit.getPluginManager().registerEvents(mobListener, this);
 
         Bukkit.getPluginManager().registerEvents(
                 new PlayerEquipListener(this, playerStatCache),
@@ -405,7 +325,6 @@ public final class TheMob extends JavaPlugin {
         }
     }
 
-
     private void registerCommands() {
         PluginCommand mob = getCommand("mob");
         if (mob != null) {
@@ -414,11 +333,18 @@ public final class TheMob extends JavaPlugin {
         }
     }
 
+    // =====================================================
+    // API
+    // =====================================================
     public MobManager mobs() { return mobManager; }
     public ConfigService configs() { return configService; }
     public KeyRegistry keys() { return keys; }
     public ItemStatReader itemStats() { return itemStatReader; }
+    public BossPhaseController bossPhases() { return phaseController; }
 
+    // =====================================================
+    // HELPERS
+    // =====================================================
     private Player findNearestPlayer(Location loc, double radius) {
         if (loc == null || loc.getWorld() == null) return null;
 
@@ -439,17 +365,10 @@ public final class TheMob extends JavaPlugin {
         Iterator<KeyedBossBar> it = Bukkit.getBossBars();
         while (it.hasNext()) {
             KeyedBossBar bar = it.next();
-            if (HUD_KEY.equals(bar.getKey())
-                    || BossBarService.BOSSBAR_KEY.equals(bar.getKey())) {
+            if (HUD_KEY.equals(bar.getKey()) || BossBarService.BOSSBAR_KEY.equals(bar.getKey())) {
                 bar.removeAll();
+                Bukkit.removeBossBar(bar.getKey());
             }
         }
     }
-
-
-    public BossPhaseController bossPhases() {
-        return phaseController;
-    }
-
-
 }

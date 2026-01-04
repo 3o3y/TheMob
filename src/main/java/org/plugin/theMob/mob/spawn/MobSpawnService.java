@@ -4,6 +4,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.attribute.Attribute;
+import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.LivingEntity;
@@ -55,9 +56,8 @@ public final class MobSpawnService {
 
         EntityType type;
         try {
-            type = EntityType.valueOf(
-                    cfg.getString("base-type").toUpperCase(Locale.ROOT)
-            );
+            String raw = cfg.getString("base-type", "ZOMBIE");
+            type = EntityType.valueOf(raw.toUpperCase(Locale.ROOT));
         } catch (Exception e) {
             return null;
         }
@@ -66,71 +66,56 @@ public final class MobSpawnService {
         LivingEntity mob;
 
         if (isBoss && type == EntityType.ZOMBIE) {
-            mob = ZombieBossFactory.spawnZombieBoss(
-                    plugin, loc, mobId, keys, cfg
-            );
+            mob = ZombieBossFactory.spawnZombieBoss(plugin, loc, mobId, keys, cfg);
         } else {
             mob = (LivingEntity) loc.getWorld().spawnEntity(loc, type);
         }
 
         // =========================
-        // STATS
+        // SCALE
         // =========================
         if (cfg.contains("stats.scale")) {
-            double scale = Math.max(
-                    0.25,
-                    Math.min(5.0, cfg.getDouble("stats.scale", 1.0))
-            );
-            var attr = mob.getAttribute(Attribute.SCALE);
-            if (attr != null && scale != 1.0) {
-                attr.setBaseValue(scale);
+            double scale = Math.max(0.25, Math.min(5.0, cfg.getDouble("stats.scale", 1.0)));
+            AttributeInstance scaleAttr = mob.getAttribute(Attribute.SCALE);
+            if (scaleAttr != null && scale != 1.0) {
+                scaleAttr.setBaseValue(scale);
             }
         }
 
-        mob.getPersistentDataContainer().set(
-                keys.MOB_ID,
-                PersistentDataType.STRING,
-                mobId
-        );
-
-        mob.getPersistentDataContainer().set(
-                keys.IS_BOSS,
-                PersistentDataType.INTEGER,
-                isBoss ? 1 : 0
-        );
-
-        String name = ChatColor.translateAlternateColorCodes(
-                '&',
-                cfg.getString("name", type.name())
-        );
-
-        mob.getPersistentDataContainer().set(
-                keys.BASE_NAME,
-                PersistentDataType.STRING,
-                name
-        );
-
-        boolean isAutoSpawn = spawnId != null;
-
-        mob.getPersistentDataContainer().set(
-                keys.SPAWN_TYPE,
-                PersistentDataType.STRING,
-                isAutoSpawn ? "AUTOSPAWN" : "MANUAL"
-        );
-
-        if (isAutoSpawn) {
-            mob.getPersistentDataContainer().set(
-                    keys.AUTO_SPAWN_ID,
-                    PersistentDataType.STRING,
-                    spawnId
-            );
+        // =========================
+        // ARMOR SEED (CRITICAL FIX)
+        // - sorgt dafür, dass der Damage-Event-Pfad (inkl. DamageNumbers)
+        //   auf allen Entities stabil feuert (auch bei 0 Armor)
+        // =========================
+        AttributeInstance armor = mob.getAttribute(Attribute.ARMOR);
+        if (armor != null && armor.getBaseValue() <= 0.0) {
+            armor.setBaseValue(0.01);
         }
 
+        // =========================
+        // PERSISTENT DATA
+        // =========================
+        mob.getPersistentDataContainer().set(keys.MOB_ID, PersistentDataType.STRING, mobId);
+        mob.getPersistentDataContainer().set(keys.IS_BOSS, PersistentDataType.INTEGER, isBoss ? 1 : 0);
+
+        String name = ChatColor.translateAlternateColorCodes('&', cfg.getString("name", type.name()));
+        mob.getPersistentDataContainer().set(keys.BASE_NAME, PersistentDataType.STRING, name);
+
+        boolean isAutoSpawn = spawnId != null;
+        mob.getPersistentDataContainer().set(keys.SPAWN_TYPE, PersistentDataType.STRING, isAutoSpawn ? "AUTOSPAWN" : "MANUAL");
+
+        if (isAutoSpawn) {
+            mob.getPersistentDataContainer().set(keys.AUTO_SPAWN_ID, PersistentDataType.STRING, spawnId);
+        }
+
+        // =========================
+        // HEALTH
+        // =========================
         if (cfg.contains("stats.health.max")) {
             double max = cfg.getDouble("stats.health.max");
-            var attr = mob.getAttribute(Attribute.MAX_HEALTH);
-            if (attr != null) {
-                attr.setBaseValue(max);
+            AttributeInstance hp = mob.getAttribute(Attribute.MAX_HEALTH);
+            if (hp != null) {
+                hp.setBaseValue(max);
                 mob.setHealth(max);
             }
         }
@@ -140,7 +125,7 @@ public final class MobSpawnService {
         }
 
         // =========================
-        // BOSS LOGIC (FILTER IM SERVICE)
+        // BOSS LOGIC
         // =========================
         if (isBoss) {
             BossTemplate tpl = mobs.bossTemplate(mobId);
@@ -157,6 +142,9 @@ public final class MobSpawnService {
             });
         }
 
+        // =========================
+        // VISUALS
+        // =========================
         if (cfg.contains("visual.helmet.type")) {
             MobVisualService.attachVisual(plugin, mob, cfg, keys);
         }
