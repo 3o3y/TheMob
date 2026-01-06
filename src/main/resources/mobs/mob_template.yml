@@ -75,6 +75,15 @@ death-commands:
   - "give {player} carrot 1"
 
 # ---------------------------------------------------------
+# XP Settings
+# ---------------------------------------------------------
+# The amount of experience the player receives upon killing this mob.
+# This value determines how much or how big XP orbs are dropped when the mob dies.
+# Useful for balancing mob rewards in progression systems.
+xp: 10
+
+
+# ---------------------------------------------------------
 # Drops
 # ---------------------------------------------------------
 # Drops are rolled independently

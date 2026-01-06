@@ -13,7 +13,7 @@ mob-id: pig_lvl_1
 base-type: PIG
 name: "&bPig King"
 display-health: true
-visual:                         # Get him a new Crown
+visual:
   helmet:
     type: PORKCHOP
 stats:
