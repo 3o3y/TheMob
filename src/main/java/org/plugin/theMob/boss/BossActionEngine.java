@@ -20,6 +20,8 @@ import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.plugin.theMob.TheMob;
+import org.plugin.theMob.boss.minion.BossMinionController;
+import org.plugin.theMob.boss.minion.BossMinionSpawner;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -29,18 +31,26 @@ public final class BossActionEngine implements Listener {
     private final TheMob plugin;
     private final Random rnd = new Random();
 
+    // v1.6 Minions
+    private final BossMinionController minionController;
+    private final BossMinionSpawner minionSpawner;
+
     private final Set<UUID> affectedPlayers = ConcurrentHashMap.newKeySet();
 
     private LivingEntity activeBoss;
     private double activeRadius = 0.0;
     private String activeWeather;
     private String activeTime;
+
     private final Map<UUID, BossSnapshot> bossSnapshots = new ConcurrentHashMap<>();
     private BukkitRunnable stationTask;
 
     public BossActionEngine(TheMob plugin) {
         this.plugin = plugin;
         Bukkit.getPluginManager().registerEvents(this, plugin);
+
+        this.minionController = new BossMinionController(plugin);
+        this.minionSpawner = new BossMinionSpawner(plugin, minionController);
 
         stationTask = new BukkitRunnable() {
             @Override
@@ -66,6 +76,7 @@ public final class BossActionEngine implements Listener {
         ensureSnapshot(boss);
         ConfigurationSection cfg = phase.cfg();
         if (cfg == null) return;
+
         applyAttributes(boss, cfg.getConfigurationSection("buffs"));
         applyAbilities(boss, cfg.getConfigurationSection("abilities"));
         applyEffects(boss, cfg.getConfigurationSection("effects"));
@@ -76,22 +87,31 @@ public final class BossActionEngine implements Listener {
         ConfigurationSection onEnter = cfg.getConfigurationSection("on-enter");
         if (onEnter != null) runOnEnterEffects(boss, onEnter);
 
+        // v1.6 – Summons (controlled)
         ConfigurationSection actions = cfg.getConfigurationSection("actions");
         if (actions != null) {
             ConfigurationSection summon = actions.getConfigurationSection("summon-minions");
-            if (summon != null && summon.getBoolean("enabled")) {
-                runSummonMinionsOnce(boss, phase, summon);
+            if (summon != null) {
+                minionSpawner.onPhaseEnter(boss, phase, summon);
             }
         }
     }
 
     public void onPhaseLeave(LivingEntity boss, BossPhase phase) {
-        if (boss == null || !boss.isValid()) return;
+        if (boss == null || phase == null || !boss.isValid()) return;
+
+        // v1.6 stop repeating summon tasks for that phase
+        minionSpawner.onPhaseLeave(boss, phase);
     }
 
     public void onBossDeath(LivingEntity boss) {
         clearWeatherStation();
+
         if (boss != null) {
+            // v1.6 – hard cleanup minions + stop tasks
+            minionSpawner.stopAllForBoss(boss.getUniqueId());
+            minionController.cleanupBoss(boss.getUniqueId());
+
             bossSnapshots.remove(boss.getUniqueId());
         }
     }
@@ -141,7 +161,6 @@ public final class BossActionEngine implements Listener {
                 case "THUNDER" -> p.setPlayerWeather(WeatherType.DOWNFALL);
                 case "NONE" -> p.resetPlayerWeather();
             }
-
         }
 
         if (activeTime != null) {
@@ -154,7 +173,6 @@ public final class BossActionEngine implements Listener {
                 case "MIDNIGHT" -> p.setPlayerTime(18000L, false);
                 case "NONE" -> p.resetPlayerTime();
             }
-
         }
 
         affectedPlayers.add(p.getUniqueId());
@@ -331,64 +349,6 @@ public final class BossActionEngine implements Listener {
         if (cfg != null) boss.setGravity(cfg.getBoolean("gravity", true));
     }
 
-    private void runSummonMinionsOnce(
-            LivingEntity boss,
-            BossPhase phase,
-            ConfigurationSection cfg
-    ) {
-        NamespacedKey key = new NamespacedKey(plugin, "minions_" + phase.id());
-        if (boss.getPersistentDataContainer().has(key, PersistentDataType.INTEGER)) {
-            return;
-        }
-        boss.getPersistentDataContainer().set(key, PersistentDataType.INTEGER, 1);
-
-        int amount = cfg.getInt("amount", 1);
-        double radius = cfg.getDouble("radius", 5.0);
-
-        int lifetimeSeconds = cfg.getInt("cooldown", 15);
-
-        String typeRaw = cfg.getString("type", "ZOMBIE");
-        EntityType type;
-        try {
-            type = EntityType.valueOf(typeRaw.toUpperCase(Locale.ROOT));
-        } catch (IllegalArgumentException ex) {
-            plugin.getLogger().warning("[TheMob] Invalid minion type: " + typeRaw + " – fallback to ZOMBIE");
-            type = EntityType.ZOMBIE;
-        }
-
-        String name = cfg.getString("name");
-
-        for (int i = 0; i < amount; i++) {
-            Location loc = boss.getLocation().clone().add(
-                    (rnd.nextDouble() * 2 - 1) * radius,
-                    0,
-                    (rnd.nextDouble() * 2 - 1) * radius
-            );
-
-            LivingEntity minion = (LivingEntity) boss.getWorld().spawnEntity(loc, type);
-            minion.setPersistent(true);
-            minion.setRemoveWhenFarAway(false);
-
-            if (name != null && !name.isEmpty()) {
-                minion.setCustomName(ChatColor.translateAlternateColorCodes('&', name));
-                minion.setCustomNameVisible(true);
-            }
-
-            minion.getPersistentDataContainer().set(
-                    plugin.keys().NO_DROPS,
-                    PersistentDataType.INTEGER,
-                    1
-            );
-
-            new BukkitRunnable() {
-                @Override
-                public void run() {
-                    if (minion.isValid()) minion.remove();
-                }
-            }.runTaskLater(plugin, lifetimeSeconds * 20L);
-        }
-    }
-
     private void runOnEnterEffects(LivingEntity boss, ConfigurationSection onEnter) {
         ConfigurationSection effects = onEnter.getConfigurationSection("effects");
         if (effects == null) return;
@@ -448,13 +408,8 @@ public final class BossActionEngine implements Listener {
 
             for (Player p : targets) {
                 try {
-                    String title = color(
-                            Placeholder.resolve(rawTitle, boss, null, p)
-                    );
-                    String subtitle = color(
-                            Placeholder.resolve(rawSubtitle, boss, null, p)
-                    );
-
+                    String title = color(Placeholder.resolve(rawTitle, boss, null, p));
+                    String subtitle = color(Placeholder.resolve(rawSubtitle, boss, null, p));
                     p.sendTitle(title, subtitle, fadeIn, stay, fadeOut);
                 } catch (Exception ignored) {}
             }
@@ -466,9 +421,7 @@ public final class BossActionEngine implements Listener {
             if (raw.isEmpty()) return;
 
             for (Player p : targets) {
-                String text = color(
-                        Placeholder.resolve(raw, boss, null, p)
-                );
+                String text = color(Placeholder.resolve(raw, boss, null, p));
                 p.sendMessage(text);
             }
             return;
@@ -484,9 +437,7 @@ public final class BossActionEngine implements Listener {
 
         for (Player p : targets) {
             try {
-                String text = color(
-                        Placeholder.resolve(raw, boss, null, p)
-                );
+                String text = color(Placeholder.resolve(raw, boss, null, p));
                 p.spigot().sendMessage(
                         ChatMessageType.ACTION_BAR,
                         TextComponent.fromLegacyText(text)
@@ -494,7 +445,6 @@ public final class BossActionEngine implements Listener {
             } catch (Exception ignored) {}
         }
     }
-
 
     private Collection<Player> resolveAudience(LivingEntity boss, String audience, double radius) {
         if (boss == null || !boss.isValid()) return List.of();
@@ -540,6 +490,12 @@ public final class BossActionEngine implements Listener {
         if (stationTask != null) {
             stationTask.cancel();
             stationTask = null;
+        }
+
+        // v1.6 cleanup
+        if (activeBoss != null && activeBoss.isValid()) {
+            minionSpawner.stopAllForBoss(activeBoss.getUniqueId());
+            minionController.cleanupBoss(activeBoss.getUniqueId());
         }
 
         bossSnapshots.clear();
