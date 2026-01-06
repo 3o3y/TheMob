@@ -1,7 +1,9 @@
 package org.plugin.theMob.mob;
 
-import org.bukkit.Bukkit;
+import org.bukkit.Particle;
+import org.bukkit.World;
 import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.entity.ExperienceOrb;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.inventory.ItemStack;
@@ -30,35 +32,79 @@ public final class MobDropEngine {
 
     public void handleDeath(LivingEntity mob, EntityDeathEvent event) {
         if (mobs == null || mob == null || event == null) return;
+
+        // Prevent double execution
         if (mob.getPersistentDataContainer().has(
                 mobs.keys().DROPS_DONE,
                 PersistentDataType.INTEGER
         )) {
             return;
         }
+
         mob.getPersistentDataContainer().set(
                 mobs.keys().DROPS_DONE,
                 PersistentDataType.INTEGER,
                 1
         );
+
+        // Minions: no drops, no XP
         Integer noDrops = mob.getPersistentDataContainer()
                 .get(mobs.keys().NO_DROPS, PersistentDataType.INTEGER);
+
+        event.getDrops().clear();
+        event.setDroppedExp(0);
+
         if (noDrops != null && noDrops == 1) {
-            event.getDrops().clear();
-            event.setDroppedExp(0);
             return;
         }
 
         FileConfiguration cfg = mobs.mobConfigOf(mob);
         if (cfg == null) return;
-        event.getDrops().clear();
-        event.setDroppedExp(0);
+
+        // ----------------------------
+        // DROPS
+        // ----------------------------
         dropList(cfg.getMapList("drops"), mob);
+
         if (mobs.isBoss(mob) && cfg.getBoolean("opdrop", false)) {
             dropList(cfg.getMapList("legendary-drops"), mob);
         }
 
+        // ----------------------------
+        // XP (v1.6)
+        // ----------------------------
+        handleXp(cfg, mob);
     }
+
+    // =====================================================
+    // XP HANDLING (VANILLA STYLE)
+    // =====================================================
+
+    private void handleXp(FileConfiguration cfg, LivingEntity mob) {
+        int xp = cfg.getInt("xp", 0);
+        if (xp <= 0) return;
+
+        World world = mob.getWorld();
+
+        // Spawn real vanilla XP orbs
+        ExperienceOrb orb = world.spawn(mob.getLocation(), ExperienceOrb.class);
+        orb.setExperience(xp);
+
+        // Visual reward feedback
+        world.spawnParticle(
+                Particle.HAPPY_VILLAGER,
+                mob.getLocation().add(0, 0.8, 0),
+                10,
+                0.4,
+                0.4,
+                0.4,
+                0.01
+        );
+    }
+
+    // =====================================================
+    // DROPS
+    // =====================================================
 
     private void dropList(List<Map<?, ?>> list, LivingEntity mob) {
         if (list == null || list.isEmpty()) return;

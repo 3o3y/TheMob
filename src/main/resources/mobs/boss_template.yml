@@ -728,3 +728,8 @@ legendary-drops:
 # Death Commands, execute Commands from Server
 death-commands: # Command executed on death
   - "broadcast &6{mob_name} &7was slain by &b{player}&7!"
+xp: 250               # Total XP for boss kill
+xp-explosion:
+  enabled: true
+  orb-count: 25       # how many orbs
+  orb-multiplier: 2   # makes orbs visually bigger

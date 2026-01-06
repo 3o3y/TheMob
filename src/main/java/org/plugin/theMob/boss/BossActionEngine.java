@@ -6,7 +6,9 @@ import org.bukkit.*;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.configuration.ConfigurationSection;
+import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.EntityType;
+import org.bukkit.entity.ExperienceOrb;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -112,9 +114,13 @@ public final class BossActionEngine implements Listener {
             minionSpawner.stopAllForBoss(boss.getUniqueId());
             minionController.cleanupBoss(boss.getUniqueId());
 
+            // 💥 BOSS XP EXPLOSION
+            spawnBossXpExplosion(boss);
+
             bossSnapshots.remove(boss.getUniqueId());
         }
     }
+
 
     private void applyWorldStationConfig(LivingEntity boss, ConfigurationSection cfg) {
         if (boss == null || !boss.isValid()) return;
@@ -517,4 +523,64 @@ public final class BossActionEngine implements Listener {
             return bases.getOrDefault(a, 0.0);
         }
     }
+    private void spawnBossXpExplosion(LivingEntity boss) {
+        FileConfiguration cfg = plugin.mobs().mobConfigOf(boss);
+        if (cfg == null) return;
+
+        int totalXp = cfg.getInt("xp", 0);
+        if (totalXp <= 0) return;
+
+        ConfigurationSection xpCfg = cfg.getConfigurationSection("xp-explosion");
+
+        boolean enabled = xpCfg == null || xpCfg.getBoolean("enabled", true);
+        if (!enabled) return;
+
+        int orbCount = xpCfg != null ? xpCfg.getInt("orb-count", 20) : 20;
+        double orbMul = xpCfg != null ? xpCfg.getDouble("orb-multiplier", 2.0) : 2.0;
+
+        World world = boss.getWorld();
+        Location center = boss.getLocation().add(0, 1.0, 0);
+
+        // 🎆 BIG PARTICLE EXPLOSION
+        world.spawnParticle(
+                Particle.EXPLOSION_EMITTER,
+                center,
+                2
+        );
+
+        world.spawnParticle(
+                Particle.HAPPY_VILLAGER,
+                center,
+                60,
+                1.8,
+                1.2,
+                1.8,
+                0.05
+        );
+
+        // 🔊 SOUND FEEDBACK
+        world.playSound(
+                center,
+                Sound.ENTITY_PLAYER_LEVELUP,
+                1.4f,
+                0.6f
+        );
+
+        // 🟢 SPAWN XP ORBS
+        int xpPerOrb = Math.max(1, totalXp / Math.max(1, orbCount));
+
+        for (int i = 0; i < orbCount; i++) {
+            Location l = center.clone().add(
+                    rnd.nextGaussian() * 1.2,
+                    rnd.nextDouble() * 0.8,
+                    rnd.nextGaussian() * 1.2
+            );
+
+            ExperienceOrb orb = world.spawn(l, ExperienceOrb.class);
+
+            // XP size controls visual size (vanilla!)
+            orb.setExperience((int) Math.round(xpPerOrb * orbMul));
+        }
+    }
+
 }
