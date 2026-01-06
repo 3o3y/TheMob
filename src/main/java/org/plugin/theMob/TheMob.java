@@ -29,6 +29,7 @@ import org.plugin.theMob.hud.NaviHudService;
 import org.plugin.theMob.mob.MobDropEngine;
 import org.plugin.theMob.mob.MobListener;
 import org.plugin.theMob.mob.MobManager;
+import org.plugin.theMob.mob.ai.MobAIService;
 import org.plugin.theMob.mob.spawn.AutoSpawnManager;
 import org.plugin.theMob.mob.spawn.MobSpawnService;
 import org.plugin.theMob.player.stats.PlayerEquipListener;
@@ -49,10 +50,13 @@ public final class TheMob extends JavaPlugin {
     private KeyRegistry keys;
     private TickScheduler ticks;
 
+
     // Mobs
     private MobManager mobManager;
     private MobHealthDisplay healthDisplay;
     private MobDropEngine dropEngine;
+    private MobAIService mobAI;
+
 
     // Spawn
     private AutoSpawnManager autoSpawnManager;
@@ -133,6 +137,11 @@ public final class TheMob extends JavaPlugin {
 
         ticks = new TickScheduler(this);
 
+        // ---------- Mob AI ----------
+        mobAI = new MobAIService();
+        ticks.syncRepeating(mobAI::tick, 1L, 1L);
+
+
         // ---------- Mob Manager ----------
         mobManager = new MobManager(this, configService, keys);
         mobManager.reloadFromConfigs();
@@ -173,8 +182,10 @@ public final class TheMob extends JavaPlugin {
                 keys,
                 healthDisplay,
                 bossBars,
-                phaseController
+                phaseController,
+                mobAI
         );
+
         mobManager.setSpawnService(spawnService);
 
         // ---------- Auto Spawn ----------
@@ -246,6 +257,10 @@ public final class TheMob extends JavaPlugin {
                 autoSpawnManager.stop();
                 autoSpawnManager = null;
             }
+            if (mobAI != null) {
+                mobAI.clearAll();
+                mobAI = null;
+            }
 
             if (hud != null) {
                 hud.shutdown();
@@ -303,9 +318,10 @@ public final class TheMob extends JavaPlugin {
                         bossBars,
                         bossActionEngine,
                         keys,
-                        autoSpawnManager
+                        autoSpawnManager,
+                        mobAI
                 ),
-                this
+        this
         );
 
         Bukkit.getPluginManager().registerEvents(

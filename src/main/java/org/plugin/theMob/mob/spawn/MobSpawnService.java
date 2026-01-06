@@ -8,6 +8,7 @@ import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.LivingEntity;
+import org.bukkit.entity.Mob;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 import org.plugin.theMob.boss.BossTemplate;
@@ -16,6 +17,9 @@ import org.plugin.theMob.boss.phase.BossPhaseController;
 import org.plugin.theMob.boss.spawn.ZombieBossFactory;
 import org.plugin.theMob.core.KeyRegistry;
 import org.plugin.theMob.mob.MobManager;
+import org.plugin.theMob.mob.ai.MobAIController;
+import org.plugin.theMob.mob.ai.MobAIProfile;
+import org.plugin.theMob.mob.ai.MobAIService;
 import org.plugin.theMob.ui.MobHealthDisplay;
 import org.plugin.theMob.visual.MobVisualService;
 
@@ -29,6 +33,7 @@ public final class MobSpawnService {
     private final MobHealthDisplay healthDisplay;
     private final BossBarService bossBars;
     private final BossPhaseController phaseController;
+    private final MobAIService mobAI; // ✅ NEW
 
     public MobSpawnService(
             Plugin plugin,
@@ -36,7 +41,8 @@ public final class MobSpawnService {
             KeyRegistry keys,
             MobHealthDisplay healthDisplay,
             BossBarService bossBars,
-            BossPhaseController phaseController
+            BossPhaseController phaseController,
+            MobAIService mobAI
     ) {
         this.plugin = plugin;
         this.mobs = mobs;
@@ -44,6 +50,7 @@ public final class MobSpawnService {
         this.healthDisplay = healthDisplay;
         this.bossBars = bossBars;
         this.phaseController = phaseController;
+        this.mobAI = mobAI;
     }
 
     public LivingEntity spawn(String mobId, String spawnId, Location loc) {
@@ -96,14 +103,23 @@ public final class MobSpawnService {
         mob.getPersistentDataContainer().set(keys.MOB_ID, PersistentDataType.STRING, mobId);
         mob.getPersistentDataContainer().set(keys.IS_BOSS, PersistentDataType.INTEGER, isBoss ? 1 : 0);
 
-        String name = ChatColor.translateAlternateColorCodes('&', cfg.getString("name", type.name()));
+        String name = ChatColor.translateAlternateColorCodes('&',
+                cfg.getString("name", type.name()));
         mob.getPersistentDataContainer().set(keys.BASE_NAME, PersistentDataType.STRING, name);
 
         boolean isAutoSpawn = spawnId != null;
-        mob.getPersistentDataContainer().set(keys.SPAWN_TYPE, PersistentDataType.STRING, isAutoSpawn ? "AUTOSPAWN" : "MANUAL");
+        mob.getPersistentDataContainer().set(
+                keys.SPAWN_TYPE,
+                PersistentDataType.STRING,
+                isAutoSpawn ? "AUTOSPAWN" : "MANUAL"
+        );
 
         if (isAutoSpawn) {
-            mob.getPersistentDataContainer().set(keys.AUTO_SPAWN_ID, PersistentDataType.STRING, spawnId);
+            mob.getPersistentDataContainer().set(
+                    keys.AUTO_SPAWN_ID,
+                    PersistentDataType.STRING,
+                    spawnId
+            );
         }
 
         // =========================
@@ -120,6 +136,18 @@ public final class MobSpawnService {
 
         if (healthDisplay != null) {
             healthDisplay.onSpawn(mob);
+        }
+
+        // =========================
+        // AI (✅ FINAL VERDRAHTUNG)
+        // =========================
+        if (mob instanceof Mob bukkitMob) {
+            MobAIProfile profile =
+                    MobAIProfile.fromConfig(cfg.getConfigurationSection("ai"));
+
+            mobAI.register(bukkitMob, profile);
+
+
         }
 
         // =========================

@@ -10,8 +10,10 @@ public final class MobAIController {
 
     private BehaviorState state = BehaviorState.IDLE;
     private Player currentTarget;
+
     private long lastSwitchTick;
     private long fleeUntil;
+    private long disengageUntil; // 🔒 NEW
 
     public MobAIController(Mob mob, MobAIProfile profile) {
         this.mob = mob;
@@ -21,9 +23,9 @@ public final class MobAIController {
     public void tick(long tick) {
         if (!mob.isValid() || mob.isDead()) return;
 
-        // -----------------------------
-        // FLEE LOGIC
-        // -----------------------------
+        // =================================================
+        // FLEE
+        // =================================================
         if (profile.fleeEnabled()
                 && mob.getHealth() / mob.getMaxHealth() <= profile.fleeThreshold()) {
 
@@ -41,9 +43,9 @@ public final class MobAIController {
             state = BehaviorState.REGROUP;
         }
 
-        // -----------------------------
-        // TARGETING
-        // -----------------------------
+        // =================================================
+        // TARGET RESOLUTION
+        // =================================================
         Player target = resolveTarget(tick);
         if (target == null) {
             state = BehaviorState.IDLE;
@@ -56,17 +58,29 @@ public final class MobAIController {
         if (dist <= profile.engageDistance()) {
             state = BehaviorState.ENGAGE;
             mob.setTarget(target);
-        } else if (dist >= profile.disengageDistance()) {
+            return;
+        }
+
+        if (dist >= profile.disengageDistance()) {
             state = BehaviorState.IDLE;
+            currentTarget = null;
+            disengageUntil = tick + profile.switchCooldown(); // 🔒 HARD GATE
             mob.setTarget(null);
         }
     }
 
     private Player resolveTarget(long tick) {
-        if (currentTarget != null && tick - lastSwitchTick < profile.switchCooldown()) {
-            if (currentTarget.isOnline() && !currentTarget.isDead()) {
-                return currentTarget;
-            }
+
+        // 🔒 do NOT re-aggro immediately after disengage
+        if (tick < disengageUntil) {
+            return null;
+        }
+
+        if (currentTarget != null
+                && tick - lastSwitchTick < profile.switchCooldown()
+                && currentTarget.isOnline()
+                && !currentTarget.isDead()) {
+            return currentTarget;
         }
 
         Player p = profile.targeting().findTarget(mob);
@@ -74,6 +88,7 @@ public final class MobAIController {
             currentTarget = p;
             lastSwitchTick = tick;
         }
+
         return p;
     }
 

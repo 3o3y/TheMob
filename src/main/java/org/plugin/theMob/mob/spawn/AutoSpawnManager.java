@@ -4,8 +4,11 @@ import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
 import org.bukkit.World;
+import org.bukkit.entity.ArmorStand;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
+import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.plugin.theMob.TheMob;
@@ -22,10 +25,15 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public final class AutoSpawnManager {
 
-    private static final long COLD_TICKS = 20L * 60L;
+    // =========================================================
+    // TUNING
+    // =========================================================
+    private static final long COLD_TICKS = 20L * 60L; // 60s until cleanup when cold
     private static final int RANDOM_WORLD_RADIUS = 1_000;
-
     private static final int RANDOM_ANYWHERE_TRIES = 6;
+
+    // ✅ 20-tick scheduler (1s)
+    private static final long SCHEDULER_PERIOD_TICKS = 20L;
 
     private final TheMob plugin;
     private final MobManager mobs;
@@ -34,21 +42,30 @@ public final class AutoSpawnManager {
 
     private final Random rnd = new Random();
 
+    // =========================================================
+    // RUNTIME STATE
+    // =========================================================
     private final Map<String, SpawnPoint> points = new ConcurrentHashMap<>();
     private final Map<String, Set<UUID>> alive = new ConcurrentHashMap<>();
 
     private final Map<String, Integer> spawnedTotal = new ConcurrentHashMap<>();
-    private final Map<String, Long> lastSpawnTick = new ConcurrentHashMap<>();
+
+    // 🔁 due system
+    private final Map<String, Long> nextDueTick = new ConcurrentHashMap<>();
+    private final Map<String, Long> lastSpawnTick = new ConcurrentHashMap<>(); // kept for debugging / legacy
+
     private SpawnController controller;
 
+    // HOT/COLD
     private final Set<String> hot = ConcurrentHashMap.newKeySet();
     private final Map<String, Long> coldSince = new ConcurrentHashMap<>();
     private final Map<String, Set<Chunk>> forcedChunks = new ConcurrentHashMap<>();
 
+    // RANDOM_WORLD
     private final Map<String, Location> randomWorldAnchor = new ConcurrentHashMap<>();
     private final Map<String, Integer> messageTasks = new ConcurrentHashMap<>();
-    private BukkitRunnable task;
 
+    private BukkitRunnable task;
     private boolean started;
 
     public AutoSpawnManager(TheMob plugin, MobManager mobs, KeyRegistry keys, BossLockService bossLocks) {
@@ -58,14 +75,23 @@ public final class AutoSpawnManager {
         this.bossLocks = bossLocks;
     }
 
+    // =========================================================
+    // LIFECYCLE
+    // =========================================================
     public void start() {
         if (started) return;
         started = true;
 
+        // 🔥 HARD CLEANUP ON START (ABSOLUT PFLICHT)
+        Bukkit.getScheduler().runTask(plugin, this::purgeAllStaleEntities);
+
         task = new BukkitRunnable() {
-            @Override public void run() { tick(); }
+            @Override
+            public void run() {
+                tick();
+            }
         };
-        task.runTaskTimer(plugin, 20L, 20L);
+        task.runTaskTimer(plugin, SCHEDULER_PERIOD_TICKS, SCHEDULER_PERIOD_TICKS);
     }
 
 
@@ -76,19 +102,26 @@ public final class AutoSpawnManager {
         }
         started = false;
 
-        for (String id : points.keySet()) {
+        for (String id : new ArrayList<>(points.keySet())) {
             hardKillAll(id);
             releaseArenaChunks(id);
             stopMessageTask(id);
         }
+
         points.clear();
         alive.clear();
         spawnedTotal.clear();
+        nextDueTick.clear();
         lastSpawnTick.clear();
+
         hot.clear();
         coldSince.clear();
         forcedChunks.clear();
+
         randomWorldAnchor.clear();
+        for (Integer taskId : messageTasks.values()) {
+            Bukkit.getScheduler().cancelTask(taskId);
+        }
         messageTasks.clear();
         started = false;
     }
@@ -97,11 +130,19 @@ public final class AutoSpawnManager {
         this.controller = controller;
     }
 
+    // =========================================================
+    // REGISTRY
+    // =========================================================
     public void register(SpawnPoint sp) {
         points.put(sp.spawnId(), sp);
         alive.put(sp.spawnId(), ConcurrentHashMap.newKeySet());
         spawnedTotal.putIfAbsent(sp.spawnId(), 0);
+
+        long now = Bukkit.getCurrentTick();
+        long interval = Math.max(1, sp.intervalSeconds()) * 20L;
+
         lastSpawnTick.put(sp.spawnId(), -1L);
+        nextDueTick.put(sp.spawnId(), now + interval);
     }
 
     public void unregister(String spawnId) {
@@ -113,9 +154,11 @@ public final class AutoSpawnManager {
         points.remove(spawnId);
         alive.remove(spawnId);
         spawnedTotal.remove(spawnId);
+        nextDueTick.remove(spawnId);
         lastSpawnTick.remove(spawnId);
         hot.remove(spawnId);
         coldSince.remove(spawnId);
+        forcedChunks.remove(spawnId);
     }
 
     public SpawnPoint get(String spawnId) {
@@ -126,8 +169,11 @@ public final class AutoSpawnManager {
         return Collections.unmodifiableCollection(points.values());
     }
 
+    // =========================================================
+    // TICK
+    // =========================================================
     private void tick() {
-        long now = Bukkit.getCurrentTick();
+        final long now = Bukkit.getCurrentTick();
 
         for (SpawnPoint sp : points.values()) {
             if (!sp.enabled()) continue;
@@ -142,7 +188,7 @@ public final class AutoSpawnManager {
     }
 
     // =========================================================
-    // FIXED_POINT / RANDOM_RADIUS (HOT/COLD)
+    // FIXED_POINT / RANDOM_RADIUS (HOT/COLD + nextDueTick)
     // =========================================================
     private void tickFixedOrRadius(SpawnPoint sp, long now, boolean radiusMode) {
         Location base = sp.baseLocation();
@@ -155,8 +201,10 @@ public final class AutoSpawnManager {
             forceLoadArenaChunks(sp);
             hot.add(sp.spawnId());
             coldSince.remove(sp.spawnId());
-        }
 
+            // schedule next due if missing
+            nextDueTick.putIfAbsent(sp.spawnId(), now + Math.max(1, sp.intervalSeconds()) * 20L);
+        }
 
         if (!hotNow && wasHot) {
             hot.remove(sp.spawnId());
@@ -165,21 +213,36 @@ public final class AutoSpawnManager {
 
         if (!hotNow && coldSince.containsKey(sp.spawnId())
                 && now - coldSince.get(sp.spawnId()) >= COLD_TICKS) {
-            hardKillAll(sp.spawnId());
+
+            hardKillAll(sp.spawnId());           // kills mobs + spawn-tagged stands
+            purgeArenaVisuals(sp);               // kills VISUAL_HEAD stands even if not tagged
             releaseArenaChunks(sp.spawnId());
             coldSince.remove(sp.spawnId());
         }
 
         if (!hotNow) return;
 
-        long last = lastSpawnTick.getOrDefault(sp.spawnId(), 0L);
-        if (now - last < sp.intervalSeconds() * 20L) return;
+        // ✅ due check (no per-tick delta math)
+        long due = nextDueTick.getOrDefault(sp.spawnId(), now);
+        if (now < due) return;
 
         int total = spawnedTotal.getOrDefault(sp.spawnId(), 0);
-        if (total >= sp.maxSpawns()) return;
+        if (total >= sp.maxSpawns()) {
+            // keep it scheduled so it doesn't spam checks
+            scheduleNext(sp, now);
+            return;
+        }
 
         Location spawnLoc = radiusMode ? randomAroundBase(base, sp.minRadius(), sp.maxRadius()) : base;
         spawnOne(sp, spawnLoc, now);
+
+        scheduleNext(sp, now);
+    }
+
+    private void scheduleNext(SpawnPoint sp, long now) {
+        long interval = Math.max(1, sp.intervalSeconds()) * 20L;
+        // ensure forward progress even if scheduler is late
+        nextDueTick.put(sp.spawnId(), now + interval);
     }
 
     private boolean isHot(SpawnPoint sp) {
@@ -194,6 +257,7 @@ public final class AutoSpawnManager {
 
     private Location randomAroundBase(Location base, int minR, int maxR) {
         if (maxR <= 0) return base;
+
         int a = Math.max(0, minR);
         int b = Math.max(a, maxR);
 
@@ -203,24 +267,41 @@ public final class AutoSpawnManager {
         double dx = Math.cos(ang) * dist;
         double dz = Math.sin(ang) * dist;
 
-        return base.clone().add(dx, 0.0, dz);
+        Location loc = base.clone().add(dx, 0.0, dz);
+        World w = loc.getWorld();
+        if (w != null) {
+            int y = w.getHighestBlockYAt(loc) + 1;
+            y = Math.max(w.getMinHeight() + 1, Math.min(w.getMaxHeight() - 2, y));
+            loc.setY(y);
+        }
+        return loc;
     }
 
     // =========================================================
-    // FOLLOW_PLAYER
+    // FOLLOW_PLAYER (nextDueTick)
     // =========================================================
     private void tickFollowPlayer(SpawnPoint sp, long now) {
         Player target = Bukkit.getPlayerExact(sp.playerName());
         if (target == null || !target.isOnline() || target.isDead()) return;
 
-        long last = lastSpawnTick.getOrDefault(sp.spawnId(), 0L);
-        if (now - last < sp.intervalSeconds() * 20L) return;
+        long due = nextDueTick.getOrDefault(sp.spawnId(), -1L);
+        if (due == -1L) {
+            nextDueTick.put(sp.spawnId(), now + Math.max(1, sp.intervalSeconds()) * 20L);
+            due = nextDueTick.get(sp.spawnId());
+        }
+        if (now < due) return;
 
         int aliveNow = alive.getOrDefault(sp.spawnId(), Set.of()).size();
-        if (aliveNow >= sp.maxSpawns()) return;
+        if (aliveNow >= sp.maxSpawns()) {
+            scheduleNext(sp, now);
+            return;
+        }
 
         int total = spawnedTotal.getOrDefault(sp.spawnId(), 0);
-        if (sp.mode() == SpawnMode.ONETIME && total >= sp.maxSpawns()) return;
+        if (sp.mode() == SpawnMode.ONETIME && total >= sp.maxSpawns()) {
+            scheduleNext(sp, now);
+            return;
+        }
 
         Location spawnLoc = randomAroundPlayer(
                 target.getLocation(),
@@ -233,8 +314,9 @@ public final class AutoSpawnManager {
         if (sp.message() != null && !sp.message().isBlank()) {
             target.sendMessage(color(sp.message()));
         }
-    }
 
+        scheduleNext(sp, now);
+    }
 
     private Location randomAroundPlayer(Location base, int minD, int maxD) {
         int a = Math.max(0, minD);
@@ -249,28 +331,38 @@ public final class AutoSpawnManager {
         Location loc = base.clone().add(dx, 0.0, dz);
         World w = loc.getWorld();
         if (w != null) {
-            int y = Math.max(w.getMinHeight() + 1, Math.min(w.getMaxHeight() - 2, loc.getBlockY()));
+            int y = w.getHighestBlockYAt(loc) + 1;
+            y = Math.max(w.getMinHeight() + 1, Math.min(w.getMaxHeight() - 2, y));
             loc.setY(y);
         }
         return loc;
     }
 
     // =====================================================
-    // RANDOM WORLD
+    // RANDOM WORLD (nextDueTick)
     // =====================================================
     private void tickRandomWorld(SpawnPoint sp, long now) {
         World world = Bukkit.getWorld(sp.worldName());
         if (world == null) return;
 
-        long last = lastSpawnTick.getOrDefault(sp.spawnId(), -1L);
-
-        if (last != -1L && now - last < sp.intervalSeconds() * 20L) return;
+        long due = nextDueTick.getOrDefault(sp.spawnId(), -1L);
+        if (due == -1L) {
+            nextDueTick.put(sp.spawnId(), now + Math.max(1, sp.intervalSeconds()) * 20L);
+            due = nextDueTick.get(sp.spawnId());
+        }
+        if (now < due) return;
 
         int aliveNow = alive.getOrDefault(sp.spawnId(), Set.of()).size();
-        if (aliveNow >= sp.maxSpawns()) return;
+        if (aliveNow >= sp.maxSpawns()) {
+            scheduleNext(sp, now);
+            return;
+        }
 
         int total = spawnedTotal.getOrDefault(sp.spawnId(), 0);
-        if (sp.mode() == SpawnMode.ONETIME && total >= sp.maxSpawns()) return;
+        if (sp.mode() == SpawnMode.ONETIME && total >= sp.maxSpawns()) {
+            scheduleNext(sp, now);
+            return;
+        }
 
         Location spawnLoc;
 
@@ -279,14 +371,14 @@ public final class AutoSpawnManager {
             if (spawnLoc == null) {
                 spawnLoc = randomAnywhere(world, RANDOM_ANYWHERE_TRIES);
                 if (spawnLoc == null) {
-                    lastSpawnTick.put(sp.spawnId(), now);
+                    scheduleNext(sp, now);
                     return;
                 }
             }
         } else {
             spawnLoc = randomAnywhere(world, RANDOM_ANYWHERE_TRIES);
             if (spawnLoc == null) {
-                lastSpawnTick.put(sp.spawnId(), now);
+                scheduleNext(sp, now);
                 return;
             }
         }
@@ -296,10 +388,12 @@ public final class AutoSpawnManager {
         spawnOne(sp, spawnLoc, now);
 
         ensureMessageTask(sp);
+
+        scheduleNext(sp, now);
     }
 
     // =====================================================
-    // RANDOM POSITION (1'000 BLOCKS) - bounded tries, low spike
+    // RANDOM POSITION (bounded tries, low spike)
     // =====================================================
     private Location randomAnywhere(World world, int tries) {
         Location center = world.getSpawnLocation();
@@ -317,17 +411,14 @@ public final class AutoSpawnManager {
 
             try {
                 int y = world.getHighestBlockYAt(x, z) + 1;
-
                 y = Math.max(world.getMinHeight() + 1, Math.min(world.getMaxHeight() - 2, y));
 
                 Location loc = new Location(world, x + 0.5, y, z + 0.5);
 
                 if (!loc.getBlock().getType().isAir()) continue;
-
                 if (!loc.clone().subtract(0, 1, 0).getBlock().getType().isSolid()) continue;
 
                 return loc;
-
             } finally {
                 chunk.removePluginChunkTicket(plugin);
             }
@@ -358,6 +449,9 @@ public final class AutoSpawnManager {
         spawnedTotal.put(sp.spawnId(), spawnedTotal.getOrDefault(sp.spawnId(), 0) + 1);
         lastSpawnTick.put(sp.spawnId(), now);
 
+        // keep due aligned
+        nextDueTick.put(sp.spawnId(), now + Math.max(1, sp.intervalSeconds()) * 20L);
+
         if (sp.type() == SpawnType.RANDOM_WORLD && controller != null) {
             controller.updateRuntimeLocation(
                     sp.spawnId(),
@@ -367,12 +461,9 @@ public final class AutoSpawnManager {
             );
         }
 
-        if (mobs.isBoss(mob)
-                && sp.type() != SpawnType.FOLLOW_PLAYER) {
-
+        if (mobs.isBoss(mob) && sp.type() != SpawnType.FOLLOW_PLAYER) {
             bossLocks.register(sp.spawnId(), mob);
         }
-
     }
 
     // =========================================================
@@ -384,12 +475,14 @@ public final class AutoSpawnManager {
 
         World w = Bukkit.getWorld(sp.worldName());
         if (w != null) {
-            for (LivingEntity e : w.getLivingEntities()) {
+            List<Entity> entities = new ArrayList<>(w.getEntities());
+
+            for (Entity e : entities) {
                 if (e instanceof Player) continue;
 
-                String id = e.getPersistentDataContainer()
-                        .get(keys.AUTO_SPAWN_ID, PersistentDataType.STRING);
+                PersistentDataContainer pdc = e.getPersistentDataContainer();
 
+                String id = pdc.get(keys.AUTO_SPAWN_ID, PersistentDataType.STRING);
                 if (spawnId.equals(id)) {
                     e.remove();
                 }
@@ -401,9 +494,31 @@ public final class AutoSpawnManager {
         if (sp.mode() != SpawnMode.ONETIME) {
             spawnedTotal.put(spawnId, 0);
         }
+
         lastSpawnTick.put(spawnId, -1L);
 
+        long now = Bukkit.getCurrentTick();
+        nextDueTick.put(spawnId, now + Math.max(1, sp.intervalSeconds()) * 20L);
+
         bossLocks.release(spawnId);
+    }
+
+    private void purgeArenaVisuals(SpawnPoint sp) {
+        if (sp == null) return;
+        Location base = sp.baseLocation();
+        if (base == null || base.getWorld() == null) return;
+
+        // rough radius based on chunk radius
+        double r = Math.max(32.0, (sp.arenaRadiusChunks() * 16.0) + 16.0);
+
+        for (Entity e : base.getWorld().getNearbyEntities(base, r, r, r)) {
+            if (e instanceof ArmorStand stand
+                    && stand.getPersistentDataContainer().has(keys.VISUAL_HEAD, PersistentDataType.INTEGER)) {
+                if (sp.isInsideArena(stand.getLocation())) {
+                    stand.remove();
+                }
+            }
+        }
     }
 
     private void forceLoadArenaChunks(SpawnPoint sp) {
@@ -426,6 +541,7 @@ public final class AutoSpawnManager {
                 set.add(chunk);
             }
         }
+
         forcedChunks.put(sp.spawnId(), set);
     }
 
@@ -535,18 +651,52 @@ public final class AutoSpawnManager {
             p.sendMessage(colored);
         }
     }
-    public void onKillAll() {
 
+    // =========================================================
+    // ADMIN / GLOBAL CLEANUP
+    // =========================================================
+    public void onKillAll() {
         for (Integer taskId : messageTasks.values()) {
             Bukkit.getScheduler().cancelTask(taskId);
         }
         messageTasks.clear();
         randomWorldAnchor.clear();
+
         for (Set<UUID> set : alive.values()) {
             set.clear();
         }
 
         bossLocks.clearAll();
+        purgeAllStaleEntities();
+    }
+    private void purgeAllStaleEntities() {
+        int removed = 0;
+
+        for (World w : Bukkit.getWorlds()) {
+            List<Entity> list = new ArrayList<>(w.getEntities());
+            for (Entity e : list) {
+                if (e instanceof Player) continue;
+
+                PersistentDataContainer pdc = e.getPersistentDataContainer();
+
+                boolean isTheMobMob = (e instanceof LivingEntity)
+                        && pdc.has(keys.MOB_ID, PersistentDataType.STRING);
+
+                boolean isAutoSpawnTagged = pdc.has(keys.AUTO_SPAWN_ID, PersistentDataType.STRING);
+
+                boolean isVisualStand = (e instanceof ArmorStand)
+                        && pdc.has(keys.VISUAL_HEAD, PersistentDataType.INTEGER);
+
+                if (isTheMobMob || isAutoSpawnTagged || isVisualStand) {
+                    e.remove();
+                    removed++;
+                }
+            }
+        }
+
+        if (removed > 0) {
+            plugin.getLogger().info("[TheMob] AutoSpawn purge removed " + removed + " stale entities.");
+        }
     }
 
     private String color(String s) {
