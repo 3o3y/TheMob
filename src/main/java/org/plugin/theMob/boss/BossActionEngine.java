@@ -24,6 +24,7 @@ import org.bukkit.scheduler.BukkitRunnable;
 import org.plugin.theMob.TheMob;
 import org.plugin.theMob.boss.minion.BossMinionController;
 import org.plugin.theMob.boss.minion.BossMinionSpawner;
+import org.plugin.theMob.boss.world.BossWorldEffectController;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -44,6 +45,8 @@ public final class BossActionEngine implements Listener {
     private String activeWeather;
     private String activeTime;
 
+    private final BossWorldEffectController worldEffects = new BossWorldEffectController();
+
     private final Map<UUID, BossSnapshot> bossSnapshots = new ConcurrentHashMap<>();
     private BukkitRunnable stationTask;
 
@@ -58,6 +61,7 @@ public final class BossActionEngine implements Listener {
             @Override
             public void run() {
                 tickWeatherStation();
+                worldEffects.tick();
                 cleanupSnapshots();
             }
         };
@@ -88,6 +92,15 @@ public final class BossActionEngine implements Listener {
 
         ConfigurationSection onEnter = cfg.getConfigurationSection("on-enter");
         if (onEnter != null) runOnEnterEffects(boss, onEnter);
+        ConfigurationSection world = cfg.getConfigurationSection("world");
+        if (world != null) {
+            worldEffects.apply(
+                    boss,
+                    world.getDouble("radius", 32.0),
+                    world.getString("weather"),
+                    world.getString("time")
+            );
+        }
 
         // v1.6 – Summons (controlled)
         ConfigurationSection actions = cfg.getConfigurationSection("actions");
@@ -107,6 +120,7 @@ public final class BossActionEngine implements Listener {
     }
 
     public void onBossDeath(LivingEntity boss) {
+        worldEffects.resetAll();
         clearWeatherStation();
 
         if (boss != null) {

@@ -247,6 +247,7 @@ phases:                               #This will make your Mob as a Boss Mob
       slow-falling: false             # Enables slow falling
 # ===== WORLD EFFECTS (NOT GLOBAL - NO EFFECTS ON MOBS) =====
     world:
+      radius: 35
       weather: THUNDER                   # NONE | CLEAR | RAIN | THUNDER
       time: NIGHT                      # NONE | DAY | NIGHT | NOON | MIDNIGHT | SUNRISE | SUNSET
   # =====================================================

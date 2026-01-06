@@ -31,6 +31,42 @@ stats:
   scale: 0.8                   # Entity size multiplier (1.0 = default size)
 
 # ---------------------------------------------------------
+# AI & BEHAVIOR (v1.8)
+# ---------------------------------------------------------
+ai:
+
+  # -----------------------
+  # TARGETING LOGIC
+  # -----------------------
+  targeting:
+    type: SMART                 # SMART | NEAREST | RANDOM (future)
+    max-distance: 16            # Max range to search for players
+    switch-cooldown: 40         # Ticks before target can change again
+
+  # -----------------------
+  # AGGRESSION DISTANCES
+  # -----------------------
+  aggression:
+    engage-distance: 14         # Start attacking if target is closer
+    disengage-distance: 22      # Stop chasing if target is too far away
+
+  # -----------------------
+  # FLEE / REGROUP LOGIC
+  # -----------------------
+  flee:
+    enabled: false              # Enable flee behavior
+    health-below: 0.25          # % of max health (0.25 = 25%)
+    regroup-after: 80           # Ticks before re-engaging
+
+  # -----------------------
+  # AI PERFORMANCE CONTROL
+  # -----------------------
+  throttle:
+    tick-rate: 10               # AI logic runs every X ticks
+    # (10 = every 0.5 seconds)
+
+
+# ---------------------------------------------------------
 # Death Commands
 # ---------------------------------------------------------
 # Executed when a PLAYER kills this mob
