@@ -124,6 +124,8 @@ public final class AutoSpawnManager {
         }
         messageTasks.clear();
         started = false;
+        purgeAllStaleEntities();
+
     }
 
     public void bindController(SpawnController controller) {
@@ -197,47 +199,82 @@ public final class AutoSpawnManager {
         boolean hotNow = isHot(sp);
         boolean wasHot = hot.contains(sp.spawnId());
 
-        if (hotNow && !wasHot) {
-            forceLoadArenaChunks(sp);
-            hot.add(sp.spawnId());
+        // =====================================================
+        // 🔥 RE-ENTRY LOGIC (HOT)
+        // =====================================================
+        if (hotNow) {
+
+            // Spieler kommt zurück → war die Arena HARD-COLD?
+            if (!wasHot) {
+
+                boolean wasHardCold =
+                        coldSince.containsKey(sp.spawnId()) &&
+                                (now - coldSince.get(sp.spawnId()) >= COLD_TICKS);
+
+                if (wasHardCold) {
+                    // 💥 NUR JETZT ALLES KILLEN
+                    hardKillAll(sp.spawnId());
+                    purgeArenaVisuals(sp);
+                    bossLocks.release(sp.spawnId());
+
+                    alive.computeIfAbsent(
+                            sp.spawnId(),
+                            k -> ConcurrentHashMap.newKeySet()
+                    ).clear();
+
+                    spawnedTotal.put(sp.spawnId(), 0);
+                    lastSpawnTick.put(sp.spawnId(), -1L);
+                }
+
+                // Arena wird wieder HOT
+                hot.add(sp.spawnId());
+                forceLoadArenaChunks(sp);
+            }
+
+            // Cold-Timer abbrechen
             coldSince.remove(sp.spawnId());
 
-            // schedule next due if missing
-            nextDueTick.putIfAbsent(sp.spawnId(), now + Math.max(1, sp.intervalSeconds()) * 20L);
+            // Spawn weiterlaufen lassen
+            nextDueTick.putIfAbsent(
+                    sp.spawnId(),
+                    now + Math.max(1, sp.intervalSeconds()) * 20L
+            );
         }
 
+        // =====================================================
+        // ❄️ LEAVE ARENA → START COLD TIMER
+        // =====================================================
         if (!hotNow && wasHot) {
             hot.remove(sp.spawnId());
             coldSince.put(sp.spawnId(), now);
+            return;
         }
 
-        if (!hotNow && coldSince.containsKey(sp.spawnId())
-                && now - coldSince.get(sp.spawnId()) >= COLD_TICKS) {
-
-            hardKillAll(sp.spawnId());           // kills mobs + spawn-tagged stands
-            purgeArenaVisuals(sp);               // kills VISUAL_HEAD stands even if not tagged
-            releaseArenaChunks(sp.spawnId());
-            coldSince.remove(sp.spawnId());
-        }
-
+        // =====================================================
+        // 💤 STILL COLD → DO NOTHING
+        // =====================================================
         if (!hotNow) return;
 
-        // ✅ due check (no per-tick delta math)
+        // =====================================================
+        // ⏱ NORMAL SPAWN LOGIC
+        // =====================================================
         long due = nextDueTick.getOrDefault(sp.spawnId(), now);
         if (now < due) return;
 
         int total = spawnedTotal.getOrDefault(sp.spawnId(), 0);
         if (total >= sp.maxSpawns()) {
-            // keep it scheduled so it doesn't spam checks
             scheduleNext(sp, now);
             return;
         }
 
-        Location spawnLoc = radiusMode ? randomAroundBase(base, sp.minRadius(), sp.maxRadius()) : base;
-        spawnOne(sp, spawnLoc, now);
+        Location spawnLoc = radiusMode
+                ? randomAroundBase(base, sp.minRadius(), sp.maxRadius())
+                : base;
 
+        spawnOne(sp, spawnLoc, now);
         scheduleNext(sp, now);
     }
+
 
     private void scheduleNext(SpawnPoint sp, long now) {
         long interval = Math.max(1, sp.intervalSeconds()) * 20L;
@@ -437,12 +474,6 @@ public final class AutoSpawnManager {
         mob.setPersistent(true);
         mob.setRemoveWhenFarAway(false);
 
-        mob.getPersistentDataContainer().set(
-                keys.AUTO_SPAWN_ID,
-                PersistentDataType.STRING,
-                sp.spawnId()
-        );
-
         alive.computeIfAbsent(sp.spawnId(), k -> ConcurrentHashMap.newKeySet())
                 .add(mob.getUniqueId());
 
@@ -470,38 +501,34 @@ public final class AutoSpawnManager {
     // KILL / CLEANUP
     // =========================================================
     private void hardKillAll(String spawnId) {
-        SpawnPoint sp = points.get(spawnId);
-        if (sp == null) return;
 
-        World w = Bukkit.getWorld(sp.worldName());
-        if (w != null) {
-            List<Entity> entities = new ArrayList<>(w.getEntities());
+        for (World w : Bukkit.getWorlds()) {
+            for (Entity e : new ArrayList<>(w.getEntities())) {
+                if (!(e instanceof LivingEntity le)) continue;
+                if (le instanceof Player) continue;
 
-            for (Entity e : entities) {
-                if (e instanceof Player) continue;
+                PersistentDataContainer pdc = le.getPersistentDataContainer();
+                String autoId = pdc.get(keys.AUTO_SPAWN_ID, PersistentDataType.STRING);
 
-                PersistentDataContainer pdc = e.getPersistentDataContainer();
-
-                String id = pdc.get(keys.AUTO_SPAWN_ID, PersistentDataType.STRING);
-                if (spawnId.equals(id)) {
-                    e.remove();
+                if (spawnId.equals(autoId)) {
+                    le.remove();
                 }
             }
         }
 
-        alive.computeIfAbsent(spawnId, k -> ConcurrentHashMap.newKeySet()).clear();
+        Set<UUID> set = alive.remove(spawnId);
+        if (set != null) set.clear();
 
-        if (sp.mode() != SpawnMode.ONETIME) {
-            spawnedTotal.put(spawnId, 0);
-        }
-
-        lastSpawnTick.put(spawnId, -1L);
-
-        long now = Bukkit.getCurrentTick();
-        nextDueTick.put(spawnId, now + Math.max(1, sp.intervalSeconds()) * 20L);
+        spawnedTotal.remove(spawnId);
+        nextDueTick.remove(spawnId);
+        lastSpawnTick.remove(spawnId);
+        coldSince.remove(spawnId);
+        hot.remove(spawnId);
 
         bossLocks.release(spawnId);
     }
+
+
 
     private void purgeArenaVisuals(SpawnPoint sp) {
         if (sp == null) return;
@@ -673,21 +700,17 @@ public final class AutoSpawnManager {
         int removed = 0;
 
         for (World w : Bukkit.getWorlds()) {
-            List<Entity> list = new ArrayList<>(w.getEntities());
-            for (Entity e : list) {
+            for (Entity e : new ArrayList<>(w.getEntities())) {
                 if (e instanceof Player) continue;
 
                 PersistentDataContainer pdc = e.getPersistentDataContainer();
 
-                boolean isTheMobMob = (e instanceof LivingEntity)
-                        && pdc.has(keys.MOB_ID, PersistentDataType.STRING);
+                boolean owned =
+                        pdc.has(keys.MOB_ID, PersistentDataType.STRING)
+                                || pdc.has(keys.AUTO_SPAWN_ID, PersistentDataType.STRING)
+                                || pdc.has(keys.VISUAL_HEAD, PersistentDataType.INTEGER);
 
-                boolean isAutoSpawnTagged = pdc.has(keys.AUTO_SPAWN_ID, PersistentDataType.STRING);
-
-                boolean isVisualStand = (e instanceof ArmorStand)
-                        && pdc.has(keys.VISUAL_HEAD, PersistentDataType.INTEGER);
-
-                if (isTheMobMob || isAutoSpawnTagged || isVisualStand) {
+                if (owned) {
                     e.remove();
                     removed++;
                 }
@@ -695,9 +718,12 @@ public final class AutoSpawnManager {
         }
 
         if (removed > 0) {
-            plugin.getLogger().info("[TheMob] AutoSpawn purge removed " + removed + " stale entities.");
+            plugin.getLogger().warning(
+                    "[TheMob] HARD PURGE removed " + removed + " orphan entities"
+            );
         }
     }
+
 
     private String color(String s) {
         return s == null ? "" : org.bukkit.ChatColor.translateAlternateColorCodes('&', s);

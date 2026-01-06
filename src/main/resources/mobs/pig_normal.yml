@@ -22,6 +22,7 @@ stats:
     current: 12
   movement-speed: 0.205
   scale: 2.5
+xp: 2
 drops:
   - item: PORKCHOP
     amount: 1
