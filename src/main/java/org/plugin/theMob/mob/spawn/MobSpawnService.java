@@ -11,13 +11,14 @@ import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Mob;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
+import org.plugin.theMob.TheMob;
 import org.plugin.theMob.boss.BossTemplate;
 import org.plugin.theMob.boss.bar.BossBarService;
 import org.plugin.theMob.boss.phase.BossPhaseController;
 import org.plugin.theMob.boss.spawn.ZombieBossFactory;
+import org.plugin.theMob.control.SpawnRole;
 import org.plugin.theMob.core.KeyRegistry;
 import org.plugin.theMob.mob.MobManager;
-import org.plugin.theMob.mob.ai.MobAIController;
 import org.plugin.theMob.mob.ai.MobAIProfile;
 import org.plugin.theMob.mob.ai.MobAIService;
 import org.plugin.theMob.ui.MobHealthDisplay;
@@ -27,16 +28,16 @@ import java.util.Locale;
 
 public final class MobSpawnService {
 
-    private final Plugin plugin;
+    private final TheMob plugin;
     private final MobManager mobs;
     private final KeyRegistry keys;
     private final MobHealthDisplay healthDisplay;
     private final BossBarService bossBars;
     private final BossPhaseController phaseController;
-    private final MobAIService mobAI; // ✅ NEW
+    private final MobAIService mobAI;
 
     public MobSpawnService(
-            Plugin plugin,
+            TheMob plugin,
             MobManager mobs,
             KeyRegistry keys,
             MobHealthDisplay healthDisplay,
@@ -63,8 +64,7 @@ public final class MobSpawnService {
 
         EntityType type;
         try {
-            String raw = cfg.getString("base-type", "ZOMBIE");
-            type = EntityType.valueOf(raw.toUpperCase(Locale.ROOT));
+            type = EntityType.valueOf(cfg.getString("base-type", "ZOMBIE").toUpperCase(Locale.ROOT));
         } catch (Exception e) {
             return null;
         }
@@ -78,28 +78,22 @@ public final class MobSpawnService {
             mob = (LivingEntity) loc.getWorld().spawnEntity(loc, type);
         }
 
+        if (mob == null) return null;
+
         // =========================
-        // SCALE
+        // STATS
         // =========================
         if (cfg.contains("stats.scale")) {
             double scale = Math.max(0.25, Math.min(5.0, cfg.getDouble("stats.scale", 1.0)));
             AttributeInstance scaleAttr = mob.getAttribute(Attribute.SCALE);
-            if (scaleAttr != null && scale != 1.0) {
-                scaleAttr.setBaseValue(scale);
-            }
+            if (scaleAttr != null) scaleAttr.setBaseValue(scale);
         }
 
-        // =========================
-        // ARMOR SEED (CRITICAL FIX)
-        // =========================
         AttributeInstance armor = mob.getAttribute(Attribute.ARMOR);
         if (armor != null && armor.getBaseValue() <= 0.0) {
             armor.setBaseValue(0.01);
         }
 
-        // =========================
-        // PERSISTENT DATA
-        // =========================
         mob.getPersistentDataContainer().set(keys.MOB_ID, PersistentDataType.STRING, mobId);
         mob.getPersistentDataContainer().set(keys.IS_BOSS, PersistentDataType.INTEGER, isBoss ? 1 : 0);
 
@@ -107,24 +101,10 @@ public final class MobSpawnService {
                 cfg.getString("name", type.name()));
         mob.getPersistentDataContainer().set(keys.BASE_NAME, PersistentDataType.STRING, name);
 
-        boolean isAutoSpawn = spawnId != null;
-        mob.getPersistentDataContainer().set(
-                keys.SPAWN_TYPE,
-                PersistentDataType.STRING,
-                isAutoSpawn ? "AUTOSPAWN" : "MANUAL"
-        );
-
-        if (isAutoSpawn) {
-            mob.getPersistentDataContainer().set(
-                    keys.AUTO_SPAWN_ID,
-                    PersistentDataType.STRING,
-                    spawnId
-            );
+        if (spawnId != null) {
+            mob.getPersistentDataContainer().set(keys.AUTO_SPAWN_ID, PersistentDataType.STRING, spawnId);
         }
 
-        // =========================
-        // HEALTH
-        // =========================
         if (cfg.contains("stats.health.max")) {
             double max = cfg.getDouble("stats.health.max");
             AttributeInstance hp = mob.getAttribute(Attribute.MAX_HEALTH);
@@ -138,39 +118,23 @@ public final class MobSpawnService {
             healthDisplay.onSpawn(mob);
         }
 
-        // =========================
-        // AI (✅ FINAL VERDRAHTUNG)
-        // =========================
         if (mob instanceof Mob bukkitMob) {
             MobAIProfile profile =
                     MobAIProfile.fromConfig(cfg.getConfigurationSection("ai"));
-
             mobAI.register(bukkitMob, profile);
-
-
         }
 
-        // =========================
-        // BOSS LOGIC
-        // =========================
         if (isBoss) {
             BossTemplate tpl = mobs.bossTemplate(mobId);
             Bukkit.getScheduler().runTask(plugin, () -> {
                 if (!mob.isValid()) return;
-
-                if (bossBars != null) {
-                    bossBars.registerBoss(mob);
-                }
-
+                if (bossBars != null) bossBars.registerBoss(mob);
                 if (tpl != null && phaseController != null) {
                     phaseController.onBossSpawn(mob, tpl);
                 }
             });
         }
 
-        // =========================
-        // VISUALS
-        // =========================
         if (cfg.contains("visual.helmet.type")) {
             MobVisualService.attachVisual(plugin, mob, cfg, keys);
         }

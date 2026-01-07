@@ -13,6 +13,8 @@ import org.plugin.theMob.boss.behavior.BossBehaviorController;
 import org.plugin.theMob.boss.phase.BossPhaseController;
 import org.plugin.theMob.boss.phase.BossPhaseResolver;
 import org.plugin.theMob.combat.CombatBootstrap;
+import org.plugin.theMob.control.AutomationScalingSystem;
+import org.plugin.theMob.control.command.TheMobDebugCommand;
 import org.plugin.theMob.item.CustomEnchantSystem;
 import org.plugin.theMob.item.ItemBuilderFromConfig;
 import org.plugin.theMob.item.ItemLoreRenderer;
@@ -83,6 +85,10 @@ public final class TheMob extends JavaPlugin {
     private StatsMenuService statsMenu;
     private CombatBootstrap combat;
     private CustomEnchantSystem customEnchants;
+
+    // v1.7 Automation & Scaling
+    private AutomationScalingSystem automationScaling;
+
 
     @Override
     public void onEnable() {
@@ -210,6 +216,10 @@ public final class TheMob extends JavaPlugin {
             hud.start();
             Bukkit.getPluginManager().registerEvents(new NaviHudListener(hud), this);
         }
+// ---------- v1.7 Automation & Scaling ----------
+        automationScaling = new AutomationScalingSystem(this);
+        automationScaling.reload(getConfig());
+        automationScaling.register();
 
         // ---------- Player Stats / Combat ----------
         playerStatCache = new PlayerStatCache(this);
@@ -218,6 +228,13 @@ public final class TheMob extends JavaPlugin {
         customEnchants = new CustomEnchantSystem(this);
         combat = new CombatBootstrap(this);
         combat.enable(playerStatCache, customEnchants);
+
+// ---------- Spawn feedback (v1.8 UX fix) ----------
+        new org.plugin.theMob.control.feedback.SpawnBlockFeedbackService(
+                this,
+                automationScaling
+        ).start();
+
 
         // ---------- Listeners + Commands ----------
         registerAllListeners();
@@ -243,6 +260,13 @@ public final class TheMob extends JavaPlugin {
     // =====================================================
     private void hardShutdown() {
         try {
+
+            if (automationScaling != null) {
+                automationScaling.shutdown();
+                automationScaling = null;
+            }
+
+
             if (spawnController != null) {
                 spawnController.stop();
                 spawnController = null;
@@ -355,6 +379,10 @@ public final class TheMob extends JavaPlugin {
     public KeyRegistry keys() { return keys; }
     public ItemStatReader itemStats() { return itemStatReader; }
     public BossPhaseController bossPhases() { return phaseController; }
+    public AutomationScalingSystem automation() {
+        return automationScaling;
+    }
+
 
     // =====================================================
     // HELPERS

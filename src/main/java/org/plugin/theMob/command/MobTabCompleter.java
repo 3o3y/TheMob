@@ -26,39 +26,54 @@ public final class MobTabCompleter implements TabCompleter {
             String[] args
     ) {
 
-        // /mob
+        // =========================
+        // ROOT
+        // =========================
         if (args.length == 1) {
             return filter(args[0],
-                    "spawn", "set", "list", "del", "killall", "reload", "toggle"
+                    "spawn", "set", "list", "del", "killall",
+                    "reload", "toggle", "diag", "debug"
             );
         }
 
+        // =========================
+        // DIAG
+        // =========================
+        if (args.length == 2 && eq(args, 0, "diag")) {
+            return filter(args[1],
+                    "status", "tps", "budgets", "throttle", "alive", "cooldown"
+            );
+        }
+
+        // =========================
+        // TOGGLE
+        // =========================
         if (args.length == 2 && eq(args, 0, "toggle")) {
             return filter(args[1], "hud");
         }
 
+        // =========================
+        // SPAWN
+        // =========================
         if (args.length == 2 && eq(args, 0, "spawn")) {
             return mobIds(args[1]);
         }
 
+        // =========================
+        // SET
+        // =========================
         if (args.length == 2 && eq(args, 0, "set")) {
             return filter(args[1],
                     "autospawn", "followplayer", "randomradius", "randomworld"
             );
         }
 
-        // =========================
-        // AUTOSPAWN
-        // =========================
         if (isSet(args, "autospawn")) {
             if (args.length == 3) return mobIds(args[2]);
             if (args.length == 4) return numbers(args[3], "10", "30", "60", "120");
             if (args.length == 5) return numbers(args[4], "1", "3", "5", "10");
         }
 
-        // =========================
-        // RANDOM RADIUS
-        // =========================
         if (isSet(args, "randomradius")) {
             if (args.length == 3) return mobIds(args[2]);
             if (args.length == 4) return numbers(args[3], "30", "60", "120");
@@ -67,9 +82,6 @@ public final class MobTabCompleter implements TabCompleter {
             if (args.length == 7) return numbers(args[6], "24", "32", "48");
         }
 
-        // =========================
-        // FOLLOW PLAYER
-        // =========================
         if (isSet(args, "followplayer")) {
             if (args.length == 3) return onlinePlayers(args[2]);
             if (args.length == 4) return mobIds(args[3]);
@@ -80,9 +92,6 @@ public final class MobTabCompleter implements TabCompleter {
             if (args.length == 9) return numbers(args[8], "16", "24", "32");
         }
 
-        // =========================
-        // RANDOM WORLD
-        // =========================
         if (isSet(args, "randomworld")) {
             if (args.length == 3) return mobIds(args[2]);
             if (args.length == 4) return numbers(args[3], "60", "120", "300");

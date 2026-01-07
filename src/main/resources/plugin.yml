@@ -1,13 +1,12 @@
 name: TheMob
-version: "1.6"
+version: "1.7"
 main: org.plugin.theMob.TheMob
 api-version: "1.21"
 author: 3o3y
 description: >
   High-performance custom mob system with YAML-based mobs,
-  boss phases, advanced drop tables, player stats GUI
-  and multi-mode spawn framework (FIXED_POINT, FOLLOW_PLAYER,
-  RANDOM_RADIUS, RANDOM_WORLD).
+  boss phases, automation & scaling, global spawn budgets,
+  TPS throttling and admin diagnostics.
 
 commands:
 
@@ -18,6 +17,15 @@ commands:
       /mob killall
       /mob reload
       /mob toggle hud
+
+      /mob diag status
+      /mob diag tps
+      /mob diag budgets
+      /mob diag throttle
+      /mob diag alive
+      /mob diag cooldown <boss-id>
+
+      /mob debug
 
       /mob autospawn <mob-id> <seconds> <maxSpawns>   (legacy)
 
@@ -69,6 +77,13 @@ permissions:
     default: op
 
   # =========================
+  # DEBUG / MONITORING (v1.8)
+  # =========================
+  themob.debug:
+    description: Allows access to /mob debug live diagnostics
+    default: op
+
+  # =========================
   # SPAWN – MANUAL
   # =========================
   themob.spawn:
@@ -81,54 +96,9 @@ permissions:
   themob.spawn.set:
     description: Allows creating and modifying all auto spawn types
     default: op
-    children:
-      themob.spawn.set.autospawn: true
-      themob.spawn.set.followplayer: true
-      themob.spawn.set.randomradius: true
-      themob.spawn.set.randomworld: true
 
-  themob.spawn.set.autospawn:
-    description: Allows creating FIXED_POINT autospawns
-    default: op
-
-  themob.spawn.set.followplayer:
-    description: Allows creating FOLLOW_PLAYER spawns
-    default: op
-
-  themob.spawn.set.randomradius:
-    description: Allows creating RANDOM_RADIUS spawns
-    default: op
-
-  themob.spawn.set.randomworld:
-    description: Allows creating RANDOM_WORLD spawns
-    default: op
-
-  # =========================
-  # SPAWN – DELETE
-  # =========================
   themob.spawn.delete:
     description: Allows deleting auto spawns
-    default: op
-    children:
-      themob.spawn.delete.autospawn: true
-      themob.spawn.delete.followplayer: true
-      themob.spawn.delete.randomradius: true
-      themob.spawn.delete.randomworld: true
-
-  themob.spawn.delete.autospawn:
-    description: Allows deleting FIXED_POINT autospawns
-    default: op
-
-  themob.spawn.delete.followplayer:
-    description: Allows deleting FOLLOW_PLAYER spawns
-    default: op
-
-  themob.spawn.delete.randomradius:
-    description: Allows deleting RANDOM_RADIUS spawns
-    default: op
-
-  themob.spawn.delete.randomworld:
-    description: Allows deleting RANDOM_WORLD spawns
     default: op
 
   # =========================

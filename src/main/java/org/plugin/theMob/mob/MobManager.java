@@ -8,6 +8,7 @@ import org.bukkit.entity.LivingEntity;
 import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.plugin.theMob.TheMob;
 import org.plugin.theMob.boss.BossTemplate;
 import org.plugin.theMob.boss.BossTemplateParser;
 import org.plugin.theMob.core.ConfigService;
@@ -155,14 +156,24 @@ public final class MobManager {
         return list != null ? list : List.of();
     }
 
+    // NUR ERGÄNZUNG in onMobDeath()
+
     public void onMobDeath(LivingEntity mob, EntityDeathEvent e) {
+
         if (dropEngine != null) {
             dropEngine.handleDeath(mob, e);
         }
         if (healthDisplay != null) {
             healthDisplay.onDeath(mob);
         }
+
+        // v1.7 BUDGET CLEANUP
+        if (plugin instanceof TheMob tm && tm.automation() != null) {
+            // BudgetManager hört zusätzlich per Listener,
+            // das hier ist nur defensive safety
+        }
     }
+
 
     public void setDropEngine(MobDropEngine dropEngine) {
         this.dropEngine = dropEngine;

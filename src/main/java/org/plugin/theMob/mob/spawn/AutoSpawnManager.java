@@ -19,6 +19,8 @@ import org.plugin.theMob.spawn.SpawnController;
 import org.plugin.theMob.spawn.SpawnPoint;
 import org.plugin.theMob.spawn.type.SpawnMode;
 import org.plugin.theMob.spawn.type.SpawnType;
+import org.plugin.theMob.control.SpawnGateResult;
+import org.plugin.theMob.control.SpawnRole;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -467,12 +469,37 @@ public final class AutoSpawnManager {
     // =========================================================
     // SPAWN CORE
     // =========================================================
+
     private void spawnOne(SpawnPoint sp, Location loc, long now) {
+
+        // =====================================================
+        // v1.7 INTEGRATION – SPAWN GATE
+        // =====================================================
+        SpawnGateResult gate =
+                plugin.automation().gate().check(
+                        loc.getWorld(),
+                        mobs.hasBossTemplate(sp.mobId())
+                                ? SpawnRole.BOSS
+                                : SpawnRole.MOB
+                );
+
+        if (!gate.allowed()) {
+            return;
+        }
+
         LivingEntity mob = mobs.spawnCustomMob(sp.mobId(), sp.spawnId(), loc);
         if (mob == null) return;
 
         mob.setPersistent(true);
         mob.setRemoveWhenFarAway(false);
+
+        // =====================================================
+        // v1.7 INTEGRATION – TAG BUDGET
+        // =====================================================
+        plugin.automation().budgets().tagSpawnedEntity(
+                mob,
+                mobs.isBoss(mob) ? SpawnRole.BOSS : SpawnRole.MOB
+        );
 
         alive.computeIfAbsent(sp.spawnId(), k -> ConcurrentHashMap.newKeySet())
                 .add(mob.getUniqueId());
@@ -480,8 +507,12 @@ public final class AutoSpawnManager {
         spawnedTotal.put(sp.spawnId(), spawnedTotal.getOrDefault(sp.spawnId(), 0) + 1);
         lastSpawnTick.put(sp.spawnId(), now);
 
-        // keep due aligned
-        nextDueTick.put(sp.spawnId(), now + Math.max(1, sp.intervalSeconds()) * 20L);
+        // v1.7 effective interval (TPS + scaling)
+        long base = Math.max(1, sp.intervalSeconds()) * 20L;
+        long effective =
+                (long) Math.max(1, base * plugin.automation().gate().effectiveIntervalMultiplier());
+
+        nextDueTick.put(sp.spawnId(), now + effective);
 
         if (sp.type() == SpawnType.RANDOM_WORLD && controller != null) {
             controller.updateRuntimeLocation(

@@ -7,6 +7,8 @@ import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.plugin.theMob.TheMob;
+import org.plugin.theMob.control.command.MobDiagCommand;
+import org.plugin.theMob.control.command.TheMobDebugCommand;
 import org.plugin.theMob.mob.MobManager;
 import org.plugin.theMob.spawn.SpawnController;
 import org.plugin.theMob.spawn.type.SpawnMode;
@@ -18,11 +20,15 @@ public final class MobCommand implements CommandExecutor {
     private final TheMob plugin;
     private final MobManager mobs;
     private final SpawnController spawns;
+    private final MobDiagCommand diag;
+
 
     public MobCommand(TheMob plugin, MobManager mobs, SpawnController spawns) {
         this.plugin = plugin;
         this.mobs = mobs;
         this.spawns = spawns;
+        this.diag = new MobDiagCommand(plugin.automation());
+
     }
 
     @Override
@@ -30,6 +36,11 @@ public final class MobCommand implements CommandExecutor {
 
         if (args.length == 0) {
             help(sender);
+            return true;
+        }
+
+        if (args[0].equalsIgnoreCase("debug")) {
+            new TheMobDebugCommand(plugin.automation()).execute(sender);
             return true;
         }
 
@@ -53,6 +64,12 @@ public final class MobCommand implements CommandExecutor {
 
             return true;
         }
+
+        if (args.length >= 1 && args[0].equalsIgnoreCase("diag")) {
+            diag.execute(sender, args);
+            return true;
+        }
+
 
         // -------------------------------------------------
         // /mob reload
@@ -460,6 +477,7 @@ public final class MobCommand implements CommandExecutor {
         s.sendMessage("§e/mob list all");
         s.sendMessage("§e/mob reload");
         s.sendMessage("§e/mob toggle hud");
+        s.sendMessage("§e/mob debug");
         s.sendMessage("§7Legacy alias: /mob autospawn <mob-id> <seconds> <maxSpawns>");
     }
 
@@ -481,4 +499,5 @@ public final class MobCommand implements CommandExecutor {
         if (start >= args.length) return "";
         return String.join(" ", Arrays.copyOfRange(args, start, args.length));
     }
+
 }
