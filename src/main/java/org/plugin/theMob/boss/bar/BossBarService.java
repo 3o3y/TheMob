@@ -11,6 +11,7 @@ import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.plugin.theMob.TheMob;
+import org.plugin.theMob.boss.Placeholder;
 import org.plugin.theMob.core.context.PlayerBarCoordinator;
 import org.plugin.theMob.mob.MobManager;
 import org.plugin.theMob.spawn.SpawnPoint;
@@ -47,11 +48,13 @@ public final class BossBarService implements Listener {
     // =====================================================
     // LIFECYCLE
     // =====================================================
+
     public void start() {
         if (task != null) return;
 
         task = new BukkitRunnable() {
-            @Override public void run() {
+            @Override
+            public void run() {
                 tick();
             }
         };
@@ -82,6 +85,7 @@ public final class BossBarService implements Listener {
     // =====================================================
     // PUBLIC API
     // =====================================================
+
     public void registerBoss(LivingEntity boss) {
         if (boss == null || !mobs.isBoss(boss)) return;
         if (isFollowPlayerMob(boss)) return;
@@ -111,6 +115,7 @@ public final class BossBarService implements Listener {
     // =====================================================
     // RESTORE
     // =====================================================
+
     public void restore() {
         for (World w : Bukkit.getWorlds()) {
             for (LivingEntity le : w.getLivingEntities()) {
@@ -131,6 +136,7 @@ public final class BossBarService implements Listener {
     // =====================================================
     // TICK
     // =====================================================
+
     private void tick() {
 
         Iterator<Map.Entry<UUID, LivingEntity>> it = bosses.entrySet().iterator();
@@ -152,16 +158,19 @@ public final class BossBarService implements Listener {
     }
 
     // =====================================================
-    // PLAYER UPDATE
+    // PLAYER UPDATE (PER PLAYER RENDER)
     // =====================================================
+
     private void updatePlayer(Player p) {
         LivingEntity nearest = null;
         double best = RANGE_SQ;
 
         for (LivingEntity boss : bosses.values()) {
             if (boss.getWorld() != p.getWorld()) continue;
+
             double d = boss.getLocation().distanceSquared(p.getLocation());
             if (d > best) continue;
+
             best = d;
             nearest = boss;
         }
@@ -176,13 +185,12 @@ public final class BossBarService implements Listener {
 
         UUID nid = nearest.getUniqueId();
         if (current != null && current.equals(nid)) {
-            if (dirty.remove(nid)) updateBar(p, nearest);
+            if (dirty.contains(nid)) updateBar(p, nearest);
             return;
         }
 
         playerBoss.put(pid, nid);
         showBar(p, nearest);
-        dirty.remove(nid);
     }
 
     private void showBar(Player p, LivingEntity boss) {
@@ -212,11 +220,24 @@ public final class BossBarService implements Listener {
         bar.setProgress(hp);
         bar.setColor(colorFor(hp));
 
-        String name = mobs.baseNameOf(boss);
-        if (name == null) name = boss.getType().name();
-
+        String rawTitle;
         String phase = phaseTitle.get(boss.getUniqueId());
-        bar.setTitle(phase != null ? name + " §8| §e" + phase : name);
+
+        if (phase != null && !phase.isBlank()) {
+            rawTitle = "{mob_name} | {phase_title} | {distance}m";
+        } else {
+            rawTitle = "{mob_name} | {distance}m";
+        }
+
+        String rendered = Placeholder.resolve(
+                rawTitle,
+                boss,
+                null, // phase handled via stored title
+                p
+        );
+
+        bar.setTitle(rendered);
+        dirty.remove(boss.getUniqueId());
     }
 
     private void clear(Player p) {
@@ -237,6 +258,7 @@ public final class BossBarService implements Listener {
     // =====================================================
     // HELPERS
     // =====================================================
+
     private boolean isFollowPlayerMob(LivingEntity mob) {
         if (mobs.getAutoSpawnManager() == null) return false;
 

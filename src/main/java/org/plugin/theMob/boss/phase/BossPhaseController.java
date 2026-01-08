@@ -1,13 +1,17 @@
 package org.plugin.theMob.boss.phase;
 
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.title.Title;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.plugin.theMob.boss.BossActionEngine;
 import org.plugin.theMob.boss.BossPhase;
 import org.plugin.theMob.boss.BossTemplate;
+import org.plugin.theMob.boss.Placeholder;
 import org.plugin.theMob.boss.bar.BossBarService;
 
+import java.time.Duration;
 import java.util.*;
 
 public final class BossPhaseController {
@@ -48,7 +52,7 @@ public final class BossPhaseController {
         lastPhase.put(id, phase);
 
         if (bars != null) {
-            bars.setPhaseTitle(boss, phase.title());
+            bars.setPhaseTitle(boss, phase.title()); // raw title
             bars.markDirty(boss);
         }
 
@@ -82,6 +86,7 @@ public final class BossPhaseController {
 
             showPhaseTitle(boss, next);
             actionEngine.onPhaseEnter(boss, next);
+
         } else {
             if (bars != null) bars.markDirty(boss);
         }
@@ -132,21 +137,34 @@ public final class BossPhaseController {
     }
 
     // =====================================================
-    // VISUALS
+    // VISUALS (PLACEHOLDER + MINIMESSAGE)
     // =====================================================
 
     private void showPhaseTitle(LivingEntity boss, BossPhase phase) {
         for (Player p : boss.getWorld().getPlayers()) {
             if (p.getLocation().distanceSquared(boss.getLocation()) > 30 * 30) continue;
-            showPhaseTitleToPlayer(p, phase);
+            showPhaseTitleToPlayer(p, boss, phase);
         }
     }
 
-    private void showPhaseTitleToPlayer(Player player, BossPhase phase) {
-        player.sendTitle(
-                "§c§l" + phase.title(),
-                "§7Boss phase",
-                10, 40, 10
+    private void showPhaseTitleToPlayer(Player player, LivingEntity boss, BossPhase phase) {
+
+        String rawTitle = "<red><bold>{phase_title}</bold></red>";
+        String rawSubtitle = "<gray>{mob_name}</gray>";
+
+        Component title = Placeholder.resolveComponent(rawTitle, boss, phase, player);
+        Component subtitle = Placeholder.resolveComponent(rawSubtitle, boss, phase, player);
+
+        player.showTitle(
+                Title.title(
+                        title,
+                        subtitle,
+                        Title.Times.times(
+                                Duration.ofMillis(500),
+                                Duration.ofMillis(2000),
+                                Duration.ofMillis(500)
+                        )
+                )
         );
     }
 
