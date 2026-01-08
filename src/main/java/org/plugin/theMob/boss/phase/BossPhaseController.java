@@ -1,5 +1,6 @@
 package org.plugin.theMob.boss.phase;
 
+import org.bukkit.Bukkit;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.plugin.theMob.boss.BossActionEngine;
@@ -7,10 +8,7 @@ import org.plugin.theMob.boss.BossPhase;
 import org.plugin.theMob.boss.BossTemplate;
 import org.plugin.theMob.boss.bar.BossBarService;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Objects;
-import java.util.UUID;
+import java.util.*;
 
 public final class BossPhaseController {
 
@@ -18,7 +16,7 @@ public final class BossPhaseController {
     private final BossActionEngine actionEngine;
     private final BossBarService bars;
 
-    // 🔁 STATE
+    // MAIN THREAD ONLY
     private final Map<UUID, BossPhase> lastPhase = new HashMap<>();
     private final Map<UUID, BossTemplate> templates = new HashMap<>();
 
@@ -31,6 +29,10 @@ public final class BossPhaseController {
         this.actionEngine = actionEngine;
         this.bars = bars;
     }
+
+    // =====================================================
+    // LIFECYCLE
+    // =====================================================
 
     public void onBossSpawn(LivingEntity boss, BossTemplate template) {
         if (boss == null || template == null) return;
@@ -53,17 +55,8 @@ public final class BossPhaseController {
         actionEngine.onPhaseEnter(boss, phase);
     }
 
-    public void onPlayerEnterArena(Player player, LivingEntity boss) {
-        if (player == null || boss == null) return;
-
-        BossPhase phase = lastPhase.get(boss.getUniqueId());
-        if (phase == null) return;
-
-        showPhaseTitleToPlayer(player, phase);
-    }
-
     public void onBossUpdate(LivingEntity boss) {
-        if (boss == null) return;
+        if (boss == null || !boss.isValid() || boss.isDead()) return;
 
         UUID id = boss.getUniqueId();
         BossTemplate template = templates.get(id);
@@ -82,13 +75,16 @@ public final class BossPhaseController {
 
             lastPhase.put(id, next);
 
-            if (bars != null) bars.setPhaseTitle(boss, next.title());
+            if (bars != null) {
+                bars.setPhaseTitle(boss, next.title());
+                bars.markDirty(boss);
+            }
+
             showPhaseTitle(boss, next);
-
             actionEngine.onPhaseEnter(boss, next);
+        } else {
+            if (bars != null) bars.markDirty(boss);
         }
-
-        if (bars != null) bars.markDirty(boss);
     }
 
     public void onBossDeath(LivingEntity boss) {
@@ -111,23 +107,33 @@ public final class BossPhaseController {
         }
     }
 
+    // =====================================================
+    // QUERIES
+    // =====================================================
+
     public BossPhase currentPhase(LivingEntity boss) {
         if (boss == null) return null;
         return lastPhase.get(boss.getUniqueId());
     }
 
-    public Iterable<LivingEntity> activeBosses() {
-        return templates.keySet().stream()
-                .map(uuid -> {
-                    for (var world : org.bukkit.Bukkit.getWorlds()) {
-                        var e = world.getEntity(uuid);
-                        if (e instanceof LivingEntity le) return le;
-                    }
-                    return null;
-                })
-                .filter(Objects::nonNull)
-                .toList();
+    public Collection<LivingEntity> activeBosses() {
+        List<LivingEntity> list = new ArrayList<>(templates.size());
+
+        for (UUID id : templates.keySet()) {
+            for (var world : Bukkit.getWorlds()) {
+                var e = world.getEntity(id);
+                if (e instanceof LivingEntity le && le.isValid()) {
+                    list.add(le);
+                    break;
+                }
+            }
+        }
+        return list;
     }
+
+    // =====================================================
+    // VISUALS
+    // =====================================================
 
     private void showPhaseTitle(LivingEntity boss, BossPhase phase) {
         for (Player p : boss.getWorld().getPlayers()) {
@@ -137,9 +143,19 @@ public final class BossPhaseController {
     }
 
     private void showPhaseTitleToPlayer(Player player, BossPhase phase) {
-        String title = "§c§l" + phase.title();
-        String subtitle = "§7Boss phase";
+        player.sendTitle(
+                "§c§l" + phase.title(),
+                "§7Boss phase",
+                10, 40, 10
+        );
+    }
 
-        player.sendTitle(title, subtitle, 10, 40, 10);
+    // =====================================================
+    // SHUTDOWN
+    // =====================================================
+
+    public void shutdown() {
+        lastPhase.clear();
+        templates.clear();
     }
 }

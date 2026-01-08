@@ -8,7 +8,6 @@ import org.bukkit.plugin.Plugin;
 import org.plugin.theMob.boss.BossTemplate;
 import org.plugin.theMob.boss.bar.BossBarService;
 import org.plugin.theMob.boss.phase.BossPhaseController;
-import org.plugin.theMob.core.MainThread;
 import org.plugin.theMob.mob.MobManager;
 
 import java.util.HashSet;
@@ -22,6 +21,7 @@ public final class BossLifecycleTracker {
     private final BossBarService bars;
     private final BossPhaseController phases;
 
+    // MAIN THREAD ONLY
     private final Set<UUID> tracked = new HashSet<>();
 
     public BossLifecycleTracker(
@@ -37,16 +37,16 @@ public final class BossLifecycleTracker {
     }
 
     public void onSpawn(LivingEntity mob) {
-        if (mob == null) return;
-        if (!mobs.isBoss(mob)) return;
+        if (mob == null || !mobs.isBoss(mob)) return;
 
-        tracked.add(mob.getUniqueId());
+        UUID id = mob.getUniqueId();
+        if (!tracked.add(id)) return;
 
         BossTemplate tpl = mobs.bossTemplate(mobs.mobIdOf(mob));
         if (tpl != null) {
-            MainThread.run(plugin, () -> phases.onBossSpawn(mob, tpl));
+            Bukkit.getScheduler().runTask(plugin, () -> phases.onBossSpawn(mob, tpl));
         } else {
-            MainThread.run(plugin, () -> bars.registerBoss(mob));
+            Bukkit.getScheduler().runTask(plugin, () -> bars.registerBoss(mob));
         }
     }
 
@@ -54,13 +54,15 @@ public final class BossLifecycleTracker {
         tracked.removeIf(id -> {
             var e = Bukkit.getEntity(id);
             if (!(e instanceof LivingEntity boss)) return true;
+
             if (!boss.isValid() || boss.isDead()) {
-                MainThread.run(plugin, () -> {
+                Bukkit.getScheduler().runTask(plugin, () -> {
                     bars.unregisterBoss(boss);
                     phases.onBossDeath(boss);
                 });
                 return true;
             }
+
             bars.markDirty(boss);
             return false;
         });
@@ -69,21 +71,22 @@ public final class BossLifecycleTracker {
     public void onFight(EntityDamageEvent e) {
         if (!(e.getEntity() instanceof LivingEntity boss)) return;
         if (!mobs.isBoss(boss)) return;
-        MainThread.run(plugin, () -> phases.onBossUpdate(boss));
+
+        Bukkit.getScheduler().runTask(plugin, () -> phases.onBossUpdate(boss));
     }
 
     public void onHeal(EntityRegainHealthEvent e) {
         if (!(e.getEntity() instanceof LivingEntity boss)) return;
         if (!mobs.isBoss(boss)) return;
-        MainThread.run(plugin, () -> phases.onBossUpdate(boss));
+
+        Bukkit.getScheduler().runTask(plugin, () -> phases.onBossUpdate(boss));
     }
 
     public void onDeath(LivingEntity boss) {
-        if (boss == null) return;
-        if (!mobs.isBoss(boss)) return;
+        if (boss == null || !mobs.isBoss(boss)) return;
 
         tracked.remove(boss.getUniqueId());
-        MainThread.run(plugin, () -> {
+        Bukkit.getScheduler().runTask(plugin, () -> {
             phases.onBossDeath(boss);
             bars.unregisterBoss(boss);
         });

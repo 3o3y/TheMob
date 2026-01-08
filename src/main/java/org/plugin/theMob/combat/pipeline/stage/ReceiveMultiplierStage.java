@@ -7,10 +7,14 @@ public final class ReceiveMultiplierStage implements DamageStage {
 
     @Override
     public void apply(DamageContext ctx) {
+        if (ctx == null) return;
+
         double mult = ctx.receiveMultiplier();
         if (mult == 1.0) return;
+
         double dmg = ctx.damage() * mult;
-        if (dmg < 0) dmg = 0;
+        if (dmg < 0.0) dmg = 0.0;
+
         ctx.setDamage(dmg);
     }
 }

@@ -13,5 +13,7 @@ public final class AggressiveBehavior implements BossBehavior {
 
     @Override
     public void tick(LivingEntity boss, BossPhase phase) {
+        if (boss == null || phase == null) return;
+        // intentionally empty (baseline aggressive behavior)
     }
 }

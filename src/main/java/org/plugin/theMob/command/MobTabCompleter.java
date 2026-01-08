@@ -9,6 +9,7 @@ import org.plugin.theMob.mob.MobManager;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 public final class MobTabCompleter implements TabCompleter {
 
@@ -127,7 +128,10 @@ public final class MobTabCompleter implements TabCompleter {
 
         if (isDel(args, "randomworld")) {
             if (args.length == 3) {
-                return Bukkit.getWorlds().stream().map(w -> w.getName()).toList();
+                return Bukkit.getWorlds()
+                        .stream()
+                        .map(w -> w.getName())
+                        .collect(Collectors.toList());
             }
             if (args.length == 4) return mobIds(args[3]);
         }
@@ -155,7 +159,7 @@ public final class MobTabCompleter implements TabCompleter {
         return mobs.registeredIds().stream()
                 .filter(id -> id.startsWith(p))
                 .sorted()
-                .toList();
+                .collect(Collectors.toList());
     }
 
     private List<String> onlinePlayers(String prefix) {

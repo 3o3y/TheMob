@@ -13,7 +13,6 @@ public final class MobMultiplierService {
 
     private final Plugin plugin;
 
-    // Tries a few common PDC keys for mob-id
     private final NamespacedKey keyA;
     private final NamespacedKey keyB;
     private final NamespacedKey keyC;
@@ -27,48 +26,50 @@ public final class MobMultiplierService {
 
     public String resolveMobId(LivingEntity e) {
         if (e == null) return null;
+
         PersistentDataContainer pdc = e.getPersistentDataContainer();
 
-        String id = getString(pdc, keyA);
-        if (id == null) id = getString(pdc, keyB);
-        if (id == null) id = getString(pdc, keyC);
+        String id = read(pdc, keyA);
+        if (id == null) id = read(pdc, keyB);
+        if (id == null) id = read(pdc, keyC);
 
-        return (id == null || id.isBlank()) ? null : id.trim();
+        if (id == null) return null;
+
+        id = id.trim();
+        return id.isEmpty() ? null : id.toLowerCase(Locale.ROOT);
     }
 
     public double multiplierFor(LivingEntity target, ConfigurationSection combatCfg) {
-        if (target == null) return 1.0;
+        if (target == null || combatCfg == null) return 1.0;
 
-        // 1) Mob-ID
-        String mobId = resolveMobId(target);
-        if (mobId != null && combatCfg != null) {
-            ConfigurationSection mob = combatCfg.getConfigurationSection("mob_multipliers");
-            if (mob != null) {
-                double v = mob.getDouble(mobId, Double.NaN);
-                if (!Double.isNaN(v)) return v;
-                // also try lowercase
-                v = mob.getDouble(mobId.toLowerCase(Locale.ROOT), Double.NaN);
-                if (!Double.isNaN(v)) return v;
+        ConfigurationSection mobSection = combatCfg.getConfigurationSection("mob_multipliers");
+        if (mobSection != null) {
+            String mobId = resolveMobId(target);
+            if (mobId != null) {
+                double v = mobSection.getDouble(mobId, Double.NaN);
+                if (!Double.isNaN(v)) return clamp(v);
             }
         }
 
-        // 2) EntityType fallback
-        if (combatCfg != null) {
-            ConfigurationSection types = combatCfg.getConfigurationSection("entitytype_multipliers");
-            if (types != null) {
-                String type = target.getType().name().toLowerCase(Locale.ROOT);
-                double v = types.getDouble(type, Double.NaN);
-                if (!Double.isNaN(v)) return v;
-            }
+        ConfigurationSection typeSection = combatCfg.getConfigurationSection("entitytype_multipliers");
+        if (typeSection != null) {
+            String type = target.getType().name().toLowerCase(Locale.ROOT);
+            double v = typeSection.getDouble(type, Double.NaN);
+            if (!Double.isNaN(v)) return clamp(v);
         }
 
         return 1.0;
     }
 
-    private String getString(PersistentDataContainer pdc, NamespacedKey key) {
-        if (pdc.has(key, PersistentDataType.STRING)) {
-            return pdc.get(key, PersistentDataType.STRING);
-        }
-        return null;
+    private String read(PersistentDataContainer pdc, NamespacedKey key) {
+        return pdc.has(key, PersistentDataType.STRING)
+                ? pdc.get(key, PersistentDataType.STRING)
+                : null;
+    }
+
+    private double clamp(double v) {
+        if (v < 0.05) return 0.05;
+        if (v > 50.0) return 50.0;
+        return v;
     }
 }

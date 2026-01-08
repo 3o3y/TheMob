@@ -30,6 +30,7 @@ public final class BossBarService implements Listener {
     private final MobManager mobs;
     private final PlayerBarCoordinator playerBars;
 
+    // MAIN THREAD ONLY
     private final Map<UUID, LivingEntity> bosses = new HashMap<>();
     private final Map<UUID, UUID> playerBoss = new HashMap<>();
     private final Set<UUID> dirty = new HashSet<>();
@@ -85,7 +86,7 @@ public final class BossBarService implements Listener {
         if (boss == null || !mobs.isBoss(boss)) return;
         if (isFollowPlayerMob(boss)) return;
 
-        bosses.put(boss.getUniqueId(), boss);
+        bosses.putIfAbsent(boss.getUniqueId(), boss);
         dirty.add(boss.getUniqueId());
     }
 
@@ -116,7 +117,7 @@ public final class BossBarService implements Listener {
                 if (!mobs.isBoss(le)) continue;
                 if (isFollowPlayerMob(le)) continue;
 
-                bosses.put(le.getUniqueId(), le);
+                bosses.putIfAbsent(le.getUniqueId(), le);
                 dirty.add(le.getUniqueId());
             }
         }
@@ -128,7 +129,7 @@ public final class BossBarService implements Listener {
     }
 
     // =====================================================
-    // TICK (FIXED)
+    // TICK
     // =====================================================
     private void tick() {
 
@@ -139,7 +140,7 @@ public final class BossBarService implements Listener {
 
             if (b == null || !b.isValid() || b.isDead()) {
                 UUID id = entry.getKey();
-                it.remove();                 // ✅ legal
+                it.remove();
                 dirty.remove(id);
                 phaseTitle.remove(id);
             }
@@ -148,8 +149,6 @@ public final class BossBarService implements Listener {
         for (Player p : Bukkit.getOnlinePlayers()) {
             updatePlayer(p);
         }
-
-        dirty.clear();
     }
 
     // =====================================================
@@ -177,12 +176,13 @@ public final class BossBarService implements Listener {
 
         UUID nid = nearest.getUniqueId();
         if (current != null && current.equals(nid)) {
-            if (dirty.contains(nid)) updateBar(p, nearest);
+            if (dirty.remove(nid)) updateBar(p, nearest);
             return;
         }
 
         playerBoss.put(pid, nid);
         showBar(p, nearest);
+        dirty.remove(nid);
     }
 
     private void showBar(Player p, LivingEntity boss) {
@@ -238,6 +238,8 @@ public final class BossBarService implements Listener {
     // HELPERS
     // =====================================================
     private boolean isFollowPlayerMob(LivingEntity mob) {
+        if (mobs.getAutoSpawnManager() == null) return false;
+
         String spawnId = mob.getPersistentDataContainer()
                 .get(mobs.keys().AUTO_SPAWN_ID, PersistentDataType.STRING);
 

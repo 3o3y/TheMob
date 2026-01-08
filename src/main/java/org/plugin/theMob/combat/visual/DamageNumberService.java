@@ -15,8 +15,10 @@ import org.joml.Vector3f;
 
 public final class DamageNumberService {
 
-    private static final int LIFETIME_TICKS = 14;
-    private static final Vector FLOAT_VELOCITY = new Vector(0, 0.03, 0);
+    private static final int LIFETIME_TICKS = 16;
+
+    // etwas schneller -> besser sichtbar
+    private static final Vector FLOAT_VELOCITY = new Vector(0, 0.045, 0);
 
     private DamageNumberService() {}
 
@@ -26,10 +28,16 @@ public final class DamageNumberService {
             double damage,
             boolean crit
     ) {
+        if (plugin == null || !plugin.isEnabled()) return;
         if (target == null || !target.isValid()) return;
 
         World world = target.getWorld();
-        Location loc = target.getLocation().add(0, target.getHeight() + 0.4, 0);
+
+        Location loc = target.getLocation().add(
+                0,
+                Math.max(0.8, target.getHeight() * 0.85),
+                0
+        );
 
         TextDisplay text = world.spawn(loc, TextDisplay.class, td -> {
             td.setText(format(damage, crit));
@@ -37,10 +45,13 @@ public final class DamageNumberService {
             td.setShadowed(true);
             td.setSeeThrough(true);
             td.setBackgroundColor(Color.fromARGB(0, 0, 0, 0));
-            td.setLineWidth(200);
+
+            // WICHTIG: kleinere LineWidth = größere Glyphs
+            td.setLineWidth(80);
             td.setTextOpacity((byte) 255);
 
-            float scale = crit ? 1.7f : 1.2f;
+            // 🔥 REAL SCALE FIX
+            float scale = crit ? 2.4f : 1.8f;
 
             td.setTransformation(new Transformation(
                     new Vector3f(0f, 0f, 0f),
@@ -55,11 +66,11 @@ public final class DamageNumberService {
         }
 
         new BukkitRunnable() {
-            int ticks = 0;
+            int ticks;
 
             @Override
             public void run() {
-                if (!text.isValid() || ticks++ > LIFETIME_TICKS) {
+                if (!text.isValid() || ticks++ >= LIFETIME_TICKS) {
                     text.remove();
                     cancel();
                     return;

@@ -4,118 +4,77 @@ import org.bukkit.plugin.Plugin;
 
 import java.io.File;
 import java.sql.*;
-import java.util.Map;
+import java.util.HashSet;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 
 public final class SqliteBossCooldownStore implements BossCooldownStore {
 
-    private final Plugin plugin;
     private final File dbFile;
-
     private Connection conn;
-    private final Map<String, Long> cache = new ConcurrentHashMap<>();
 
     public SqliteBossCooldownStore(Plugin plugin) {
-        this.plugin = plugin;
-        this.dbFile = new File(plugin.getDataFolder(), "themob.db");
+        this.dbFile = new File(plugin.getDataFolder(), "boss-cooldowns.db");
     }
 
     @Override
     public void load() {
-        cache.clear();
         try {
-            ensureOpen();
-            ensureSchema();
-
-            try (PreparedStatement ps =
-                         conn.prepareStatement("SELECT boss_id, next_spawn FROM themob_boss_cooldowns")) {
-
-                try (ResultSet rs = ps.executeQuery()) {
-                    while (rs.next()) {
-                        cache.put(rs.getString("boss_id"), rs.getLong("next_spawn"));
-                    }
-                }
+            conn = DriverManager.getConnection("jdbc:sqlite:" + dbFile.getAbsolutePath());
+            try (Statement st = conn.createStatement()) {
+                st.executeUpdate("""
+                    CREATE TABLE IF NOT EXISTS cooldowns (
+                        boss_id TEXT PRIMARY KEY,
+                        next_spawn INTEGER
+                    )
+                """);
             }
-        } catch (Exception e) {
-            plugin.getLogger().warning("[TheMob] Failed to load boss cooldowns (sqlite): " + e.getMessage());
-        }
+        } catch (SQLException ignored) {}
     }
 
     @Override
     public void save() {
-        // no-op: sqlite writes immediately on set
+        // sqlite auto-commit, nothing required
     }
 
     @Override
     public long getNextSpawnEpochSeconds(String bossId) {
-        return cache.getOrDefault(bossId, 0L);
+        try (PreparedStatement ps = conn.prepareStatement(
+                "SELECT next_spawn FROM cooldowns WHERE boss_id = ?"
+        )) {
+            ps.setString(1, bossId);
+            ResultSet rs = ps.executeQuery();
+            if (rs.next()) return rs.getLong(1);
+        } catch (SQLException ignored) {}
+        return 0L;
     }
 
     @Override
     public void setNextSpawnEpochSeconds(String bossId, long epochSeconds) {
-        if (bossId == null || bossId.isBlank()) return;
-
-        try {
-            ensureOpen();
-            ensureSchema();
-
-            if (epochSeconds <= 0) {
-                cache.remove(bossId);
-                try (PreparedStatement ps =
-                             conn.prepareStatement("DELETE FROM themob_boss_cooldowns WHERE boss_id=?")) {
-                    ps.setString(1, bossId);
-                    ps.executeUpdate();
-                }
-                return;
-            }
-
-            cache.put(bossId, epochSeconds);
-
-            try (PreparedStatement ps = conn.prepareStatement(
-                    "INSERT INTO themob_boss_cooldowns (boss_id, next_spawn) VALUES (?, ?) " +
-                            "ON CONFLICT(boss_id) DO UPDATE SET next_spawn=excluded.next_spawn"
-            )) {
-                ps.setString(1, bossId);
-                ps.setLong(2, epochSeconds);
-                ps.executeUpdate();
-            }
-
-        } catch (Exception e) {
-            plugin.getLogger().warning("[TheMob] Failed to set boss cooldown (sqlite): " + e.getMessage());
-        }
+        try (PreparedStatement ps = conn.prepareStatement(
+                "INSERT INTO cooldowns (boss_id, next_spawn) VALUES (?, ?) " +
+                        "ON CONFLICT(boss_id) DO UPDATE SET next_spawn = excluded.next_spawn"
+        )) {
+            ps.setString(1, bossId);
+            ps.setLong(2, epochSeconds);
+            ps.executeUpdate();
+        } catch (SQLException ignored) {}
     }
 
     @Override
     public Set<String> getAllBossIds() {
-        return Set.copyOf(cache.keySet());
-    }
-
-    private void ensureOpen() throws SQLException {
-        if (conn != null && !conn.isClosed()) return;
-
-        String url = "jdbc:sqlite:" + dbFile.getAbsolutePath();
-        conn = DriverManager.getConnection(url);
-        conn.setAutoCommit(true);
-    }
-
-    private void ensureSchema() throws SQLException {
+        Set<String> out = new HashSet<>();
         try (Statement st = conn.createStatement()) {
-            st.executeUpdate(
-                    "CREATE TABLE IF NOT EXISTS themob_boss_cooldowns (" +
-                            "boss_id TEXT PRIMARY KEY," +
-                            "next_spawn INTEGER NOT NULL" +
-                            ")"
-            );
-        }
+            ResultSet rs = st.executeQuery("SELECT boss_id FROM cooldowns");
+            while (rs.next()) out.add(rs.getString(1));
+        } catch (SQLException ignored) {}
+        return out;
     }
 
     @Override
     public void close() {
-        try {
-            if (conn != null) conn.close();
-        } catch (Exception ignored) {}
-        conn = null;
-        cache.clear();
+        if (conn != null) {
+            try { conn.close(); } catch (SQLException ignored) {}
+            conn = null;
+        }
     }
 }

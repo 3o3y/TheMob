@@ -6,10 +6,13 @@ import org.bukkit.entity.*;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
-import org.bukkit.inventory.ItemStack;
-import org.bukkit.plugin.Plugin;
 import org.plugin.theMob.TheMob;
 import org.plugin.theMob.combat.visual.DamageNumberService;
+import org.plugin.theMob.item.CustomEnchantSystem;
+import org.plugin.theMob.player.stats.PlayerStatCache;
+import org.plugin.theMob.progression.PlayerProgressionManager;
+import org.plugin.theMob.progression.PlayerProgressionState;
+import org.plugin.theMob.progression.ProgressionCombatApplier;
 
 import java.util.Map;
 
@@ -18,26 +21,30 @@ public final class CombatListener implements Listener {
     private final TheMob plugin;
     private final DamageCalculator calc;
     private final CombatDebugService debug;
-    private final org.plugin.theMob.player.stats.PlayerStatCache cache;
-    private final org.plugin.theMob.item.CustomEnchantSystem enchants;
+    private final PlayerStatCache cache;
+    private final CustomEnchantSystem enchants;
+
+    private final PlayerProgressionManager progression;
+    private final ProgressionCombatApplier progressionCombat;
 
     public CombatListener(
             TheMob plugin,
-            org.plugin.theMob.player.stats.PlayerStatCache cache,
+            PlayerStatCache cache,
             DamageCalculator calc,
             CombatDebugService debug,
-            org.plugin.theMob.item.CustomEnchantSystem enchants
+            CustomEnchantSystem enchants,
+            PlayerProgressionManager progression,
+            ProgressionCombatApplier progressionCombat
     ) {
         this.plugin = plugin;
         this.cache = cache;
         this.calc = calc;
         this.debug = debug;
         this.enchants = enchants;
+        this.progression = progression;
+        this.progressionCombat = progressionCombat;
     }
 
-    // =====================================================
-    // DAMAGE EVENT
-    // =====================================================
     @EventHandler(ignoreCancelled = true)
     public void onDamage(EntityDamageByEntityEvent e) {
 
@@ -46,24 +53,35 @@ public final class CombatListener implements Listener {
 
         if (!(e.getEntity() instanceof LivingEntity target)) return;
 
-        String gm = attacker.getGameMode().name();
-        if (gm.contains("CREATIVE") || gm.contains("SPECTATOR")) return;
+        if (attacker.getGameMode() == org.bukkit.GameMode.CREATIVE
+                || attacker.getGameMode() == org.bukkit.GameMode.SPECTATOR) return;
 
         Map<String, Double> stats = cache.get(attacker);
         ConfigurationSection combatCfg =
                 plugin.getConfig().getConfigurationSection("combat");
 
-        double vanillaBase = vanillaWeaponBase(attacker);
+        // ✅ USE REAL VANILLA DAMAGE
+        double vanillaDamage = e.getDamage();
 
         DamageResult r = calc.calculate(
                 attacker,
                 target,
-                vanillaBase,
+                vanillaDamage,
                 stats,
                 combatCfg
         );
 
-        e.setDamage(r.finalDamage());
+        double finalDamage = r.finalDamage();
+
+        // ---------- v1.9 Progression ----------
+        if (progression != null && progressionCombat != null) {
+            PlayerProgressionState state = progression.get(attacker.getUniqueId());
+            if (state != null) {
+                finalDamage = progressionCombat.applyDamage(state, finalDamage);
+            }
+        }
+
+        e.setDamage(finalDamage);
 
         boolean showNumbers =
                 combatCfg == null || combatCfg.getBoolean("damage-indicator", true);
@@ -72,88 +90,31 @@ public final class CombatListener implements Listener {
             DamageNumberService.spawn(
                     plugin,
                     target,
-                    r.finalDamage(),
+                    finalDamage,
                     r.crit()
             );
         }
 
         if (r.lifestealAmount() > 0) {
-            Bukkit.getScheduler().runTask(plugin,
-                    () -> heal(attacker, r.lifestealAmount()));
+            Bukkit.getScheduler().runTask(
+                    plugin,
+                    () -> heal(attacker, r.lifestealAmount())
+            );
         }
 
         if (enchants != null) {
-            enchants.trigger(attacker, target, stats, r.finalDamage());
+            enchants.trigger(attacker, target, stats, finalDamage);
         }
 
-        if (debug != null && debug.isEnabled(attacker)) {
+        if (debug != null) {
             debug.send(attacker, r);
         }
     }
 
     // =====================================================
-    // VANILLA WEAPON BASE (V1.5.1)
-    // =====================================================
-    private double vanillaWeaponBase(Player p) {
-        ItemStack it = p.getInventory().getItemInMainHand();
-
-        if (it == null || it.getType().isAir()) {
-            return 1.0;
-        }
-
-        return switch (it.getType()) {
-
-            // SWORDS
-            case WOODEN_SWORD -> 4.0;
-            case STONE_SWORD -> 5.0;
-            case IRON_SWORD -> 6.0;
-            case GOLDEN_SWORD -> 4.0;
-            case DIAMOND_SWORD -> 7.0;
-            case NETHERITE_SWORD -> 8.0;
-
-            // AXES
-            case WOODEN_AXE -> 7.0;
-            case STONE_AXE -> 9.0;
-            case IRON_AXE -> 9.0;
-            case GOLDEN_AXE -> 7.0;
-            case DIAMOND_AXE -> 9.0;
-            case NETHERITE_AXE -> 10.0;
-
-            // PICKAXES
-            case WOODEN_PICKAXE -> 2.0;
-            case STONE_PICKAXE -> 3.0;
-            case IRON_PICKAXE -> 4.0;
-            case GOLDEN_PICKAXE -> 2.0;
-            case DIAMOND_PICKAXE -> 5.0;
-            case NETHERITE_PICKAXE -> 6.0;
-
-            // SHOVELS
-            case WOODEN_SHOVEL -> 2.5;
-            case STONE_SHOVEL -> 3.5;
-            case IRON_SHOVEL -> 4.5;
-            case GOLDEN_SHOVEL -> 2.5;
-            case DIAMOND_SHOVEL -> 5.5;
-            case NETHERITE_SHOVEL -> 6.5;
-
-            // HOES
-            case WOODEN_HOE -> 1.5;
-            case STONE_HOE -> 2.0;
-            case IRON_HOE -> 2.5;
-            case GOLDEN_HOE -> 1.5;
-            case DIAMOND_HOE -> 3.0;
-            case NETHERITE_HOE -> 4.0;
-
-            // SPECIAL
-            case TRIDENT -> 8.0;
-            case MACE -> 7.0;
-
-            default -> 1.0;
-        };
-    }
-
-    // =====================================================
     // HELPERS
     // =====================================================
+
     private void heal(Player p, double amount) {
         if (p == null || amount <= 0) return;
         p.setHealth(Math.min(p.getMaxHealth(), p.getHealth() + amount));

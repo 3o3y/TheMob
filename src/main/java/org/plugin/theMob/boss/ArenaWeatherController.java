@@ -1,6 +1,7 @@
 package org.plugin.theMob.boss;
 
-import org.bukkit.*;
+import org.bukkit.Bukkit;
+import org.bukkit.WeatherType;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -16,24 +17,37 @@ import java.util.UUID;
 public final class ArenaWeatherController implements Listener {
 
     private final Plugin plugin;
+    // MAIN THREAD ONLY
     private final Set<UUID> affectedPlayers = new HashSet<>();
 
     public ArenaWeatherController(Plugin plugin) {
         this.plugin = plugin;
+        Bukkit.getPluginManager().registerEvents(this, plugin);
     }
 
+    // =====================================================
+    // APPLY / RESET
+    // =====================================================
+
     public void applyToPlayer(Player p, String weather, String time) {
+        if (p == null || !p.isOnline()) return;
+
         if (weather != null) {
             switch (weather.toUpperCase()) {
                 case "CLEAR" -> p.setPlayerWeather(WeatherType.CLEAR);
                 case "RAIN", "THUNDER" -> p.setPlayerWeather(WeatherType.DOWNFALL);
+                case "NONE" -> p.resetPlayerWeather();
             }
         }
 
         if (time != null) {
             switch (time.toUpperCase()) {
                 case "DAY" -> p.setPlayerTime(1000, false);
+                case "NOON" -> p.setPlayerTime(6000, false);
+                case "SUNSET" -> p.setPlayerTime(12000, false);
                 case "NIGHT" -> p.setPlayerTime(13000, false);
+                case "MIDNIGHT" -> p.setPlayerTime(18000, false);
+                case "NONE" -> p.resetPlayerTime();
             }
         }
 
@@ -41,10 +55,15 @@ public final class ArenaWeatherController implements Listener {
     }
 
     public void reset(Player p) {
+        if (p == null) return;
         p.resetPlayerWeather();
         p.resetPlayerTime();
         affectedPlayers.remove(p.getUniqueId());
     }
+
+    // =====================================================
+    // EVENTS
+    // =====================================================
 
     @EventHandler
     public void onQuit(PlayerQuitEvent e) {
@@ -58,29 +77,31 @@ public final class ArenaWeatherController implements Listener {
 
     @EventHandler
     public void onMove(PlayerMoveEvent e) {
-        if (!affectedPlayers.contains(e.getPlayer().getUniqueId())) return;
-
+        Player p = e.getPlayer();
+        if (!affectedPlayers.contains(p.getUniqueId())) return;
+        if (e.getTo() == null) return;
         if (e.getFrom().getChunk().equals(e.getTo().getChunk())) return;
 
-        // Arena-Check muss von außen kommen (Radius / Hot-Cold)
-        if (!isInArena(e.getPlayer())) {
-            reset(e.getPlayer());
+        if (!isInArena(p)) {
+            reset(p);
         }
     }
 
     // =====================================================
-    // PLACEHOLDER – bindest du an Hot/Cold Logic
+    // ARENA CHECK (BIND HERE)
     // =====================================================
+
     private boolean isInArena(Player p) {
-        // 👉 hier deine ArenaRadiusChunks / SpawnController Logik
+        // hook into your arena / spawn / hot-cold logic
         return true;
     }
 
     // =====================================================
     // HARD RESET (reload)
     // =====================================================
+
     public void resetAll() {
-        for (UUID id : affectedPlayers) {
+        for (UUID id : new HashSet<>(affectedPlayers)) {
             Player p = Bukkit.getPlayer(id);
             if (p != null) reset(p);
         }

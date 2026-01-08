@@ -10,9 +10,17 @@ public final class BossPhaseResolver {
 
     public BossPhase resolve(LivingEntity boss, BossTemplate tpl) {
         if (boss == null || tpl == null) return null;
+        if (!boss.isValid() || boss.isDead()) return null;
+
         AttributeInstance maxAttr = boss.getAttribute(Attribute.MAX_HEALTH);
-        if (maxAttr == null || maxAttr.getValue() <= 0) return null;
-        double hpPercent = (boss.getHealth() / maxAttr.getValue()) * 100.0;
+        if (maxAttr == null) return null;
+
+        double max = maxAttr.getValue();
+        if (max <= 0.0) return null;
+
+        double hp = Math.max(0.0, boss.getHealth());
+        double hpPercent = (hp / max) * 100.0;
+
         return tpl.findPhase(hpPercent);
     }
 }

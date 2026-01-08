@@ -1,6 +1,5 @@
 package org.plugin.theMob.command;
 
-import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -21,14 +20,14 @@ public final class MobCommand implements CommandExecutor {
     private final MobManager mobs;
     private final SpawnController spawns;
     private final MobDiagCommand diag;
-
+    private final TheMobDebugCommand debug;
 
     public MobCommand(TheMob plugin, MobManager mobs, SpawnController spawns) {
         this.plugin = plugin;
         this.mobs = mobs;
         this.spawns = spawns;
         this.diag = new MobDiagCommand(plugin.automation());
-
+        this.debug = new TheMobDebugCommand(plugin, mobs, spawns);
     }
 
     @Override
@@ -40,7 +39,7 @@ public final class MobCommand implements CommandExecutor {
         }
 
         if (args[0].equalsIgnoreCase("debug")) {
-            new TheMobDebugCommand(plugin.automation()).execute(sender);
+            debug.execute(sender);
             return true;
         }
 
@@ -65,11 +64,10 @@ public final class MobCommand implements CommandExecutor {
             return true;
         }
 
-        if (args.length >= 1 && args[0].equalsIgnoreCase("diag")) {
+        if (args[0].equalsIgnoreCase("diag")) {
             diag.execute(sender, args);
             return true;
         }
-
 
         // -------------------------------------------------
         // /mob reload
@@ -118,7 +116,6 @@ public final class MobCommand implements CommandExecutor {
 
         // -------------------------------------------------
         // LEGACY: /mob autospawn <id> <seconds> <maxSpawns>
-        // alias to: /mob set autospawn ...
         // -------------------------------------------------
         if (args[0].equalsIgnoreCase("autospawn")) {
             if (!(sender instanceof Player p)) {
@@ -450,12 +447,11 @@ public final class MobCommand implements CommandExecutor {
             }
 
             mobs.killAll();
-            spawns.getAutoSpawnManager().onKillAll(); // 🔥 WICHTIG
+            spawns.getAutoSpawnManager().onKillAll();
 
             sender.sendMessage("§aAll custom mobs have been removed.");
             return true;
         }
-
 
         help(sender);
         return true;
@@ -499,5 +495,4 @@ public final class MobCommand implements CommandExecutor {
         if (start >= args.length) return "";
         return String.join(" ", Arrays.copyOfRange(args, start, args.length));
     }
-
 }

@@ -14,7 +14,6 @@ import org.plugin.theMob.boss.phase.BossPhaseController;
 import org.plugin.theMob.boss.phase.BossPhaseResolver;
 import org.plugin.theMob.combat.CombatBootstrap;
 import org.plugin.theMob.control.AutomationScalingSystem;
-import org.plugin.theMob.control.command.TheMobDebugCommand;
 import org.plugin.theMob.item.CustomEnchantSystem;
 import org.plugin.theMob.item.ItemBuilderFromConfig;
 import org.plugin.theMob.item.ItemLoreRenderer;
@@ -41,6 +40,9 @@ import org.plugin.theMob.player.stats.menu.StatsMenuService;
 import org.plugin.theMob.spawn.SpawnController;
 import org.plugin.theMob.ui.MobHealthDisplay;
 
+import org.plugin.theMob.progression.ProgressionBootstrap;
+import org.plugin.theMob.progression.ProgressionV19Bootstrap;
+
 import java.util.Iterator;
 
 import static org.plugin.theMob.hud.NaviHudService.HUD_KEY;
@@ -52,13 +54,11 @@ public final class TheMob extends JavaPlugin {
     private KeyRegistry keys;
     private TickScheduler ticks;
 
-
     // Mobs
     private MobManager mobManager;
     private MobHealthDisplay healthDisplay;
     private MobDropEngine dropEngine;
     private MobAIService mobAI;
-
 
     // Spawn
     private AutoSpawnManager autoSpawnManager;
@@ -89,19 +89,21 @@ public final class TheMob extends JavaPlugin {
     // v1.7 Automation & Scaling
     private AutomationScalingSystem automationScaling;
 
+    // v1.9 Progression (ADD ONLY)
+    private ProgressionBootstrap progressionBootstrap;
+    private ProgressionV19Bootstrap progressionV19;
 
     @Override
     public void onEnable() {
         saveDefaultConfig();
         cleanupStaleHudBars();
-
         boot(true);
-
         getLogger().info("[TheMob] Enabled.");
     }
 
     @Override
     public void onDisable() {
+        cleanupStaleHudBars(); // extra safety for crashy reloads
         hardShutdown();
         getLogger().info("[TheMob] Disabled cleanly.");
     }
@@ -141,12 +143,16 @@ public final class TheMob extends JavaPlugin {
             keys = new KeyRegistry(this);
         }
 
+        // ✅ reload-safe: never leave old scheduled tasks running
+        if (ticks != null) {
+            try { ticks.shutdown(); } catch (Throwable ignored) {}
+            ticks = null;
+        }
         ticks = new TickScheduler(this);
 
         // ---------- Mob AI ----------
         mobAI = new MobAIService();
         ticks.syncRepeating(mobAI::tick, 1L, 1L);
-
 
         // ---------- Mob Manager ----------
         mobManager = new MobManager(this, configService, keys);
@@ -178,7 +184,6 @@ public final class TheMob extends JavaPlugin {
         Bukkit.getPluginManager().registerEvents(bossBars, this);
 
         phaseController = new BossPhaseController(resolver, bossActionEngine, bossBars);
-
         behaviorController = new BossBehaviorController(this, mobManager, phaseController);
 
         // ---------- Spawn Service ----------
@@ -191,7 +196,6 @@ public final class TheMob extends JavaPlugin {
                 phaseController,
                 mobAI
         );
-
         mobManager.setSpawnService(spawnService);
 
         // ---------- Auto Spawn ----------
@@ -216,7 +220,8 @@ public final class TheMob extends JavaPlugin {
             hud.start();
             Bukkit.getPluginManager().registerEvents(new NaviHudListener(hud), this);
         }
-// ---------- v1.7 Automation & Scaling ----------
+
+        // ---------- v1.7 Automation & Scaling ----------
         automationScaling = new AutomationScalingSystem(this);
         automationScaling.reload(getConfig());
         automationScaling.register();
@@ -229,12 +234,15 @@ public final class TheMob extends JavaPlugin {
         combat = new CombatBootstrap(this);
         combat.enable(playerStatCache, customEnchants);
 
-// ---------- Spawn feedback (v1.8 UX fix) ----------
+        // ---------- v1.9 Progression (ADD ONLY) ----------
+        progressionBootstrap = new ProgressionBootstrap(this);
+        progressionV19 = new ProgressionV19Bootstrap(this);
+
+        // ---------- Spawn feedback (v1.8 UX fix) ----------
         new org.plugin.theMob.control.feedback.SpawnBlockFeedbackService(
                 this,
                 automationScaling
         ).start();
-
 
         // ---------- Listeners + Commands ----------
         registerAllListeners();
@@ -261,11 +269,13 @@ public final class TheMob extends JavaPlugin {
     private void hardShutdown() {
         try {
 
+            progressionV19 = null;
+            progressionBootstrap = null;
+
             if (automationScaling != null) {
                 automationScaling.shutdown();
                 automationScaling = null;
             }
-
 
             if (spawnController != null) {
                 spawnController.stop();
@@ -281,6 +291,7 @@ public final class TheMob extends JavaPlugin {
                 autoSpawnManager.stop();
                 autoSpawnManager = null;
             }
+
             if (mobAI != null) {
                 mobAI.clearAll();
                 mobAI = null;
@@ -316,7 +327,6 @@ public final class TheMob extends JavaPlugin {
                 ticks = null;
             }
 
-
         } catch (Throwable t) {
             getLogger().severe("[TheMob] HARD SHUTDOWN FAILED");
             t.printStackTrace();
@@ -345,7 +355,7 @@ public final class TheMob extends JavaPlugin {
                         autoSpawnManager,
                         mobAI
                 ),
-        this
+                this
         );
 
         Bukkit.getPluginManager().registerEvents(
@@ -379,14 +389,12 @@ public final class TheMob extends JavaPlugin {
     public KeyRegistry keys() { return keys; }
     public ItemStatReader itemStats() { return itemStatReader; }
     public BossPhaseController bossPhases() { return phaseController; }
-    public AutomationScalingSystem automation() {
-        return automationScaling;
-    }
-
+    public AutomationScalingSystem automation() { return automationScaling; }
 
     // =====================================================
     // HELPERS
     // =====================================================
+    @SuppressWarnings("unused")
     private Player findNearestPlayer(Location loc, double radius) {
         if (loc == null || loc.getWorld() == null) return null;
 

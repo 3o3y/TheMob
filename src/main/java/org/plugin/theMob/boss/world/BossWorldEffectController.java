@@ -1,6 +1,7 @@
 package org.plugin.theMob.boss.world;
 
-import org.bukkit.*;
+import org.bukkit.Bukkit;
+import org.bukkit.WeatherType;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 
@@ -10,8 +11,9 @@ import java.util.UUID;
 
 public final class BossWorldEffectController {
 
+    // MAIN THREAD ONLY
     private LivingEntity activeBoss;
-    private double radius;
+    private double radiusSq;
 
     private String weather;
     private String time;
@@ -23,12 +25,14 @@ public final class BossWorldEffectController {
     // =====================================================
 
     public void apply(LivingEntity boss, double radius, String weather, String time) {
+        resetAll();
+
+        if (boss == null || !boss.isValid() || boss.isDead()) return;
+
         this.activeBoss = boss;
-        this.radius = radius;
+        this.radiusSq = Math.max(0.0, radius * radius);
         this.weather = weather;
         this.time = time;
-
-        if (boss == null || !boss.isValid()) return;
 
         for (Player p : boss.getWorld().getPlayers()) {
             if (isInside(p)) applyToPlayer(p);
@@ -40,7 +44,7 @@ public final class BossWorldEffectController {
     // =====================================================
 
     public void tick() {
-        if (activeBoss == null || !activeBoss.isValid()) {
+        if (activeBoss == null || !activeBoss.isValid() || activeBoss.isDead()) {
             resetAll();
             return;
         }
@@ -49,8 +53,11 @@ public final class BossWorldEffectController {
             boolean inside = isInside(p);
             boolean affected = affectedPlayers.contains(p.getUniqueId());
 
-            if (inside && !affected) applyToPlayer(p);
-            else if (!inside && affected) reset(p);
+            if (inside && !affected) {
+                applyToPlayer(p);
+            } else if (!inside && affected) {
+                reset(p);
+            }
         }
     }
 
@@ -66,7 +73,7 @@ public final class BossWorldEffectController {
         affectedPlayers.clear();
 
         activeBoss = null;
-        radius = 0;
+        radiusSq = 0.0;
         weather = null;
         time = null;
     }
@@ -84,7 +91,7 @@ public final class BossWorldEffectController {
     private boolean isInside(Player p) {
         if (p == null || activeBoss == null) return false;
         if (!p.getWorld().equals(activeBoss.getWorld())) return false;
-        return p.getLocation().distanceSquared(activeBoss.getLocation()) <= radius * radius;
+        return p.getLocation().distanceSquared(activeBoss.getLocation()) <= radiusSq;
     }
 
     private void applyToPlayer(Player p) {

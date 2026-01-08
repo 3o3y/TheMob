@@ -12,7 +12,7 @@ public final class MinionRules {
     // Global safety cap (server-wide)
     public static final int MAX_MINIONS_GLOBAL = 200;
 
-    // Disallowed minion entity types (dangerous / weird / boss-class)
+    // Disallowed minion entity types
     private static final Set<EntityType> DISALLOWED = EnumSet.of(
             EntityType.ENDER_DRAGON,
             EntityType.WITHER,
@@ -22,7 +22,8 @@ public final class MinionRules {
 
     public static boolean isAllowed(EntityType type) {
         if (type == null) return false;
-        if (!type.isAlive() || !type.isSpawnable()) return false;
+        if (!type.isAlive()) return false;
+        if (!type.isSpawnable()) return false;
         return !DISALLOWED.contains(type);
     }
 }

@@ -13,6 +13,13 @@ public final class PassiveBehavior implements BossBehavior {
 
     @Override
     public void onEnter(LivingEntity boss, BossPhase phase) {
+        if (boss == null || phase == null || !boss.isValid() || boss.isDead()) return;
         boss.setAI(false);
+    }
+
+    @Override
+    public void onExit(LivingEntity boss, BossPhase phase) {
+        if (boss == null || phase == null || !boss.isValid() || boss.isDead()) return;
+        boss.setAI(true);
     }
 }

@@ -18,7 +18,7 @@ public final class CompassRenderer {
         float deg = (yaw + 180f) % 360f;
         if (deg < 0f) deg += 360f;
 
-        int center = Math.round((deg / 360f) * STEPS) % STEPS;
+        int center = (int) Math.floor((deg / 360f) * STEPS) % STEPS;
         int half = WIDTH / 2;
 
         StringBuilder sb = new StringBuilder(128);
@@ -29,7 +29,8 @@ public final class CompassRenderer {
                 sb.append("§f§l▲");
                 continue;
             }
-            int idx = (center + offset + STEPS) % STEPS;
+            int idx = (center + offset) % STEPS;
+            if (idx < 0) idx += STEPS;
             sb.append(color(offset)).append(RING[idx]);
         }
 

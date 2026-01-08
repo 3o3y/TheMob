@@ -1,5 +1,6 @@
 package org.plugin.theMob.combat;
 
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -15,8 +16,16 @@ public record DamageResult(
         double lifestealAmount,
         Map<String, String> debug
 ) {
+
+    public DamageResult {
+        // defensive copy + immutability
+        debug = debug != null
+                ? Collections.unmodifiableMap(new LinkedHashMap<>(debug))
+                : Collections.emptyMap();
+    }
+
     public static DamageResult empty(double vanillaBase) {
-        double v = Math.max(1.0, vanillaBase);
+        double v = Math.max(0.0, vanillaBase);
         return new DamageResult(
                 v,
                 v,
@@ -27,7 +36,7 @@ public record DamageResult(
                 1.0,
                 v,
                 0.0,
-                new LinkedHashMap<>()
+                Collections.emptyMap()
         );
     }
 }

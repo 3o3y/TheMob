@@ -2,17 +2,31 @@ package org.plugin.theMob.control.command;
 
 import org.bukkit.ChatColor;
 import org.bukkit.command.CommandSender;
+import org.plugin.theMob.TheMob;
 import org.plugin.theMob.control.AutomationScalingSystem;
+import org.plugin.theMob.mob.MobManager;
+import org.plugin.theMob.spawn.SpawnController;
 
 public final class TheMobDebugCommand {
 
     private final AutomationScalingSystem sys;
 
+    // Original
     public TheMobDebugCommand(AutomationScalingSystem sys) {
         this.sys = sys;
     }
 
+    // Compatibility overload
+    public TheMobDebugCommand(TheMob plugin, MobManager mobManager, SpawnController spawnController) {
+        this.sys = plugin == null ? null : plugin.automation();
+    }
+
     public void execute(CommandSender sender) {
+
+        if (sys == null) {
+            sender.sendMessage(ChatColor.RED + "Debug system not available.");
+            return;
+        }
 
         if (!sender.hasPermission("themob.admin")) {
             sender.sendMessage(ChatColor.RED + "No permission.");
@@ -23,7 +37,7 @@ public final class TheMobDebugCommand {
         var tps = sys.tps();
         var throttle = sys.throttling();
 
-        sender.sendMessage(ChatColor.GOLD + "=== TheMob v1.8 – Debug ===");
+        sender.sendMessage(ChatColor.GOLD + "=== TheMob – Debug ===");
 
         sender.sendMessage(ChatColor.YELLOW + "TPS: " +
                 ChatColor.WHITE + String.format("%.2f", tps.tps1m()) +

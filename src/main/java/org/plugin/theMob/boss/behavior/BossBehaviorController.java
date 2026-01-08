@@ -12,7 +12,9 @@ import java.util.Map;
 
 public final class BossBehaviorController {
 
+    // MAIN THREAD ONLY
     private final Map<String, BossBehavior> registry = new HashMap<>();
+    private BukkitRunnable task;
 
     public BossBehaviorController(
             TheMob plugin,
@@ -24,10 +26,11 @@ public final class BossBehaviorController {
         register(new org.plugin.theMob.boss.behavior.core.PassiveBehavior());
         register(new org.plugin.theMob.boss.behavior.core.FleeBehavior());
 
-        new BukkitRunnable() {
+        task = new BukkitRunnable() {
             @Override
             public void run() {
                 for (LivingEntity boss : phases.activeBosses()) {
+                    if (boss == null || !boss.isValid() || boss.isDead()) continue;
                     if (!mobs.isBoss(boss)) continue;
 
                     BossPhase phase = phases.currentPhase(boss);
@@ -43,10 +46,23 @@ public final class BossBehaviorController {
                     }
                 }
             }
-        }.runTaskTimer(plugin, 1L, 10L);
+        };
+        task.runTaskTimer(plugin, 1L, 10L);
+    }
+
+    public void shutdown() {
+        if (task != null) {
+            task.cancel();
+            task = null;
+        }
+        registry.clear();
     }
 
     public void register(BossBehavior behavior) {
-        registry.put(behavior.id().toLowerCase(), behavior);
+        if (behavior == null) return;
+        String id = behavior.id();
+        if (id == null || id.isBlank()) return;
+
+        registry.put(id.toLowerCase(), behavior);
     }
 }

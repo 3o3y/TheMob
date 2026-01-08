@@ -20,11 +20,18 @@ public final class StatsCommand implements CommandExecutor {
     @Override
     public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
         if (!(sender instanceof Player p)) {
-            sender.sendMessage("Only players can use this command.");
+            sender.sendMessage("§cOnly players can use this command.");
             return true;
         }
-        cache.invalidate(p);
-        menu.open(p);
+
+        if (cache != null) {
+            cache.invalidate(p);
+        }
+
+        if (menu != null) {
+            menu.open(p);
+        }
+
         return true;
     }
 }

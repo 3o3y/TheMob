@@ -1,16 +1,21 @@
 package org.plugin.theMob.boss;
 
 import org.bukkit.Location;
+import org.bukkit.NamespacedKey;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
+import org.bukkit.persistence.PersistentDataType;
 
 import java.util.Locale;
 
 public final class Placeholder {
 
-    private Placeholder() {
-        // utility
-    }
+    // ❌ no TheMob.getInstance()
+    // ✅ use fixed namespace instead
+    private static final NamespacedKey BASE_NAME_KEY =
+            new NamespacedKey("themob", "base_name");
+
+    private Placeholder() {}
 
     public static String resolve(
             String input,
@@ -19,30 +24,21 @@ public final class Placeholder {
             Player viewer
     ) {
         if (input == null || input.isEmpty()) return "";
+        if (boss == null || !boss.isValid()) return input;
 
         String out = input;
-        String mobName = null;
 
-        if (boss.getPersistentDataContainer().has(
-                new org.bukkit.NamespacedKey(
-                        org.bukkit.Bukkit.getPluginManager().getPlugins()[0],
-                        "base_name"
-                ),
-                org.bukkit.persistence.PersistentDataType.STRING
-        )) {
-            mobName = boss.getPersistentDataContainer().get(
-                    new org.bukkit.NamespacedKey(
-                            org.bukkit.Bukkit.getPluginManager().getPlugins()[0],
-                            "base_name"
-                    ),
-                    org.bukkit.persistence.PersistentDataType.STRING
-            );
-        }
+        // =====================================================
+        // MOB NAME
+        // =====================================================
+        String mobName = boss.getPersistentDataContainer()
+                .get(BASE_NAME_KEY, PersistentDataType.STRING);
 
         if (mobName == null || mobName.isEmpty()) {
             String raw = boss.getCustomName();
-            if (raw != null) {
-                mobName = raw.replaceAll(" ?❤.*", "");
+            if (raw != null && !raw.isEmpty()) {
+                int heart = raw.indexOf('❤');
+                mobName = (heart > 0 ? raw.substring(0, heart).trim() : raw);
             }
         }
 
@@ -52,20 +48,25 @@ public final class Placeholder {
 
         out = out.replace("{mob_name}", mobName);
 
+        // =====================================================
+        // PHASE
+        // =====================================================
         if (phase != null) {
             out = out.replace("{phase_id}", phase.id());
+            out = out.replace("{phase_title}", phase.title() != null ? phase.title() : "");
         } else {
             out = out.replace("{phase_id}", "none");
-        }
-
-        if (phase != null && phase.title() != null) {
-            out = out.replace("{phase_title}", phase.title());
-        } else {
             out = out.replace("{phase_title}", "");
         }
 
+        // =====================================================
+        // WORLD
+        // =====================================================
         out = out.replace("{world}", boss.getWorld().getName());
 
+        // =====================================================
+        // DISTANCE
+        // =====================================================
         if (viewer != null && viewer.isOnline()) {
             Location pl = viewer.getLocation();
             Location bl = boss.getLocation();
@@ -80,13 +81,16 @@ public final class Placeholder {
             out = out.replace("{distance}", "-");
         }
 
+        // =====================================================
+        // PLAYER
+        // =====================================================
         if (out.contains("{player}")) {
-            String name = (viewer != null ? viewer.getName() : "unknown");
-            out = out.replace("{player}", name);
+            out = out.replace(
+                    "{player}",
+                    viewer != null ? viewer.getName() : "unknown"
+            );
         }
-
 
         return out;
     }
-
 }

@@ -28,9 +28,8 @@ public final class BossCooldownService {
     public void reload(FileConfiguration cfg) {
         enabled = cfg.getBoolean("boss-cooldowns.enabled", true);
 
-        String storage = cfg.getString("boss-cooldowns.storage", "file")
-                .trim()
-                .toLowerCase();
+        String storage = cfg.getString("boss-cooldowns.storage", "file");
+        storage = storage == null ? "file" : storage.trim().toLowerCase();
 
         BossCooldownStore next = switch (storage) {
             case "sqlite" -> new SqliteBossCooldownStore(plugin);
@@ -44,7 +43,6 @@ public final class BossCooldownService {
         store = next;
         store.load();
 
-        // Optional: import predefined cooldowns from config
         if (cfg.isConfigurationSection("boss-cooldowns.data")) {
             for (String bossId : cfg.getConfigurationSection("boss-cooldowns.data").getKeys(false)) {
                 long nextSpawn = cfg.getLong(
@@ -72,7 +70,9 @@ public final class BossCooldownService {
     // SPAWN CHECK
     // =========================
     public boolean canSpawnNow(String bossId) {
-        if (!enabled || bossId == null || bossId.isBlank()) return true;
+        if (!enabled) return true;
+        if (store == null) return true;
+        if (bossId == null || bossId.isBlank()) return true;
 
         long now = Instant.now().getEpochSecond();
         long next = store.getNextSpawnEpochSeconds(bossId);
@@ -84,7 +84,9 @@ public final class BossCooldownService {
     // TIME LEFT
     // =========================
     public long secondsRemaining(String bossId) {
-        if (!enabled || bossId == null || bossId.isBlank()) return 0;
+        if (!enabled) return 0;
+        if (store == null) return 0;
+        if (bossId == null || bossId.isBlank()) return 0;
 
         long now = Instant.now().getEpochSecond();
         long next = store.getNextSpawnEpochSeconds(bossId);
@@ -96,7 +98,9 @@ public final class BossCooldownService {
     // SET COOLDOWN
     // =========================
     public void setCooldownSeconds(String bossId, long cooldownSeconds) {
-        if (!enabled || bossId == null || bossId.isBlank()) return;
+        if (!enabled) return;
+        if (store == null) return;
+        if (bossId == null || bossId.isBlank()) return;
 
         long now = Instant.now().getEpochSecond();
         store.setNextSpawnEpochSeconds(
@@ -110,7 +114,8 @@ public final class BossCooldownService {
     // DIAGNOSTICS SUPPORT
     // =========================
     public Set<String> allBossIds() {
-        if (!enabled || store == null) return Collections.emptySet();
+        if (!enabled) return Collections.emptySet();
+        if (store == null) return Collections.emptySet();
         return store.getAllBossIds();
     }
 

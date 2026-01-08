@@ -33,7 +33,7 @@ public final class BossMinionController implements Listener {
     }
 
     // =====================================================
-    // COUNTS (ANTI-ABUSE)
+    // COUNTS
     // =====================================================
 
     public int countBossMinions(UUID bossId) {
@@ -68,7 +68,6 @@ public final class BossMinionController implements Listener {
                 .computeIfAbsent(phaseId, k -> ConcurrentHashMap.newKeySet())
                 .add(minionId);
 
-        // Mark as minion (no drops / no XP)
         minion.getPersistentDataContainer().set(
                 plugin.keys().NO_DROPS,
                 PersistentDataType.INTEGER,
@@ -129,7 +128,18 @@ public final class BossMinionController implements Listener {
 
     @EventHandler
     public void onMinionDeath(EntityDeathEvent e) {
-        if (e.getEntity() == null) return;
-        unregister(e.getEntity().getUniqueId());
+        LivingEntity entity = e.getEntity();
+        if (entity == null) return;
+        unregister(entity.getUniqueId());
+    }
+
+    // =====================================================
+    // SHUTDOWN
+    // =====================================================
+
+    public void shutdown() {
+        bossToMinions.clear();
+        bossPhaseToMinions.clear();
+        minionToBoss.clear();
     }
 }

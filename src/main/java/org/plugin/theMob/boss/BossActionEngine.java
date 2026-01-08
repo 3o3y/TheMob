@@ -7,17 +7,10 @@ import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
-import org.bukkit.entity.EntityType;
 import org.bukkit.entity.ExperienceOrb;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
-import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
-import org.bukkit.event.player.PlayerChangedWorldEvent;
-import org.bukkit.event.player.PlayerJoinEvent;
-import org.bukkit.event.player.PlayerMoveEvent;
-import org.bukkit.event.player.PlayerQuitEvent;
-import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
@@ -27,54 +20,38 @@ import org.plugin.theMob.boss.minion.BossMinionSpawner;
 import org.plugin.theMob.boss.world.BossWorldEffectController;
 
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 
 public final class BossActionEngine implements Listener {
 
     private final TheMob plugin;
     private final Random rnd = new Random();
 
-    // v1.6 Minions
     private final BossMinionController minionController;
     private final BossMinionSpawner minionSpawner;
-
-    private final Set<UUID> affectedPlayers = ConcurrentHashMap.newKeySet();
-
-    private LivingEntity activeBoss;
-    private double activeRadius = 0.0;
-    private String activeWeather;
-    private String activeTime;
-
     private final BossWorldEffectController worldEffects = new BossWorldEffectController();
 
-    private final Map<UUID, BossSnapshot> bossSnapshots = new ConcurrentHashMap<>();
-    private BukkitRunnable stationTask;
+    private final Map<UUID, BossSnapshot> bossSnapshots = new HashMap<>();
+    private BukkitRunnable tickTask;
 
     public BossActionEngine(TheMob plugin) {
         this.plugin = plugin;
-        Bukkit.getPluginManager().registerEvents(this, plugin);
 
         this.minionController = new BossMinionController(plugin);
         this.minionSpawner = new BossMinionSpawner(plugin, minionController);
 
-        stationTask = new BukkitRunnable() {
+        tickTask = new BukkitRunnable() {
             @Override
             public void run() {
-                tickWeatherStation();
                 worldEffects.tick();
                 cleanupSnapshots();
             }
         };
-        stationTask.runTaskTimer(plugin, 20L, 20L); // every 1s
+        tickTask.runTaskTimer(plugin, 20L, 20L);
     }
 
-    public LivingEntity getActiveBoss() {
-        return activeBoss;
-    }
-
-    public double getActiveBossRadius() {
-        return activeRadius;
-    }
+    // =====================================================
+    // PHASE HOOKS
+    // =====================================================
 
     public void onPhaseEnter(LivingEntity boss, BossPhase phase) {
         if (boss == null || phase == null || !boss.isValid()) return;
@@ -88,10 +65,6 @@ public final class BossActionEngine implements Listener {
         applyEffects(boss, cfg.getConfigurationSection("effects"));
         applyPhysics(boss, cfg.getConfigurationSection("physics"));
 
-        applyWorldStationConfig(boss, cfg.getConfigurationSection("world"));
-
-        ConfigurationSection onEnter = cfg.getConfigurationSection("on-enter");
-        if (onEnter != null) runOnEnterEffects(boss, onEnter);
         ConfigurationSection world = cfg.getConfigurationSection("world");
         if (world != null) {
             worldEffects.apply(
@@ -102,7 +75,9 @@ public final class BossActionEngine implements Listener {
             );
         }
 
-        // v1.6 – Summons (controlled)
+        ConfigurationSection onEnter = cfg.getConfigurationSection("on-enter");
+        if (onEnter != null) runOnEnterEffects(boss, onEnter);
+
         ConfigurationSection actions = cfg.getConfigurationSection("actions");
         if (actions != null) {
             ConfigurationSection summon = actions.getConfigurationSection("summon-minions");
@@ -113,235 +88,68 @@ public final class BossActionEngine implements Listener {
     }
 
     public void onPhaseLeave(LivingEntity boss, BossPhase phase) {
-        if (boss == null || phase == null || !boss.isValid()) return;
-
-        // v1.6 stop repeating summon tasks for that phase
+        if (boss == null || phase == null) return;
         minionSpawner.onPhaseLeave(boss, phase);
     }
 
     public void onBossDeath(LivingEntity boss) {
         worldEffects.resetAll();
-        clearWeatherStation();
 
         if (boss != null) {
-            // v1.6 – hard cleanup minions + stop tasks
             minionSpawner.stopAllForBoss(boss.getUniqueId());
             minionController.cleanupBoss(boss.getUniqueId());
-
-            // 💥 BOSS XP EXPLOSION
             spawnBossXpExplosion(boss);
-
             bossSnapshots.remove(boss.getUniqueId());
         }
     }
 
-
-    private void applyWorldStationConfig(LivingEntity boss, ConfigurationSection cfg) {
-        if (boss == null || !boss.isValid()) return;
-
-        if (cfg == null) {
-            clearWeatherStation();
-            return;
-        }
-
-        this.activeBoss = boss;
-        this.activeRadius = Math.max(0.0, cfg.getDouble("radius", 32.0));
-        this.activeWeather = cfg.getString("weather");
-        this.activeTime = cfg.getString("time");
-
-        for (Player p : boss.getWorld().getPlayers()) {
-            if (isInsideStation(p)) {
-                applyToPlayer(p);
-            } else {
-                if (affectedPlayers.contains(p.getUniqueId())) resetPlayer(p);
-            }
-        }
-    }
-
-    private boolean isInsideStation(Player p) {
-        if (p == null) return false;
-        LivingEntity boss = activeBoss;
-        if (boss == null || !boss.isValid()) return false;
-        if (!Objects.equals(p.getWorld(), boss.getWorld())) return false;
-
-        double r = activeRadius;
-        if (r <= 0) return false;
-
-        return p.getLocation().distanceSquared(boss.getLocation()) <= (r * r);
-    }
-
-    private void applyToPlayer(Player p) {
-        if (p == null) return;
-
-        if (activeWeather != null) {
-            String w = activeWeather.trim().toUpperCase(Locale.ROOT);
-            switch (w) {
-                case "CLEAR" -> p.setPlayerWeather(WeatherType.CLEAR);
-                case "RAIN" -> p.setPlayerWeather(WeatherType.DOWNFALL);
-                case "THUNDER" -> p.setPlayerWeather(WeatherType.DOWNFALL);
-                case "NONE" -> p.resetPlayerWeather();
-            }
-        }
-
-        if (activeTime != null) {
-            String t = activeTime.trim().toUpperCase(Locale.ROOT);
-            switch (t) {
-                case "DAY" -> p.setPlayerTime(1000L, false);
-                case "NOON" -> p.setPlayerTime(6000L, false);
-                case "SUNSET" -> p.setPlayerTime(12000L, false);
-                case "NIGHT" -> p.setPlayerTime(13000L, false);
-                case "MIDNIGHT" -> p.setPlayerTime(18000L, false);
-                case "NONE" -> p.resetPlayerTime();
-            }
-        }
-
-        affectedPlayers.add(p.getUniqueId());
-    }
-
-    private void resetPlayer(Player p) {
-        if (p == null) return;
-        p.resetPlayerWeather();
-        p.resetPlayerTime();
-        affectedPlayers.remove(p.getUniqueId());
-    }
-
-    private void resetAllPlayers() {
-        for (UUID id : new HashSet<>(affectedPlayers)) {
-            Player p = Bukkit.getPlayer(id);
-            if (p != null) resetPlayer(p);
-        }
-        affectedPlayers.clear();
-    }
-
-    private void clearWeatherStation() {
-        resetAllPlayers();
-        activeBoss = null;
-        activeRadius = 0.0;
-        activeWeather = null;
-        activeTime = null;
-    }
-
-    private void tickWeatherStation() {
-        LivingEntity boss = activeBoss;
-        if (boss == null) return;
-
-        if (!boss.isValid()) {
-            clearWeatherStation();
-            return;
-        }
-
-        World w = boss.getWorld();
-        for (Player p : w.getPlayers()) {
-            UUID id = p.getUniqueId();
-            boolean inside = isInsideStation(p);
-
-            if (inside) {
-                if (!affectedPlayers.contains(id)) applyToPlayer(p);
-            } else {
-                if (affectedPlayers.contains(id)) resetPlayer(p);
-            }
-        }
-
-        for (UUID id : new HashSet<>(affectedPlayers)) {
-            Player p = Bukkit.getPlayer(id);
-            if (p == null || !p.isOnline()) affectedPlayers.remove(id);
-        }
-    }
-
-    @EventHandler
-    public void onQuit(PlayerQuitEvent e) {
-        resetPlayer(e.getPlayer());
-    }
-
-    @EventHandler
-    public void onWorldChange(PlayerChangedWorldEvent e) {
-        resetPlayer(e.getPlayer());
-    }
-
-    @EventHandler
-    public void onJoin(PlayerJoinEvent e) {
-        Player p = e.getPlayer();
-        if (isInsideStation(p)) applyToPlayer(p);
-        else resetPlayer(p);
-    }
-
-    @EventHandler
-    public void onMove(PlayerMoveEvent e) {
-        if (activeBoss == null) return;
-
-        if (e.getFrom().getBlockX() == e.getTo().getBlockX()
-                && e.getFrom().getBlockY() == e.getTo().getBlockY()
-                && e.getFrom().getBlockZ() == e.getTo().getBlockZ()) {
-            return;
-        }
-
-        Player p = e.getPlayer();
-        UUID id = p.getUniqueId();
-
-        boolean inside = isInsideStation(p);
-        if (inside) {
-            if (!affectedPlayers.contains(id)) applyToPlayer(p);
-        } else {
-            if (affectedPlayers.contains(id)) resetPlayer(p);
-        }
-    }
+    // =====================================================
+    // SNAPSHOTS
+    // =====================================================
 
     private void ensureSnapshot(LivingEntity boss) {
-        UUID id = boss.getUniqueId();
-        bossSnapshots.computeIfAbsent(id, k -> BossSnapshot.capture(boss));
+        bossSnapshots.computeIfAbsent(
+                boss.getUniqueId(),
+                id -> BossSnapshot.capture(boss)
+        );
     }
 
     private void cleanupSnapshots() {
-        for (UUID id : new HashSet<>(bossSnapshots.keySet())) {
-            LivingEntity le = findLivingEntity(id);
-            if (le == null || !le.isValid()) {
-                bossSnapshots.remove(id);
+        bossSnapshots.keySet().removeIf(id -> {
+            for (World w : Bukkit.getWorlds()) {
+                var e = w.getEntity(id);
+                if (e instanceof LivingEntity le && le.isValid()) return false;
             }
-        }
+            return true;
+        });
     }
 
-    private LivingEntity findLivingEntity(UUID uuid) {
-        for (World w : Bukkit.getWorlds()) {
-            org.bukkit.entity.Entity e = w.getEntity(uuid);
-            if (e instanceof LivingEntity le) return le;
-        }
-        return null;
-    }
+    // =====================================================
+    // ATTRIBUTES / EFFECTS
+    // =====================================================
 
     private void applyAttributes(LivingEntity boss, ConfigurationSection cfg) {
         if (cfg == null) return;
 
         BossSnapshot snap = bossSnapshots.get(boss.getUniqueId());
-        if (snap == null) {
-            applyAttributeAdditive(boss, Attribute.MOVEMENT_SPEED, cfg.getDouble("movement-speed", 0));
-            applyAttributeAdditive(boss, Attribute.ATTACK_DAMAGE, cfg.getDouble("damage", 0));
-            applyAttributeAdditive(boss, Attribute.ARMOR, cfg.getDouble("armor", 0));
-            applyAttributeAdditive(boss, Attribute.ARMOR_TOUGHNESS, cfg.getDouble("armor-toughness", 0));
-            applyAttributeAdditive(boss, Attribute.KNOCKBACK_RESISTANCE, cfg.getDouble("knockback-resistance", 0));
-            return;
-        }
 
-        setAttribute(boss, Attribute.MOVEMENT_SPEED, snap.base(Attribute.MOVEMENT_SPEED) + cfg.getDouble("movement-speed", 0));
-        setAttribute(boss, Attribute.ATTACK_DAMAGE, snap.base(Attribute.ATTACK_DAMAGE) + cfg.getDouble("damage", 0));
-        setAttribute(boss, Attribute.ARMOR, snap.base(Attribute.ARMOR) + cfg.getDouble("armor", 0));
-        setAttribute(boss, Attribute.ARMOR_TOUGHNESS, snap.base(Attribute.ARMOR_TOUGHNESS) + cfg.getDouble("armor-toughness", 0));
-        setAttribute(boss, Attribute.KNOCKBACK_RESISTANCE, snap.base(Attribute.KNOCKBACK_RESISTANCE) + cfg.getDouble("knockback-resistance", 0));
+        setAttr(boss, Attribute.MOVEMENT_SPEED, snap, cfg, "movement-speed");
+        setAttr(boss, Attribute.ATTACK_DAMAGE, snap, cfg, "damage");
+        setAttr(boss, Attribute.ARMOR, snap, cfg, "armor");
+        setAttr(boss, Attribute.ARMOR_TOUGHNESS, snap, cfg, "armor-toughness");
+        setAttr(boss, Attribute.KNOCKBACK_RESISTANCE, snap, cfg, "knockback-resistance");
     }
 
-    private void applyAttributeAdditive(LivingEntity e, Attribute attr, double add) {
-        if (add == 0) return;
+    private void setAttr(LivingEntity e, Attribute attr, BossSnapshot snap, ConfigurationSection cfg, String key) {
         AttributeInstance inst = e.getAttribute(attr);
-        if (inst != null) inst.setBaseValue(inst.getBaseValue() + add);
-    }
+        if (inst == null) return;
 
-    private void setAttribute(LivingEntity e, Attribute attr, double value) {
-        AttributeInstance inst = e.getAttribute(attr);
-        if (inst != null) inst.setBaseValue(value);
+        double add = cfg.getDouble(key, 0);
+        inst.setBaseValue(snap.base(attr) + add);
     }
 
     private void applyAbilities(LivingEntity boss, ConfigurationSection cfg) {
         if (cfg == null) return;
-
         boss.setAI(!cfg.getBoolean("no-ai", false));
         boss.setSilent(cfg.getBoolean("silent", false));
         boss.setInvulnerable(cfg.getBoolean("invulnerable", false));
@@ -353,7 +161,6 @@ public final class BossActionEngine implements Listener {
 
     private void applyEffects(LivingEntity boss, ConfigurationSection cfg) {
         if (cfg == null) return;
-
         if (cfg.getBoolean("fire-resistance", false)) {
             boss.addPotionEffect(new PotionEffect(
                     PotionEffectType.FIRE_RESISTANCE,
@@ -369,19 +176,24 @@ public final class BossActionEngine implements Listener {
         if (cfg != null) boss.setGravity(cfg.getBoolean("gravity", true));
     }
 
+    // =====================================================
+    // ENTER EFFECTS
+    // =====================================================
+
     private void runOnEnterEffects(LivingEntity boss, ConfigurationSection onEnter) {
         ConfigurationSection effects = onEnter.getConfigurationSection("effects");
         if (effects == null) return;
 
-        Location loc = boss.getLocation().clone().add(0, 1, 0);
+        Location loc = boss.getLocation().add(0, 1, 0);
 
         ConfigurationSection particles = effects.getConfigurationSection("particles");
         if (particles != null) {
             try {
-                Particle type = Particle.valueOf(particles.getString("type", "FLAME").toUpperCase(Locale.ROOT));
+                Particle type = Particle.valueOf(
+                        particles.getString("type", "FLAME").toUpperCase(Locale.ROOT)
+                );
                 boss.getWorld().spawnParticle(
-                        type,
-                        loc,
+                        type, loc,
                         particles.getInt("amount", 20),
                         particles.getDouble("radius", 1),
                         particles.getDouble("height", 1),
@@ -404,123 +216,85 @@ public final class BossActionEngine implements Listener {
         }
 
         ConfigurationSection msg = effects.getConfigurationSection("message");
-        if (msg != null) {
-            sendPhaseEnterMessage(boss, msg);
-        }
+        if (msg != null) sendPhaseEnterMessage(boss, msg);
     }
+
+    // =====================================================
+    // MESSAGES
+    // =====================================================
 
     private void sendPhaseEnterMessage(LivingEntity boss, ConfigurationSection msg) {
-        String type = msg.getString("type", "ACTIONBAR").toUpperCase(Locale.ROOT);
-
-        String audience = msg.getString("audience", "NEARBY").toUpperCase(Locale.ROOT);
-        double radius = msg.getDouble("radius", activeRadius > 0.0 ? activeRadius : 32.0);
-
-        Collection<Player> targets = resolveAudience(boss, audience, radius);
-        if (targets.isEmpty()) return;
-
-        if (type.equals("TITLE")) {
-            String rawTitle = msg.getString("title", "");
-            String rawSubtitle = msg.getString("subtitle", "");
-
-            int fadeIn = msg.getInt("fade-in", 10);
-            int stay = msg.getInt("stay", 50);
-            int fadeOut = msg.getInt("fade-out", 10);
-
-            for (Player p : targets) {
-                try {
-                    String title = color(Placeholder.resolve(rawTitle, boss, null, p));
-                    String subtitle = color(Placeholder.resolve(rawSubtitle, boss, null, p));
-                    p.sendTitle(title, subtitle, fadeIn, stay, fadeOut);
-                } catch (Exception ignored) {}
-            }
-            return;
-        }
-
-        if (type.equals("CHAT")) {
-            String raw = msg.getString("text", "");
-            if (raw.isEmpty()) return;
-
-            for (Player p : targets) {
-                String text = color(Placeholder.resolve(raw, boss, null, p));
-                p.sendMessage(text);
-            }
-            return;
-        }
-
         String raw = msg.getString("text", "");
-        if (raw.isEmpty()) {
-            String t = msg.getString("title", "");
-            String s = msg.getString("subtitle", "");
-            raw = (t + (s.isEmpty() ? "" : " §7" + s)).trim();
-        }
         if (raw.isEmpty()) return;
 
-        for (Player p : targets) {
-            try {
-                String text = color(Placeholder.resolve(raw, boss, null, p));
-                p.spigot().sendMessage(
-                        ChatMessageType.ACTION_BAR,
-                        TextComponent.fromLegacyText(text)
-                );
-            } catch (Exception ignored) {}
+        double radius = msg.getDouble("radius", 32.0);
+        double r2 = radius * radius;
+
+        for (Player p : boss.getWorld().getPlayers()) {
+            if (p.getLocation().distanceSquared(boss.getLocation()) > r2) continue;
+
+            String text = ChatColor.translateAlternateColorCodes(
+                    '&',
+                    Placeholder.resolve(raw, boss, null, p)
+            );
+
+            p.spigot().sendMessage(
+                    ChatMessageType.ACTION_BAR,
+                    TextComponent.fromLegacyText(text)
+            );
         }
     }
 
-    private Collection<Player> resolveAudience(LivingEntity boss, String audience, double radius) {
-        if (boss == null || !boss.isValid()) return List.of();
+    // =====================================================
+    // XP EXPLOSION
+    // =====================================================
+
+    private void spawnBossXpExplosion(LivingEntity boss) {
+        FileConfiguration cfg = plugin.mobs().mobConfigOf(boss);
+        if (cfg == null) return;
+
+        int totalXp = cfg.getInt("xp", 0);
+        if (totalXp <= 0) return;
+
         World w = boss.getWorld();
+        Location c = boss.getLocation().add(0, 1, 0);
 
-        switch (audience) {
-            case "WORLD" -> {
-                return new ArrayList<>(w.getPlayers());
-            }
-            case "STATION" -> {
-                if (activeBoss != null && activeBoss.isValid() && activeBoss.getUniqueId().equals(boss.getUniqueId()) && activeRadius > 0.0) {
-                    List<Player> out = new ArrayList<>();
-                    for (UUID id : affectedPlayers) {
-                        Player p = Bukkit.getPlayer(id);
-                        if (p != null && p.isOnline() && Objects.equals(p.getWorld(), w)) out.add(p);
-                    }
-                    return out;
-                }
-            }
+        w.spawnParticle(Particle.EXPLOSION_EMITTER, c, 2);
+        w.spawnParticle(Particle.HAPPY_VILLAGER, c, 60, 1.8, 1.2, 1.8, 0.05);
+        w.playSound(c, Sound.ENTITY_PLAYER_LEVELUP, 1.4f, 0.6f);
+
+        int orbCount = 20;
+        int xpPerOrb = Math.max(1, totalXp / orbCount);
+
+        for (int i = 0; i < orbCount; i++) {
+            Location l = c.clone().add(
+                    rnd.nextGaussian() * 1.2,
+                    rnd.nextDouble() * 0.8,
+                    rnd.nextGaussian() * 1.2
+            );
+            ExperienceOrb orb = w.spawn(l, ExperienceOrb.class);
+            orb.setExperience(xpPerOrb);
         }
-
-        double r2 = Math.max(0.0, radius);
-        r2 = r2 * r2;
-
-        List<Player> out = new ArrayList<>();
-        Location b = boss.getLocation();
-
-        for (Player p : w.getPlayers()) {
-            if (!p.isOnline()) continue;
-            if (p.getLocation().distanceSquared(b) <= r2) out.add(p);
-        }
-        return out;
     }
 
-    private String color(String s) {
-        if (s == null) return "";
-        return ChatColor.translateAlternateColorCodes('&', s);
-    }
+    // =====================================================
+    // SHUTDOWN
+    // =====================================================
 
     public void shutdown() {
-        clearWeatherStation();
+        worldEffects.resetAll();
 
-        if (stationTask != null) {
-            stationTask.cancel();
-            stationTask = null;
-        }
-
-        // v1.6 cleanup
-        if (activeBoss != null && activeBoss.isValid()) {
-            minionSpawner.stopAllForBoss(activeBoss.getUniqueId());
-            minionController.cleanupBoss(activeBoss.getUniqueId());
+        if (tickTask != null) {
+            tickTask.cancel();
+            tickTask = null;
         }
 
         bossSnapshots.clear();
-        activeBoss = null;
     }
+
+    // =====================================================
+    // SNAPSHOT
+    // =====================================================
 
     private record BossSnapshot(Map<Attribute, Double> bases) {
 
@@ -537,64 +311,4 @@ public final class BossActionEngine implements Listener {
             return bases.getOrDefault(a, 0.0);
         }
     }
-    private void spawnBossXpExplosion(LivingEntity boss) {
-        FileConfiguration cfg = plugin.mobs().mobConfigOf(boss);
-        if (cfg == null) return;
-
-        int totalXp = cfg.getInt("xp", 0);
-        if (totalXp <= 0) return;
-
-        ConfigurationSection xpCfg = cfg.getConfigurationSection("xp-explosion");
-
-        boolean enabled = xpCfg == null || xpCfg.getBoolean("enabled", true);
-        if (!enabled) return;
-
-        int orbCount = xpCfg != null ? xpCfg.getInt("orb-count", 20) : 20;
-        double orbMul = xpCfg != null ? xpCfg.getDouble("orb-multiplier", 2.0) : 2.0;
-
-        World world = boss.getWorld();
-        Location center = boss.getLocation().add(0, 1.0, 0);
-
-        // 🎆 BIG PARTICLE EXPLOSION
-        world.spawnParticle(
-                Particle.EXPLOSION_EMITTER,
-                center,
-                2
-        );
-
-        world.spawnParticle(
-                Particle.HAPPY_VILLAGER,
-                center,
-                60,
-                1.8,
-                1.2,
-                1.8,
-                0.05
-        );
-
-        // 🔊 SOUND FEEDBACK
-        world.playSound(
-                center,
-                Sound.ENTITY_PLAYER_LEVELUP,
-                1.4f,
-                0.6f
-        );
-
-        // 🟢 SPAWN XP ORBS
-        int xpPerOrb = Math.max(1, totalXp / Math.max(1, orbCount));
-
-        for (int i = 0; i < orbCount; i++) {
-            Location l = center.clone().add(
-                    rnd.nextGaussian() * 1.2,
-                    rnd.nextDouble() * 0.8,
-                    rnd.nextGaussian() * 1.2
-            );
-
-            ExperienceOrb orb = world.spawn(l, ExperienceOrb.class);
-
-            // XP size controls visual size (vanilla!)
-            orb.setExperience((int) Math.round(xpPerOrb * orbMul));
-        }
-    }
-
 }

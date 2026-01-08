@@ -6,11 +6,13 @@ import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 public final class StatKeys {
 
+    // pluginName:key -> NamespacedKey
     private static final Map<String, NamespacedKey> CACHE = new ConcurrentHashMap<>();
 
     private StatKeys() {}
@@ -19,29 +21,37 @@ public final class StatKeys {
         if (plugin == null || meta == null || key == null) return 0.0;
 
         PersistentDataContainer pdc = meta.getPersistentDataContainer();
-        String normKey = key.toLowerCase();
+        String norm = key.toLowerCase(Locale.ROOT);
 
-        NamespacedKey k1 = CACHE.computeIfAbsent(
-                plugin.getName() + ":" + normKey,
-                s -> new NamespacedKey(plugin, normKey)
+        // =====================================================
+        // PRIMARY: plugin namespace
+        // =====================================================
+
+        NamespacedKey pluginKey = CACHE.computeIfAbsent(
+                plugin.getName().toLowerCase(Locale.ROOT) + ":" + norm,
+                s -> new NamespacedKey(plugin, norm)
         );
 
-        Double d = pdc.get(k1, PersistentDataType.DOUBLE);
+        Double d = pdc.get(pluginKey, PersistentDataType.DOUBLE);
         if (d != null) return d;
 
-        Integer i = pdc.get(k1, PersistentDataType.INTEGER);
+        Integer i = pdc.get(pluginKey, PersistentDataType.INTEGER);
         if (i != null) return i.doubleValue();
 
-        NamespacedKey k2 = CACHE.computeIfAbsent(
-                "themob:" + normKey,
+        // =====================================================
+        // FALLBACK: legacy "themob" namespace
+        // =====================================================
+
+        NamespacedKey legacyKey = CACHE.computeIfAbsent(
+                "themob:" + norm,
                 NamespacedKey::fromString
         );
 
-        if (k2 != null) {
-            Double d2 = pdc.get(k2, PersistentDataType.DOUBLE);
+        if (legacyKey != null) {
+            Double d2 = pdc.get(legacyKey, PersistentDataType.DOUBLE);
             if (d2 != null) return d2;
 
-            Integer i2 = pdc.get(k2, PersistentDataType.INTEGER);
+            Integer i2 = pdc.get(legacyKey, PersistentDataType.INTEGER);
             if (i2 != null) return i2.doubleValue();
         }
 

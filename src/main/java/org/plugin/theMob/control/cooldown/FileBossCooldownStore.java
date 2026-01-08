@@ -4,83 +4,64 @@ import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.Plugin;
 
 import java.io.File;
+import java.io.IOException;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 
 public final class FileBossCooldownStore implements BossCooldownStore {
 
     private final Plugin plugin;
     private final File file;
-
-    // bossId -> nextSpawnEpochSeconds
-    private final Map<String, Long> next = new ConcurrentHashMap<>();
+    private final Map<String, Long> data = new HashMap<>();
 
     public FileBossCooldownStore(Plugin plugin) {
         this.plugin = plugin;
-        this.file = new File(plugin.getDataFolder(), "boss_cooldowns.yml");
+        this.file = new File(plugin.getDataFolder(), "boss-cooldowns.yml");
     }
 
     @Override
     public void load() {
-        next.clear();
+        data.clear();
 
-        try {
-            if (!file.exists()) return;
+        if (!file.exists()) return;
 
-            YamlConfiguration yml = YamlConfiguration.loadConfiguration(file);
-            if (!yml.isConfigurationSection("data")) return;
-
-            for (String bossId : yml.getConfigurationSection("data").getKeys(false)) {
-                long v = yml.getLong("data." + bossId + ".next-spawn", 0L);
-                if (v > 0) {
-                    next.put(bossId, v);
-                }
-            }
-        } catch (Exception e) {
-            plugin.getLogger().warning("[TheMob] Failed to load boss cooldowns (file): " + e.getMessage());
+        YamlConfiguration cfg = YamlConfiguration.loadConfiguration(file);
+        for (String key : cfg.getKeys(false)) {
+            data.put(key, cfg.getLong(key, 0L));
         }
     }
 
     @Override
     public void save() {
-        try {
-            YamlConfiguration yml = new YamlConfiguration();
-
-            for (Map.Entry<String, Long> en : next.entrySet()) {
-                yml.set("data." + en.getKey() + ".next-spawn", en.getValue());
-            }
-
-            yml.save(file);
-        } catch (Exception e) {
-            plugin.getLogger().warning("[TheMob] Failed to save boss cooldowns (file): " + e.getMessage());
+        YamlConfiguration cfg = new YamlConfiguration();
+        for (var e : data.entrySet()) {
+            cfg.set(e.getKey(), e.getValue());
         }
+
+        try {
+            cfg.save(file);
+        } catch (IOException ignored) {}
     }
 
     @Override
     public long getNextSpawnEpochSeconds(String bossId) {
-        return next.getOrDefault(bossId, 0L);
+        return data.getOrDefault(bossId, 0L);
     }
 
     @Override
     public void setNextSpawnEpochSeconds(String bossId, long epochSeconds) {
-        if (bossId == null || bossId.isBlank()) return;
-
-        if (epochSeconds <= 0) {
-            next.remove(bossId);
-        } else {
-            next.put(bossId, epochSeconds);
-        }
+        data.put(bossId, epochSeconds);
     }
 
     @Override
     public Set<String> getAllBossIds() {
-        return Set.copyOf(next.keySet());
+        return data.keySet();
     }
 
     @Override
     public void close() {
         save();
-        next.clear();
+        data.clear();
     }
 }
