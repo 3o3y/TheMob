@@ -1,5 +1,9 @@
 package org.plugin.theMob;
 
+import org.bstats.charts.SimplePie;
+import org.bstats.charts.SingleLineChart;
+
+import org.bstats.bukkit.Metrics;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.boss.KeyedBossBar;
@@ -27,6 +31,7 @@ import org.plugin.theMob.core.TickScheduler;
 import org.plugin.theMob.core.context.PlayerBarCoordinator;
 import org.plugin.theMob.hud.NaviHudListener;
 import org.plugin.theMob.hud.NaviHudService;
+import org.plugin.theMob.metrics.MetricsService;
 import org.plugin.theMob.mob.MobDropEngine;
 import org.plugin.theMob.mob.MobListener;
 import org.plugin.theMob.mob.MobManager;
@@ -95,11 +100,31 @@ public final class TheMob extends JavaPlugin {
 
     @Override
     public void onEnable() {
+        // =====================
+        // bStats Metrics
+        // =====================
+        MetricsService.init(this);
+        registerMetricsCharts();
+
         saveDefaultConfig();
         cleanupStaleHudBars();
         boot(true);
         getLogger().info("[TheMob] Enabled.");
     }
+    private void registerMetricsCharts() {
+        if (MetricsService.chartsRegistered()) return;
+
+        Metrics metrics = MetricsService.getMetrics();
+        if (metrics == null) return;
+
+        metrics.addCustomChart(new SimplePie(
+                "plugin_version",
+                () -> getDescription().getVersion()
+        ));
+
+        MetricsService.markChartsRegistered();
+    }
+
 
     @Override
     public void onDisable() {

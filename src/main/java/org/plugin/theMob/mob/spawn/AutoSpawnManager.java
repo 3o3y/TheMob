@@ -27,14 +27,9 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public final class AutoSpawnManager {
 
-    // =========================================================
-    // TUNING
-    // =========================================================
-    private static final long COLD_TICKS = 20L * 60L; // 60s until cleanup when cold
+    private static final long COLD_TICKS = 20L * 60L;
     private static final int RANDOM_WORLD_RADIUS = 1_000;
     private static final int RANDOM_ANYWHERE_TRIES = 6;
-
-    // ✅ 20-tick scheduler (1s)
     private static final long SCHEDULER_PERIOD_TICKS = 20L;
 
     private final TheMob plugin;
@@ -44,26 +39,18 @@ public final class AutoSpawnManager {
 
     private final Random rnd = new Random();
 
-    // =========================================================
-    // RUNTIME STATE
-    // =========================================================
     private final Map<String, SpawnPoint> points = new ConcurrentHashMap<>();
     private final Map<String, Set<UUID>> alive = new ConcurrentHashMap<>();
-
     private final Map<String, Integer> spawnedTotal = new ConcurrentHashMap<>();
-
-    // 🔁 due system
     private final Map<String, Long> nextDueTick = new ConcurrentHashMap<>();
-    private final Map<String, Long> lastSpawnTick = new ConcurrentHashMap<>(); // kept for debugging / legacy
+    private final Map<String, Long> lastSpawnTick = new ConcurrentHashMap<>();
 
     private SpawnController controller;
 
-    // HOT/COLD
     private final Set<String> hot = ConcurrentHashMap.newKeySet();
     private final Map<String, Long> coldSince = new ConcurrentHashMap<>();
     private final Map<String, Set<Chunk>> forcedChunks = new ConcurrentHashMap<>();
 
-    // RANDOM_WORLD
     private final Map<String, Location> randomWorldAnchor = new ConcurrentHashMap<>();
     private final Map<String, Integer> messageTasks = new ConcurrentHashMap<>();
 
@@ -77,25 +64,17 @@ public final class AutoSpawnManager {
         this.bossLocks = bossLocks;
     }
 
-    // =========================================================
-    // LIFECYCLE
-    // =========================================================
     public void start() {
         if (started) return;
         started = true;
 
-        // 🔥 HARD CLEANUP ON START (ABSOLUT PFLICHT)
         Bukkit.getScheduler().runTask(plugin, this::purgeAllStaleEntities);
 
         task = new BukkitRunnable() {
-            @Override
-            public void run() {
-                tick();
-            }
+            @Override public void run() { tick(); }
         };
         task.runTaskTimer(plugin, SCHEDULER_PERIOD_TICKS, SCHEDULER_PERIOD_TICKS);
     }
-
 
     public void stop() {
         if (task != null) {
@@ -115,28 +94,23 @@ public final class AutoSpawnManager {
         spawnedTotal.clear();
         nextDueTick.clear();
         lastSpawnTick.clear();
-
         hot.clear();
         coldSince.clear();
         forcedChunks.clear();
-
         randomWorldAnchor.clear();
+
         for (Integer taskId : messageTasks.values()) {
             Bukkit.getScheduler().cancelTask(taskId);
         }
         messageTasks.clear();
-        started = false;
-        purgeAllStaleEntities();
 
+        purgeAllStaleEntities();
     }
 
     public void bindController(SpawnController controller) {
         this.controller = controller;
     }
 
-    // =========================================================
-    // REGISTRY
-    // =========================================================
     public void register(SpawnPoint sp) {
         points.put(sp.spawnId(), sp);
         alive.put(sp.spawnId(), ConcurrentHashMap.newKeySet());
@@ -173,9 +147,6 @@ public final class AutoSpawnManager {
         return Collections.unmodifiableCollection(points.values());
     }
 
-    // =========================================================
-    // TICK
-    // =========================================================
     private void tick() {
         final long now = Bukkit.getCurrentTick();
 
@@ -191,9 +162,6 @@ public final class AutoSpawnManager {
         }
     }
 
-    // =========================================================
-    // FIXED_POINT / RANDOM_RADIUS (HOT/COLD + nextDueTick)
-    // =========================================================
     private void tickFixedOrRadius(SpawnPoint sp, long now, boolean radiusMode) {
         Location base = sp.baseLocation();
         if (base == null || base.getWorld() == null) return;
@@ -202,19 +170,17 @@ public final class AutoSpawnManager {
         boolean wasHot = hot.contains(sp.spawnId());
 
         // =====================================================
-        // 🔥 RE-ENTRY LOGIC (HOT)
+        // 🔥 ENTER ARENA
         // =====================================================
         if (hotNow) {
 
-            // Spieler kommt zurück → war die Arena HARD-COLD?
             if (!wasHot) {
+                boolean hardCold =
+                        coldSince.containsKey(sp.spawnId())
+                                && (now - coldSince.get(sp.spawnId()) >= COLD_TICKS);
 
-                boolean wasHardCold =
-                        coldSince.containsKey(sp.spawnId()) &&
-                                (now - coldSince.get(sp.spawnId()) >= COLD_TICKS);
-
-                if (wasHardCold) {
-                    // 💥 NUR JETZT ALLES KILLEN
+                if (hardCold) {
+                    // ✅ NUR nach 60s Cold → Reset
                     hardKillAll(sp.spawnId());
                     purgeArenaVisuals(sp);
                     bossLocks.release(sp.spawnId());
@@ -228,15 +194,13 @@ public final class AutoSpawnManager {
                     lastSpawnTick.put(sp.spawnId(), -1L);
                 }
 
-                // Arena wird wieder HOT
                 hot.add(sp.spawnId());
                 forceLoadArenaChunks(sp);
             }
 
-            // Cold-Timer abbrechen
+            // Cold abbrechen
             coldSince.remove(sp.spawnId());
 
-            // Spawn weiterlaufen lassen
             nextDueTick.putIfAbsent(
                     sp.spawnId(),
                     now + Math.max(1, sp.intervalSeconds()) * 20L
@@ -253,12 +217,12 @@ public final class AutoSpawnManager {
         }
 
         // =====================================================
-        // 💤 STILL COLD → DO NOTHING
+        // 💤 STILL COLD
         // =====================================================
         if (!hotNow) return;
 
         // =====================================================
-        // ⏱ NORMAL SPAWN LOGIC
+        // ⏱ SPAWN LOGIC
         // =====================================================
         long due = nextDueTick.getOrDefault(sp.spawnId(), now);
         if (now < due) return;
@@ -280,7 +244,6 @@ public final class AutoSpawnManager {
 
     private void scheduleNext(SpawnPoint sp, long now) {
         long interval = Math.max(1, sp.intervalSeconds()) * 20L;
-        // ensure forward progress even if scheduler is late
         nextDueTick.put(sp.spawnId(), now + interval);
     }
 
@@ -316,9 +279,6 @@ public final class AutoSpawnManager {
         return loc;
     }
 
-    // =========================================================
-    // FOLLOW_PLAYER (nextDueTick)
-    // =========================================================
     private void tickFollowPlayer(SpawnPoint sp, long now) {
         Player target = Bukkit.getPlayerExact(sp.playerName());
         if (target == null || !target.isOnline() || target.isDead()) return;
@@ -377,9 +337,6 @@ public final class AutoSpawnManager {
         return loc;
     }
 
-    // =====================================================
-    // RANDOM WORLD (nextDueTick)
-    // =====================================================
     private void tickRandomWorld(SpawnPoint sp, long now) {
         World world = Bukkit.getWorld(sp.worldName());
         if (world == null) return;
@@ -425,15 +382,10 @@ public final class AutoSpawnManager {
         randomWorldAnchor.put(sp.spawnId(), spawnLoc);
 
         spawnOne(sp, spawnLoc, now);
-
         ensureMessageTask(sp);
-
         scheduleNext(sp, now);
     }
 
-    // =====================================================
-    // RANDOM POSITION (bounded tries, low spike)
-    // =====================================================
     private Location randomAnywhere(World world, int tries) {
         Location center = world.getSpawnLocation();
         int attempt = Math.max(1, tries);
@@ -466,15 +418,7 @@ public final class AutoSpawnManager {
         return null;
     }
 
-    // =========================================================
-    // SPAWN CORE
-    // =========================================================
-
     private void spawnOne(SpawnPoint sp, Location loc, long now) {
-
-        // =====================================================
-        // v1.7 INTEGRATION – SPAWN GATE
-        // =====================================================
         SpawnGateResult gate =
                 plugin.automation().gate().check(
                         loc.getWorld(),
@@ -483,9 +427,7 @@ public final class AutoSpawnManager {
                                 : SpawnRole.MOB
                 );
 
-        if (!gate.allowed()) {
-            return;
-        }
+        if (!gate.allowed()) return;
 
         LivingEntity mob = mobs.spawnCustomMob(sp.mobId(), sp.spawnId(), loc);
         if (mob == null) return;
@@ -493,9 +435,6 @@ public final class AutoSpawnManager {
         mob.setPersistent(true);
         mob.setRemoveWhenFarAway(false);
 
-        // =====================================================
-        // v1.7 INTEGRATION – TAG BUDGET
-        // =====================================================
         plugin.automation().budgets().tagSpawnedEntity(
                 mob,
                 mobs.isBoss(mob) ? SpawnRole.BOSS : SpawnRole.MOB
@@ -507,7 +446,6 @@ public final class AutoSpawnManager {
         spawnedTotal.put(sp.spawnId(), spawnedTotal.getOrDefault(sp.spawnId(), 0) + 1);
         lastSpawnTick.put(sp.spawnId(), now);
 
-        // v1.7 effective interval (TPS + scaling)
         long base = Math.max(1, sp.intervalSeconds()) * 20L;
         long effective =
                 (long) Math.max(1, base * plugin.automation().gate().effectiveIntervalMultiplier());
@@ -528,11 +466,7 @@ public final class AutoSpawnManager {
         }
     }
 
-    // =========================================================
-    // KILL / CLEANUP
-    // =========================================================
     private void hardKillAll(String spawnId) {
-
         for (World w : Bukkit.getWorlds()) {
             for (Entity e : new ArrayList<>(w.getEntities())) {
                 if (!(e instanceof LivingEntity le)) continue;
@@ -559,14 +493,11 @@ public final class AutoSpawnManager {
         bossLocks.release(spawnId);
     }
 
-
-
     private void purgeArenaVisuals(SpawnPoint sp) {
         if (sp == null) return;
         Location base = sp.baseLocation();
         if (base == null || base.getWorld() == null) return;
 
-        // rough radius based on chunk radius
         double r = Math.max(32.0, (sp.arenaRadiusChunks() * 16.0) + 16.0);
 
         for (Entity e : base.getWorld().getNearbyEntities(base, r, r, r)) {
@@ -652,9 +583,6 @@ public final class AutoSpawnManager {
         return id != null && hot.contains(id);
     }
 
-    // =========================================================
-    // RANDOM_WORLD MESSAGE LOOP
-    // =========================================================
     private void ensureMessageTask(SpawnPoint sp) {
         if (sp.type() != SpawnType.RANDOM_WORLD) return;
         if (sp.message() == null || sp.message().isBlank()) return;
@@ -710,9 +638,6 @@ public final class AutoSpawnManager {
         }
     }
 
-    // =========================================================
-    // ADMIN / GLOBAL CLEANUP
-    // =========================================================
     public void onKillAll() {
         for (Integer taskId : messageTasks.values()) {
             Bukkit.getScheduler().cancelTask(taskId);
@@ -727,6 +652,7 @@ public final class AutoSpawnManager {
         bossLocks.clearAll();
         purgeAllStaleEntities();
     }
+
     private void purgeAllStaleEntities() {
         int removed = 0;
 
@@ -754,7 +680,6 @@ public final class AutoSpawnManager {
             );
         }
     }
-
 
     private String color(String s) {
         return s == null ? "" : org.bukkit.ChatColor.translateAlternateColorCodes('&', s);

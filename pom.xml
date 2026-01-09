@@ -2,6 +2,7 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>org.plugin</groupId>
@@ -14,41 +15,51 @@
 
     <properties>
         <java.version>21</java.version>
-        <maven.compiler.source>21</maven.compiler.source>
-        <maven.compiler.target>21</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
+    <!-- ===================== -->
+    <!-- Repositories -->
+    <!-- ===================== -->
     <repositories>
         <repository>
-            <id>papermc-repo</id>
+            <id>papermc</id>
             <url>https://repo.papermc.io/repository/maven-public/</url>
         </repository>
     </repositories>
-    <dependencyManagement>
-        <dependencies>
-            <dependency>
-                <groupId>org.apache.commons</groupId>
-                <artifactId>commons-lang3</artifactId>
-                <version>3.14.0</version>
-            </dependency>
-        </dependencies>
-    </dependencyManagement>
 
+    <!-- ===================== -->
+    <!-- Dependencies -->
+    <!-- ===================== -->
     <dependencies>
+
+        <!-- Paper API -->
         <dependency>
             <groupId>io.papermc.paper</groupId>
             <artifactId>paper-api</artifactId>
             <version>1.21.10-R0.1-SNAPSHOT</version>
             <scope>provided</scope>
         </dependency>
+
+        <!-- bStats -->
+        <dependency>
+            <groupId>org.bstats</groupId>
+            <artifactId>bstats-bukkit</artifactId>
+            <version>3.0.2</version>
+        </dependency>
+
     </dependencies>
 
+    <!-- ===================== -->
+    <!-- Build -->
+    <!-- ===================== -->
     <build>
+
         <finalName>TheMob</finalName>
 
         <plugins>
-            <!-- Java Compiler -->
+
+            <!-- Compiler -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
@@ -59,7 +70,7 @@
                 </configuration>
             </plugin>
 
-            <!-- Shaded JAR (optional, aber empfohlen) -->
+            <!-- Shade (SEHR wichtig) -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
@@ -71,11 +82,21 @@
                             <goal>shade</goal>
                         </goals>
                         <configuration>
+
+                            <!-- bStats relocation -->
+                            <relocations>
+                                <relocation>
+                                    <pattern>org.bstats</pattern>
+                                    <shadedPattern>org.plugin.theMob.libs.bstats</shadedPattern>
+                                </relocation>
+                            </relocations>
+
                             <createDependencyReducedPom>false</createDependencyReducedPom>
                         </configuration>
                     </execution>
                 </executions>
             </plugin>
+
         </plugins>
 
         <resources>
@@ -84,6 +105,7 @@
                 <filtering>false</filtering>
             </resource>
         </resources>
+
     </build>
 
 </project>
