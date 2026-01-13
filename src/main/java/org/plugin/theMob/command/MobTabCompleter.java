@@ -33,7 +33,7 @@ public final class MobTabCompleter implements TabCompleter {
         if (args.length == 1) {
             return filter(args[0],
                     "spawn", "set", "list", "del", "killall",
-                    "reload", "toggle", "diag", "debug"
+                    "reload", "toggle", "diag", "debug", "get"
             );
         }
 
@@ -134,6 +134,15 @@ public final class MobTabCompleter implements TabCompleter {
                         .collect(Collectors.toList());
             }
             if (args.length == 4) return mobIds(args[3]);
+        }
+
+        // =========================
+// GET
+// =========================
+        if (args.length == 2 && eq(args, 0, "get")) {
+            return filter(args[1],
+                    "base64" // ✅ NEU
+            );
         }
 
         return List.of();

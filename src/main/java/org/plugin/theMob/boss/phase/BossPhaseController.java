@@ -149,8 +149,8 @@ public final class BossPhaseController {
 
     private void showPhaseTitleToPlayer(Player player, LivingEntity boss, BossPhase phase) {
 
-        String rawTitle = "<red><bold>{phase_title}</bold></red>";
-        String rawSubtitle = "<gray>{mob_name}</gray>";
+        String rawTitle = "{phase_title}";
+        String rawSubtitle = "{mob_name}";
 
         Component title = Placeholder.resolveComponent(rawTitle, boss, phase, player);
         Component subtitle = Placeholder.resolveComponent(rawSubtitle, boss, phase, player);

@@ -1,11 +1,10 @@
 package org.plugin.theMob;
 
-import org.bstats.charts.SimplePie;
-import org.bstats.charts.SingleLineChart;
-
 import org.bstats.bukkit.Metrics;
+import org.bstats.charts.SimplePie;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.NamespacedKey;
 import org.bukkit.boss.KeyedBossBar;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.entity.Player;
@@ -48,8 +47,11 @@ import org.plugin.theMob.ui.MobHealthDisplay;
 import org.plugin.theMob.progression.ProgressionBootstrap;
 import org.plugin.theMob.progression.ProgressionV19Bootstrap;
 
+import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 
+import static org.plugin.theMob.boss.bar.BossBarService.BOSSBAR_KEY;
 import static org.plugin.theMob.hud.NaviHudService.HUD_KEY;
 
 public final class TheMob extends JavaPlugin {
@@ -189,9 +191,11 @@ public final class TheMob extends JavaPlugin {
         itemStatReader = new ItemStatReader(this);
 
         // ---------- Drops ----------
-        dropEngine = new MobDropEngine(itemBuilder);
-        dropEngine.bind(mobManager);
-        mobManager.setDropEngine(dropEngine);
+        this.dropEngine = new MobDropEngine(this);
+        this.dropEngine.bind(mobManager);
+        mobManager.setDropEngine(this.dropEngine);
+
+
 
         // ---------- Health Display ----------
         healthDisplay = new MobHealthDisplay(this, mobManager);
@@ -437,13 +441,21 @@ public final class TheMob extends JavaPlugin {
     }
 
     private void cleanupStaleHudBars() {
+        List<NamespacedKey> toRemove = new ArrayList<>();
+
         Iterator<KeyedBossBar> it = Bukkit.getBossBars();
         while (it.hasNext()) {
             KeyedBossBar bar = it.next();
-            if (HUD_KEY.equals(bar.getKey()) || BossBarService.BOSSBAR_KEY.equals(bar.getKey())) {
+            if (BOSSBAR_KEY.equals(bar.getKey())) {
                 bar.removeAll();
-                Bukkit.removeBossBar(bar.getKey());
+                toRemove.add(bar.getKey());
             }
         }
+
+        for (NamespacedKey key : toRemove) {
+            Bukkit.removeBossBar(key);
+        }
+
     }
+
 }

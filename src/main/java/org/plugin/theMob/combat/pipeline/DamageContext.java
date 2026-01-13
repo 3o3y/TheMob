@@ -160,6 +160,29 @@ public final class DamageContext {
     }
 
     // =====================================================
+// UNIFIED STAT ACCESS
+// =====================================================
+
+    public double stat(String key) {
+        if (key == null) return 0.0;
+
+        // 1️⃣ Weapon overrides (Items sind bewusst stärker)
+        Double w = weaponStats.get(key);
+        if (w != null) return w;
+
+        // 2️⃣ Player totals (Equip + Progression)
+        Double p = playerTotals.get(key);
+        if (p != null) return p;
+
+        return 0.0;
+    }
+
+    public boolean hasStat(String key) {
+        return weaponStats.containsKey(key) || playerTotals.containsKey(key);
+    }
+
+
+    // =====================================================
     // PLAYER TOTALS
     // =====================================================
 

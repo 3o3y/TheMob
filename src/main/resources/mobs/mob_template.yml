@@ -19,6 +19,31 @@ base-type: ZOMBIE                      # Vanilla entity type
 name: "&b&lZombie"             # Colored mob name
 display-health: true           # Show health above mob (HUD)
 
+equipment:                     # equipment will not drop!
+  helmet:
+    chance: 1.0                # Chance to equip the mob
+    type: HEAD_TEXTURE
+    value: "eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvYjE1ZjM1MTdmMjg3NDA0NzBlOGY1MWI0ZDc1NWJlMTU5ZWU2NTg2MWMwNWUyZjc0NGZiNjFiZmRjY2Q1YzBlMSJ9fX0="
+
+  chestplate:
+    chance: 0.6
+    material: GOLDEN_CHESTPLATE
+
+  leggings:
+    chance: 0.8
+    material: IRON_LEGGINGS
+
+  boots:
+    material: IRON_BOOTS        # equipment chance = 1.0 (default)
+
+  main-hand:
+    chance: 1.0
+    material: IRON_SWORD
+
+  off-hand:
+    chance: 1.0
+    material: SHIELD
+
 # ---------------------------------------------------------
 # Stats
 # ---------------------------------------------------------

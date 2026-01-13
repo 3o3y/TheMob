@@ -16,18 +16,30 @@ public final class CritStage implements DamageStage {
         Player p = ctx.attacker();
         if (p == null || !p.isOnline()) return;
 
-        double chance = ctx.weaponStat("crit");
+        // =========================
+        // CRIT CHANCE (%)
+        // =========================
+        double chance = ctx.stat("crit_chance"); // 8 = 8%
         if (chance <= 0.0) return;
 
         double roll = ThreadLocalRandom.current().nextDouble(100.0);
         if (roll >= chance) return;
 
-        double mul = ctx.weaponStat("crit_multiplier");
+        // =========================
+        // CRIT MULTIPLIER
+        // =========================
+        double mul = ctx.stat("crit_multiplier");
         if (mul < 1.0) mul = 1.0;
 
+        // =========================
+        // APPLY (MULTIPLY, NOT ADD)
+        // =========================
         ctx.setCrit(true);
         ctx.setDamage(ctx.damage() * mul);
 
+        // =========================
+        // FEEDBACK
+        // =========================
         p.playSound(
                 p.getLocation(),
                 Sound.ENTITY_PLAYER_ATTACK_CRIT,

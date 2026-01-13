@@ -1,20 +1,26 @@
 package org.plugin.theMob.item;
 
 import net.kyori.adventure.text.Component;
+import org.bukkit.Bukkit;
+import org.bukkit.Color;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
-import org.bukkit.attribute.Attribute;
-import org.bukkit.attribute.AttributeModifier;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.inventory.meta.LeatherArmorMeta;
+import org.bukkit.inventory.meta.SkullMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
+import org.bukkit.profile.PlayerProfile;
+import org.bukkit.profile.PlayerTextures;
+import org.bukkit.util.io.BukkitObjectInputStream;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.io.ByteArrayInputStream;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
 
 public final class ItemBuilderFromConfig {
 
@@ -24,12 +30,30 @@ public final class ItemBuilderFromConfig {
         this.plugin = plugin;
     }
 
+    // =====================================================
+    // MAIN ENTRY
+    // =====================================================
     public ItemStack build(Map<?, ?> cfg) {
         if (cfg == null) return null;
 
+        String type = String.valueOf(cfg.get("type"));
+        if ("BASE64".equalsIgnoreCase(type)) {
+            return fromBase64(String.valueOf(cfg.get("value")));
+        }
+
+        if ("HEAD_TEXTURE".equalsIgnoreCase(type)) {
+            return skullFromTexture(String.valueOf(cfg.get("value")));
+        }
+
+        String matKey = cfg.containsKey("material")
+                ? String.valueOf(cfg.get("material"))
+                : String.valueOf(cfg.get("item"));
+
+        if (matKey == null || matKey.isBlank()) return null;
+
         Material mat;
         try {
-            mat = Material.valueOf(cfg.get("item").toString().toUpperCase());
+            mat = Material.valueOf(matKey.toUpperCase(Locale.ROOT));
         } catch (Exception e) {
             return null;
         }
@@ -38,7 +62,17 @@ public final class ItemBuilderFromConfig {
         ItemMeta meta = item.getItemMeta();
         if (meta == null) return item;
 
-        // ---------- NAME + LORE ----------
+        applyMeta(item, meta, cfg);
+        item.setItemMeta(meta);
+        return item;
+    }
+
+    // =====================================================
+    // META
+    // =====================================================
+    private void applyMeta(ItemStack item, ItemMeta meta, Map<?, ?> cfg) {
+
+        // ---------- NAME ----------
         List<Component> lore = new ArrayList<>();
 
         Object name = cfg.get("name");
@@ -51,13 +85,13 @@ public final class ItemBuilderFromConfig {
             }
         }
 
+        // ---------- LORE ----------
         Object loreObj = cfg.get("lore");
         if (loreObj instanceof List<?> list) {
             for (Object o : list) {
                 lore.add(Component.text(cc(o.toString())));
             }
         }
-
         if (!lore.isEmpty()) meta.lore(lore);
 
         // ---------- ENCHANTS ----------
@@ -65,19 +99,11 @@ public final class ItemBuilderFromConfig {
         if (enchants instanceof Map<?, ?> map) {
             for (var e : map.entrySet()) {
                 Enchantment ench = Enchantment.getByKey(
-                        NamespacedKey.minecraft(e.getKey().toString().toLowerCase())
+                        NamespacedKey.minecraft(e.getKey().toString().toLowerCase(Locale.ROOT))
                 );
                 if (ench != null) {
                     meta.addEnchant(ench, parseInt(e.getValue(), 1), true);
                 }
-            }
-        }
-
-        // ---------- VANILLA ATTRIBUTES ----------
-        Object attrs = cfg.get("attributes");
-        if (attrs instanceof Map<?, ?> map) {
-            for (var e : map.entrySet()) {
-                applyAttribute(meta, e.getKey().toString(), e.getValue());
             }
         }
 
@@ -89,36 +115,116 @@ public final class ItemBuilderFromConfig {
             }
         }
 
+        // ---------- LEATHER COLOR ----------
+        if (meta instanceof LeatherArmorMeta leather && cfg.containsKey("color")) {
+            Color color = parseColor(cfg.get("color"));
+            if (color != null) {
+                leather.setColor(color);
+                item.setItemMeta(leather); // safety write-back
+            }
+        }
+
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS);
-        item.setItemMeta(meta);
-        return item;
     }
 
-    private void applyAttribute(ItemMeta meta, String key, Object val) {
-        Attribute attr = switch (key.toLowerCase()) {
-            case "armor" -> Attribute.ARMOR;
-            case "armor_toughness", "armor-toughness" -> Attribute.ARMOR_TOUGHNESS;
-            case "attack_damage", "attack-damage" -> Attribute.ATTACK_DAMAGE;
-            case "attack_speed", "attack-speed" -> Attribute.ATTACK_SPEED;
-            case "movement_speed", "movement-speed" -> Attribute.MOVEMENT_SPEED;
-            case "max_health", "max-health" -> Attribute.MAX_HEALTH;
-            case "knockback_resistance", "knockback-resistance" -> Attribute.KNOCKBACK_RESISTANCE;
-            default -> null;
-        };
-        if (attr == null) return;
+    // =====================================================
+    // COLOR PARSER
+    // =====================================================
+    private Color parseColor(Object o) {
+        if (o instanceof String s) {
+
+            // HEX: "#3366ff"
+            if (s.startsWith("#")) {
+                try {
+                    return Color.fromRGB(Integer.parseInt(s.substring(1), 16));
+                } catch (Exception ignored) {}
+            }
+
+            return switch (s.toUpperCase(Locale.ROOT)) {
+                case "BLUE" -> Color.BLUE;
+                case "RED" -> Color.RED;
+                case "GREEN" -> Color.GREEN;
+                case "BLACK" -> Color.BLACK;
+                case "WHITE" -> Color.WHITE;
+                case "PURPLE" -> Color.PURPLE;
+                default -> null;
+            };
+        }
+
+        if (o instanceof Map<?, ?> map) {
+            try {
+                int r = Integer.parseInt(map.get("r").toString());
+                int g = Integer.parseInt(map.get("g").toString());
+                int b = Integer.parseInt(map.get("b").toString());
+                return Color.fromRGB(r, g, b);
+            } catch (Exception ignored) {}
+        }
+        return null;
+    }
+
+    // =====================================================
+    // BASE64 ITEM
+    // =====================================================
+    public ItemStack fromBase64(String base64) {
+        if (base64 == null || base64.isBlank()) return null;
 
         try {
-            meta.addAttributeModifier(
-                    attr,
-                    new AttributeModifier(
-                            new NamespacedKey(plugin, "themob_" + normalize(key)),
-                            Double.parseDouble(val.toString()),
-                            AttributeModifier.Operation.ADD_NUMBER
-                    )
-            );
-        } catch (Exception ignored) {}
+            byte[] bytes = Base64.getDecoder().decode(base64);
+
+            try {
+                ItemStack it = ItemStack.deserializeBytes(bytes);
+                if (it != null && !it.getType().isAir()) return it;
+            } catch (Throwable ignored) {}
+
+            try (BukkitObjectInputStream in =
+                         new BukkitObjectInputStream(new ByteArrayInputStream(bytes))) {
+
+                Object obj = in.readObject();
+                if (obj instanceof ItemStack it) return it;
+                if (obj instanceof ItemStack[] arr && arr.length > 0) return arr[0];
+            }
+        } catch (Throwable ignored) {}
+
+        return null;
     }
 
+    // =====================================================
+    // HEAD TEXTURE
+    // =====================================================
+    public ItemStack skullFromTexture(String base64Texture) {
+        ItemStack head = new ItemStack(Material.PLAYER_HEAD);
+        SkullMeta meta = (SkullMeta) head.getItemMeta();
+        if (meta == null) return head;
+
+        try {
+            String json = new String(
+                    Base64.getDecoder().decode(base64Texture),
+                    StandardCharsets.UTF_8
+            );
+
+            int start = json.indexOf("\"url\":\"");
+            if (start == -1) return head;
+            start += 7;
+            int end = json.indexOf('"', start);
+            if (end == -1) return head;
+
+            String urlStr = json.substring(start, end);
+
+            PlayerProfile profile = Bukkit.createProfile(UUID.randomUUID(), null);
+            PlayerTextures textures = profile.getTextures();
+            textures.setSkin(new URL(urlStr));
+            profile.setTextures(textures);
+
+            meta.setOwnerProfile(profile);
+            head.setItemMeta(meta);
+        } catch (Throwable ignored) {}
+
+        return head;
+    }
+
+    // =====================================================
+    // HELPERS
+    // =====================================================
     private void setDouble(ItemMeta meta, String key, Object val) {
         try {
             meta.getPersistentDataContainer().set(
@@ -126,19 +232,19 @@ public final class ItemBuilderFromConfig {
                     PersistentDataType.DOUBLE,
                     Double.parseDouble(val.toString())
             );
-        } catch (Exception ignored) {}
+        } catch (Throwable ignored) {}
     }
 
     private int parseInt(Object o, int def) {
-        try { return Integer.parseInt(o.toString()); }
-        catch (Exception e) { return def; }
+        try { return Integer.parseInt(String.valueOf(o)); }
+        catch (Throwable e) { return def; }
     }
 
     private String cc(String s) {
-        return s.replace('&', '§');
+        return s == null ? "" : s.replace('&', '§');
     }
 
     private String normalize(String s) {
-        return s.toLowerCase().replace("-", "_").trim();
+        return s == null ? "" : s.toLowerCase(Locale.ROOT).replace("-", "_").trim();
     }
 }

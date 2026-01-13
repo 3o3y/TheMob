@@ -39,9 +39,10 @@ public final class KeyRegistry {
         IS_BOSS = new NamespacedKey(plugin, "is_boss");
         NO_DROPS = new NamespacedKey(plugin, "no_drops");
         VISUAL_HEAD = new NamespacedKey(plugin, "visual_head");
-        SPAWN_TYPE    = new NamespacedKey(plugin, "spawn_type");
+        SPAWN_TYPE = new NamespacedKey(plugin, "spawn_type");
         AUTO_SPAWN_ID = new NamespacedKey(plugin, "auto_spawn_id");
         BOSS_SPAWN_TIME = new NamespacedKey(plugin, "boss_spawn_time");
+
         DAMAGE = new NamespacedKey(plugin, "damage");
         EXTRA_DAMAGE = new NamespacedKey(plugin, "extra_damage");
         CRIT = new NamespacedKey(plugin, "crit");
@@ -54,6 +55,7 @@ public final class KeyRegistry {
         ATTACK_SPEED = new NamespacedKey(plugin, "attack_speed");
         KNOCKBACK_RESISTANCE = new NamespacedKey(plugin, "knockback_resistance");
         LUCK = new NamespacedKey(plugin, "luck");
+
         DROPS_DONE = new NamespacedKey(plugin, "drops_done");
 
         Map<String, NamespacedKey> map = new LinkedHashMap<>();
@@ -71,5 +73,13 @@ public final class KeyRegistry {
         map.put("luck", LUCK);
 
         ALL_STATS = Map.copyOf(map);
+    }
+
+    // ============================================
+    // 🔥 HELPER FOR MOB / PLAYER STATS
+    // ============================================
+    public NamespacedKey mobStat(String key) {
+        if (key == null) return null;
+        return ALL_STATS.get(key.toLowerCase());
     }
 }

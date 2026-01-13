@@ -80,6 +80,51 @@ public final class DamageNumberService {
         }.runTaskTimer(plugin, 1L, 1L);
     }
 
+    public static void spawnHeal(
+            Plugin plugin,
+            Entity target,
+            double healAmount
+    ) {
+        if (plugin == null || !plugin.isEnabled()) return;
+        if (target == null || !target.isValid()) return;
+
+        double hearts = healAmount / 2.0;
+        if (hearts < 0.25) return;
+
+        World world = target.getWorld();
+        Location loc = target.getLocation().add(0, target.getHeight() + 0.8, 0);
+
+        TextDisplay text = world.spawn(loc, TextDisplay.class, td -> {
+            td.setText("§a+" + Math.round(hearts) + "♥");
+            td.setBillboard(Display.Billboard.CENTER);
+            td.setShadowed(true);
+            td.setSeeThrough(true);
+            td.setLineWidth(80);
+            td.setTextOpacity((byte) 255);
+
+            td.setTransformation(new Transformation(
+                    new Vector3f(),
+                    new Quaternionf(),
+                    new Vector3f(1.6f, 1.6f, 1.6f),
+                    new Quaternionf()
+            ));
+        });
+
+        new BukkitRunnable() {
+            int ticks;
+            @Override
+            public void run() {
+                if (!text.isValid() || ticks++ > 18) {
+                    text.remove();
+                    cancel();
+                    return;
+                }
+                text.teleport(text.getLocation().add(0, 0.04, 0));
+            }
+        }.runTaskTimer(plugin, 1L, 1L);
+    }
+
+
     private static String format(double dmg, boolean crit) {
         String value = dmg >= 100
                 ? String.valueOf(Math.round(dmg))

@@ -6,11 +6,16 @@ import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.NamespacedKey;
 import org.bukkit.attribute.Attribute;
+import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.persistence.PersistentDataType;
 
-import java.util.*;
+import java.lang.reflect.Method;
+import java.util.HashMap;
+import java.util.Locale;
+import java.util.Map;
+import java.util.UUID;
 import java.util.function.Supplier;
 
 public final class Placeholder {
@@ -22,6 +27,28 @@ public final class Placeholder {
             new NamespacedKey("themob", "base_name");
 
     private static final MiniMessage MINI_MESSAGE = MiniMessage.miniMessage();
+
+    // PlaceholderAPI (soft) cache
+    private static final boolean PAPI_PRESENT;
+    private static final Method PAPI_SET_PLACEHOLDERS;
+
+    static {
+        boolean present = false;
+        Method method = null;
+
+        try {
+            present = Bukkit.getPluginManager().isPluginEnabled("PlaceholderAPI");
+            if (present) {
+                Class<?> papi = Class.forName("me.clip.placeholderapi.PlaceholderAPI");
+                method = papi.getMethod("setPlaceholders", Player.class, String.class);
+            }
+        } catch (Throwable ignored) {
+            // keep null
+        }
+
+        PAPI_PRESENT = present;
+        PAPI_SET_PLACEHOLDERS = method;
+    }
 
     private Placeholder() {}
 
@@ -41,12 +68,11 @@ public final class Placeholder {
 
         String out = input;
         for (Map.Entry<String, Supplier<String>> e : values.entrySet()) {
-            out = out.replace("{" + e.getKey() + "}", e.getValue().get());
+            out = out.replace("{" + e.getKey() + "}", safe(e.getValue()));
         }
 
         // PlaceholderAPI (optional, last)
-        out = applyPlaceholderAPI(out, viewer);
-        return out;
+        return applyPlaceholderAPI(out, viewer);
     }
 
     // =====================================================
@@ -58,7 +84,14 @@ public final class Placeholder {
             BossPhase phase,
             Player viewer
     ) {
-        return MINI_MESSAGE.deserialize(resolve(input, boss, phase, viewer));
+        String resolved = resolve(input, boss, phase, viewer);
+
+        // defensive: avoid MiniMessage exploding on invalid tags
+        try {
+            return MINI_MESSAGE.deserialize(resolved);
+        } catch (Throwable ignored) {
+            return Component.text(resolved);
+        }
     }
 
     // =====================================================
@@ -69,7 +102,7 @@ public final class Placeholder {
             BossPhase phase,
             Player viewer
     ) {
-        Map<String, Supplier<String>> map = new HashMap<>();
+        Map<String, Supplier<String>> map = new HashMap<>(64);
 
         // -------- MOB --------
         map.put("mob_name", () -> baseName(boss));
@@ -77,24 +110,26 @@ public final class Placeholder {
         map.put("mob_uuid", () -> boss.getUniqueId().toString());
 
         // -------- HEALTH --------
-        map.put("health", () -> String.valueOf((int) boss.getHealth()));
+        map.put("health", () -> String.valueOf((int) Math.ceil(boss.getHealth())));
         map.put("max_health", () -> {
-            var a = boss.getAttribute(Attribute.MAX_HEALTH);
-            return a != null ? String.valueOf((int) a.getValue()) : "0";
+            AttributeInstance a = boss.getAttribute(Attribute.MAX_HEALTH);
+            return a != null ? String.valueOf((int) Math.ceil(a.getValue())) : "0";
         });
         map.put("health_percent", () -> {
-            var a = boss.getAttribute(Attribute.MAX_HEALTH);
-            if (a == null || a.getValue() <= 0) return "0";
-            return String.valueOf((int) ((boss.getHealth() / a.getValue()) * 100));
+            AttributeInstance a = boss.getAttribute(Attribute.MAX_HEALTH);
+            if (a == null) return "0";
+            double max = a.getValue();
+            if (max <= 0) return "0";
+            return String.valueOf((int) Math.round((boss.getHealth() / max) * 100.0));
         });
 
         // -------- PHASE --------
-        map.put("phase_id", () -> phase != null ? phase.id() : "none");
-        map.put("phase_title", () -> phase != null && phase.title() != null ? phase.title() : "");
+        map.put("phase_id", () -> phase != null ? nz(phase.id(), "none") : "none");
+        map.put("phase_title", () -> phase != null ? nz(phase.title(), "") : "");
 
         // -------- WORLD / LOCATION --------
         Location bl = boss.getLocation();
-        map.put("world", () -> bl.getWorld().getName());
+        map.put("world", () -> bl.getWorld() != null ? bl.getWorld().getName() : "unknown");
         map.put("x", () -> String.valueOf(bl.getBlockX()));
         map.put("y", () -> String.valueOf(bl.getBlockY()));
         map.put("z", () -> String.valueOf(bl.getBlockZ()));
@@ -104,6 +139,7 @@ public final class Placeholder {
         // -------- DISTANCE --------
         map.put("distance", () -> {
             if (viewer == null || !viewer.isOnline()) return "-";
+            if (bl.getWorld() == null || viewer.getWorld() == null) return "-";
             if (!viewer.getWorld().equals(bl.getWorld())) return "-";
             return String.valueOf((int) Math.round(viewer.getLocation().distance(bl)));
         });
@@ -115,6 +151,7 @@ public final class Placeholder {
         // -------- META --------
         map.put("online_players", () -> String.valueOf(Bukkit.getOnlinePlayers().size()));
         map.put("server", () -> Bukkit.getServer().getName());
+        map.put("server_uuid", () -> UUID.nameUUIDFromBytes(Bukkit.getServer().getName().getBytes()).toString());
 
         return map;
     }
@@ -143,15 +180,28 @@ public final class Placeholder {
     private static String applyPlaceholderAPI(String input, Player player) {
         if (input == null || input.isEmpty()) return "";
         if (player == null) return input;
-        if (!Bukkit.getPluginManager().isPluginEnabled("PlaceholderAPI")) return input;
+        if (!PAPI_PRESENT || PAPI_SET_PLACEHOLDERS == null) return input;
 
         try {
-            Class<?> papi = Class.forName("me.clip.placeholderapi.PlaceholderAPI");
-            return (String) papi
-                    .getMethod("setPlaceholders", Player.class, String.class)
-                    .invoke(null, player, input);
+            return (String) PAPI_SET_PLACEHOLDERS.invoke(null, player, input);
         } catch (Throwable ignored) {
             return input;
         }
+    }
+
+    // =====================================================
+    // UTILS
+    // =====================================================
+    private static String safe(Supplier<String> s) {
+        try {
+            String v = s.get();
+            return v == null ? "" : v;
+        } catch (Throwable ignored) {
+            return "";
+        }
+    }
+
+    private static String nz(String v, String def) {
+        return (v == null || v.isBlank()) ? def : v;
     }
 }

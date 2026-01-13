@@ -9,6 +9,7 @@ import org.bukkit.entity.LivingEntity;
 import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.persistence.PersistentDataType;
+import org.plugin.theMob.TheMob;
 import org.plugin.theMob.item.ItemBuilderFromConfig;
 import org.plugin.theMob.item.ItemLoreRenderer;
 import org.plugin.theMob.progression.TieredLootTableService;
@@ -20,15 +21,18 @@ import java.util.Random;
 public final class MobDropEngine {
 
     private MobManager mobs;
+
+    private final TheMob plugin;
     private final ItemBuilderFromConfig builder;
     private final ItemLoreRenderer loreRenderer = new ItemLoreRenderer();
     private final Random random = new Random();
 
-    // v1.9 optional
     private TieredLootTableService tieredLoot;
 
-    public MobDropEngine(ItemBuilderFromConfig builder) {
-        this.builder = builder;
+    // ✅ RICHTIGER KONSTRUKTOR
+    public MobDropEngine(TheMob plugin) {
+        this.plugin = plugin;
+        this.builder = new ItemBuilderFromConfig(plugin);
     }
 
     public void bind(MobManager manager) {
@@ -39,9 +43,13 @@ public final class MobDropEngine {
         this.tieredLoot = tieredLoot;
     }
 
+    // =====================================================
+    // CORE
+    // =====================================================
     public void handleDeath(LivingEntity mob, EntityDeathEvent event) {
         if (mobs == null || mob == null || event == null) return;
 
+        // ❌ doppelte Ausführung verhindern
         if (mob.getPersistentDataContainer().has(
                 mobs.keys().DROPS_DONE,
                 PersistentDataType.INTEGER
@@ -53,26 +61,35 @@ public final class MobDropEngine {
                 1
         );
 
-        Integer noDrops = mob.getPersistentDataContainer()
+        FileConfiguration cfg = mobs.mobConfigOf(mob);
+        if (cfg == null) return;
+
+        boolean isBoss = mobs.isBoss(mob);
+
+        Integer noDropsFlag = mob.getPersistentDataContainer()
                 .get(mobs.keys().NO_DROPS, PersistentDataType.INTEGER);
 
         event.getDrops().clear();
         event.setDroppedExp(0);
 
-        if (noDrops != null && noDrops == 1) return;
+        // =================================================
+// NORMAL DROPS (nur blockiert bei NO_DROPS)
+// =================================================
+        if (noDropsFlag == null || noDropsFlag != 1) {
+            dropList(cfg.getMapList("drops"), mob);
+        }
 
-        FileConfiguration cfg = mobs.mobConfigOf(mob);
-        if (cfg == null) return;
-
-        // ---------- Normal drops ----------
-        dropList(cfg.getMapList("drops"), mob);
-
-        // ---------- Boss legendary drops ----------
-        if (mobs.isBoss(mob) && cfg.getBoolean("opdrop", false)) {
+// =================================================
+// OP / LEGENDARY DROPS (BOSS → IMMER erlaubt)
+// =================================================
+        if (isBoss && cfg.getBoolean("opdrop", false)) {
             dropList(cfg.getMapList("legendary-drops"), mob);
         }
 
-        // ---------- v1.9 Tiered loot ----------
+
+        // =================================================
+        // v1.9 TIERED LOOT
+        // =================================================
         if (tieredLoot != null) {
             String tier = cfg.getString("loot-tier");
             if (tier != null) {

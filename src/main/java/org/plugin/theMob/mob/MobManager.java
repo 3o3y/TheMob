@@ -177,7 +177,11 @@ public final class MobManager {
 
     public void setDropEngine(MobDropEngine dropEngine) {
         this.dropEngine = dropEngine;
+        if (dropEngine == null) {
+            plugin.getLogger().warning("[TheMob] DropEngine cleared");
+        }
     }
+
 
     public void setHealthDisplay(MobHealthDisplay display) {
         this.healthDisplay = display;
@@ -212,3 +216,4 @@ public final class MobManager {
         autoSpawn = null;
     }
 }
+

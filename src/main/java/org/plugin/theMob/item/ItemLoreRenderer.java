@@ -17,49 +17,97 @@ public final class ItemLoreRenderer {
 
     private static final NamespacedKey RENDERED_KEY =
             new NamespacedKey("themob", "lore_rendered");
+
     public void apply(ItemStack item) {
         if (item == null || !item.hasItemMeta()) return;
+
         ItemMeta meta = item.getItemMeta();
+
         if (meta.getPersistentDataContainer().has(RENDERED_KEY, PersistentDataType.INTEGER)) {
             return;
         }
+
         List<Component> lore = new ArrayList<>();
         if (meta.lore() != null) {
             lore.addAll(meta.lore());
         }
-        lore.add(Component.empty());
-        lore.add(cc("&bProperties:"));
-        add(meta, lore, "damage", "Damage", "+");
-        add(meta, lore, "extra_damage", "Bonus Damage", "+");
-        add(meta, lore, "crit", "Critical Chance", "+", "%");
-        add(meta, lore, "lifesteal", "Lifesteal", "+", "%");
-        add(meta, lore, "armor", "Armor", "+");
-        add(meta, lore, "health", "Health", "+");
-        add(meta, lore, "defense", "Defense", "+");
+
+        // =====================================================
+        // PROPERTIES (only if at least one exists)
+        // =====================================================
+        if (hasAnyProperties(meta)) {
+            lore.add(Component.empty());
+            lore.add(cc("&bProperties:"));
+
+            add(meta, lore, "damage", "Damage", "+");
+            add(meta, lore, "extra_damage", "Bonus Damage", "+");
+            add(meta, lore, "crit", "Critical Chance", "+", "%");
+            add(meta, lore, "lifesteal", "Lifesteal", "+", "%");
+            add(meta, lore, "armor", "Armor", "+");
+            add(meta, lore, "health", "Health", "+");
+            add(meta, lore, "defense", "Defense", "+");
+        }
+
+        // =====================================================
+        // ENCHANTMENTS
+        // =====================================================
         if (!meta.getEnchants().isEmpty()) {
             lore.add(Component.empty());
             lore.add(cc("&dEnchantments:"));
+
             for (Map.Entry<Enchantment, Integer> e : meta.getEnchants().entrySet()) {
                 lore.add(cc("&f- " + formatEnchant(e.getKey()) + " " + e.getValue()));
             }
         }
+
         meta.lore(lore);
+
         meta.addItemFlags(
                 ItemFlag.HIDE_ATTRIBUTES,
                 ItemFlag.HIDE_ENCHANTS,
                 ItemFlag.HIDE_ADDITIONAL_TOOLTIP
         );
+
         meta.getPersistentDataContainer().set(
                 RENDERED_KEY,
                 PersistentDataType.INTEGER,
                 1
         );
+
         item.setItemMeta(meta);
     }
+
+    // =====================================================
+    // PROPERTY CHECKS
+    // =====================================================
+
+    private boolean hasAnyProperties(ItemMeta meta) {
+        return has(meta, "damage")
+                || has(meta, "extra_damage")
+                || has(meta, "crit")
+                || has(meta, "lifesteal")
+                || has(meta, "armor")
+                || has(meta, "health")
+                || has(meta, "defense");
+    }
+
+    private boolean has(ItemMeta meta, String key) {
+        Double v = meta.getPersistentDataContainer().get(
+                new NamespacedKey("themob", key),
+                PersistentDataType.DOUBLE
+        );
+        return v != null && v != 0;
+    }
+
+    // =====================================================
+    // LORE HELPERS
+    // =====================================================
+
     private void add(ItemMeta meta, List<Component> lore,
                      String key, String label, String prefix) {
         add(meta, lore, key, label, prefix, "");
     }
+
     private void add(ItemMeta meta, List<Component> lore,
                      String key, String label, String prefix, String suffix) {
         Double v = meta.getPersistentDataContainer().get(
@@ -70,12 +118,15 @@ public final class ItemLoreRenderer {
             lore.add(cc("&f- " + label + ": &a" + prefix + trim(v) + suffix));
         }
     }
+
     private Component cc(String s) {
         return Component.text(ChatColor.translateAlternateColorCodes('&', s));
     }
+
     private String trim(double d) {
         return d % 1 == 0 ? String.valueOf((int) d) : String.valueOf(d);
     }
+
     private String formatEnchant(Enchantment e) {
         String raw = e.getKey().getKey().replace("_", " ");
         String[] p = raw.split(" ");

@@ -21,6 +21,7 @@ public final class MobCommand implements CommandExecutor {
     private final SpawnController spawns;
     private final MobDiagCommand diag;
     private final TheMobDebugCommand debug;
+    private final MobBase64Command base64; // ✅ NEU
 
     public MobCommand(TheMob plugin, MobManager mobs, SpawnController spawns) {
         this.plugin = plugin;
@@ -28,10 +29,21 @@ public final class MobCommand implements CommandExecutor {
         this.spawns = spawns;
         this.diag = new MobDiagCommand(plugin.automation());
         this.debug = new TheMobDebugCommand(plugin, mobs, spawns);
+        this.base64 = new MobBase64Command(plugin); // ✅ NEU
     }
 
     @Override
     public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
+
+        // -------------------------------------------------
+// /mob get base64
+// -------------------------------------------------
+        if (args.length == 2
+                && args[0].equalsIgnoreCase("get")
+                && args[1].equalsIgnoreCase("base64")) {
+
+            return base64.onCommand(sender, cmd, label, args);
+        }
 
         if (args.length == 0) {
             help(sender);
