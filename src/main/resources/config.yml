@@ -32,7 +32,6 @@ plugin:
   #  • Throttle state changes
   #  • Boss cooldown checks
 
-
 # =========================================================
 #  GLOBAL SPAWN BUDGETS
 # =========================================================
@@ -42,15 +41,11 @@ plugin:
 
 global-budgets:
   enabled: true
-
   total-mobs: 500
   bosses: 10
   minions: 200
-
-
 world-budgets:
   enabled: true
-
   worlds:
     world:
       total-mobs: 300
@@ -58,26 +53,23 @@ world-budgets:
       total-mobs: 150
     world_the_end:
       total-mobs: 100
-
-
 # =========================================================
 #  AUTO-SPAWN THROTTLING (TPS SAFETY)
 # =========================================================
-
 throttling:
   enabled: true
-
   tps-thresholds:
     normal: 19.5
     warning: 18.0
     critical: 16.0
-
   behavior:
     warning-multiplier: 1.25
     critical-multiplier: 1.75
-    hard-stop-below-critical: true
-    # true = no new auto spawns below critical TPS
-
+    hard-stop-below-critical: true # true = no new auto spawns below critical TPS
+# TPS warning is part of the built-in spawn protection system (v1.7). It prevents lag by disabling auto-spawns when TPS drops.
+automation:
+  feedback:
+    show-to-players: false # just shown to Admins
 
 # =========================================================
 #  DYNAMIC SCALING BY PLAYER COUNT
@@ -85,7 +77,6 @@ throttling:
 
 scaling:
   enabled: true
-
   player-ranges:
     players-1-10:
       spawn-multiplier: 0.5
@@ -95,84 +86,69 @@ scaling:
       spawn-multiplier: 1.3
     players-151-plus:
       spawn-multiplier: 1.5
-
-
 # =========================================================
 #  BOSS COOLDOWNS (PERSISTENT)
 # =========================================================
 # Cooldowns survive server restarts.
 # Used to prevent boss farming via restarts.
 # =========================================================
-
 boss-cooldowns:
   enabled: true
-
   storage: file
-  # file | sqlite (sqlite empfohlen für Netzwerke)
-
+  # file | sqlite
   data:
     zombie_king:
       next-spawn: 1700000000
-
-
 # =========================================================
 #  ADMIN DIAGNOSTICS
 # =========================================================
-
 diagnostics:
   enabled: true
-
   commands:
     show-block-reasons: true
     show-budgets: true
     show-throttle-state: true
     show-alive-mobs: true
-
-
 # =========================================================
 #  NAVIGATION HUD / MOB RADAR
 # =========================================================
-
 navigation-hud:
   enabled: true
-
   update-interval-ticks: 5
   hide-in-combat: false
   hide-when-idle: false
   hide-in-creative: false
   hide-in-spectator: true
-
-
 mob-radar:
   scan-radius: 20
-
   scan-chunks:
     horizontal: 1
     vertical: 1
-
   priority:
     plugin-mobs: 1
     aggressive: 2
     neutral: 3
     passive: 4
-
   colors:
     plugin-mob: PURPLE
     aggressive-mob: RED
     neutral-mob: YELLOW
     passive-mob: GREEN
     empty: WHITE
-
   ignore:
     bats: true
     villagers: true
     named-mobs: false
-
-
 # =========================================================
 #  COMBAT SETTINGS
 # =========================================================
-
+# Damage Indicator
 combat:
-  crit:
+  damage-indicator:
+    enabled: false
+    show-to:
+      - op
+      - admin
+# Max Critical multiplier for damage
+    crit:
     max-multiplier: 10.0

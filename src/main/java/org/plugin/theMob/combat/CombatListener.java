@@ -5,6 +5,7 @@ import org.bukkit.GameMode;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.*;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.inventory.ItemStack;
@@ -16,14 +17,8 @@ import org.plugin.theMob.player.stats.PlayerStatCache;
 import org.plugin.theMob.progression.PlayerProgressionManager;
 import org.plugin.theMob.progression.PlayerProgressionState;
 import org.plugin.theMob.progression.ProgressionCombatApplier;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Set;
-import java.util.Collections;
 
-
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 public final class CombatListener implements Listener {
 
@@ -32,7 +27,6 @@ public final class CombatListener implements Listener {
     private final CombatDebugService debug;
     private final PlayerStatCache cache;
     private final CustomEnchantSystem enchants;
-
     private final PlayerProgressionManager progression;
     private final ProgressionCombatApplier progressionCombat;
 
@@ -54,7 +48,7 @@ public final class CombatListener implements Listener {
         this.progressionCombat = progressionCombat;
     }
 
-    @EventHandler(ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onDamage(EntityDamageByEntityEvent e) {
 
         Player attacker = resolveAttacker(e.getDamager());
@@ -65,21 +59,17 @@ public final class CombatListener implements Listener {
         if (attacker.getGameMode() == GameMode.CREATIVE
                 || attacker.getGameMode() == GameMode.SPECTATOR) return;
 
-        // =====================================
-        // STAT COLLECTION
-        // =====================================
-
-        Map<String, Double> playerStats = cache.get(attacker);
-        Map<String, Double> itemStats = collectItemStats(attacker);
-
-        Map<String, Double> mergedStats = merge(playerStats, itemStats);
+        // -----------------------------
+        // STATS
+        // -----------------------------
+        Map<String, Double> mergedStats = merge(
+                cache != null ? cache.get(attacker) : Map.of(),
+                collectItemStats(attacker)
+        );
 
         ConfigurationSection combatCfg =
                 plugin.getConfig().getConfigurationSection("combat");
 
-        // =====================================
-        // VANILLA BASE DAMAGE
-        // =====================================
         double vanillaDamage = e.getDamage();
 
         DamageResult result = calc.calculate(
@@ -90,41 +80,34 @@ public final class CombatListener implements Listener {
                 combatCfg
         );
 
-        double finalDamage = result.finalDamage();
+        double finalDamage = Math.max(0.0, result.finalDamage());
+        double health = Math.max(0.0, target.getHealth());
 
-        double health = target.getHealth();
+        // -----------------------------
+        // APPLY DAMAGE + HARD KILL
+        // -----------------------------
+        if (finalDamage >= health && health > 0.0) {
+            // Apply lethal damage first (keeps vanilla death pipeline as much as possible)
+            e.setDamage(health);
 
-        if (finalDamage >= health) {
-            // Erzwinge Vanilla-Kill
-            e.setDamage(health + 0.01);
+            // Hard-kill next tick (fixes "unkillable boss at 1 HP" edge cases)
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                if (target.isValid() && !target.isDead()) {
+                    try {
+                        target.setHealth(0.0);
+                    } catch (Throwable ignored) {
+                        // some entities/plugins may block setHealth
+                    }
+                }
+            });
         } else {
             e.setDamage(finalDamage);
         }
 
-
-        // =====================================
-        // PROGRESSION SCALING (POST)
-        // =====================================
-        if (progression != null && progressionCombat != null) {
-            PlayerProgressionState state =
-                    progression.get(attacker.getUniqueId());
-            if (state != null) {
-                finalDamage =
-                        progressionCombat.applyDamage(state, finalDamage);
-            }
-        }
-
-        e.setDamage(finalDamage);
-
-        // =====================================
+        // -----------------------------
         // DAMAGE NUMBERS
-        // =====================================
-        boolean showNumbers =
-                combatCfg == null || combatCfg.getBoolean(
-                        "damage-indicator", true
-                );
-
-        if (showNumbers && !(target instanceof Player)) {
+        // -----------------------------
+        if (shouldShowDamageNumbers(attacker, combatCfg) && !(target instanceof Player)) {
             DamageNumberService.spawn(
                     plugin,
                     target,
@@ -132,62 +115,72 @@ public final class CombatListener implements Listener {
                     result.crit()
             );
         }
+
+        // -----------------------------
+        // LIFESTEAL (POST)
+        // -----------------------------
         if (result.lifestealAmount() > 0) {
             double heal = result.lifestealAmount();
             Bukkit.getScheduler().runTask(plugin, () -> {
-                attacker.setHealth(
-                        Math.min(attacker.getMaxHealth(),
-                                attacker.getHealth() + heal)
-                );
-                DamageNumberService.spawnHeal(plugin, attacker, heal);
+                if (!attacker.isOnline()) return;
+                double maxHp = attacker.getAttribute(org.bukkit.attribute.Attribute.MAX_HEALTH) != null
+                        ? attacker.getAttribute(org.bukkit.attribute.Attribute.MAX_HEALTH).getValue()
+                        : attacker.getMaxHealth();
+
+                attacker.setHealth(Math.min(maxHp, attacker.getHealth() + heal));
+
+                if (shouldShowDamageNumbers(attacker, combatCfg)) {
+                    DamageNumberService.spawnHeal(plugin, attacker, heal);
+                }
             });
         }
 
-        // =====================================
-        // ON-HIT EFFECTS (ITEM ONLY)
-        // =====================================
-        if (enchants != null && itemStats != null && !itemStats.isEmpty()) {
-            enchants.trigger(attacker, target, itemStats, finalDamage);
+        // -----------------------------
+        // ITEM ENCHANTS
+        // -----------------------------
+        if (enchants != null) {
+            enchants.trigger(attacker, target, mergedStats, finalDamage);
         }
 
-        // =====================================
+        // -----------------------------
         // DEBUG
-        // =====================================
+        // -----------------------------
         if (debug != null) {
             debug.send(attacker, result);
         }
     }
 
     // =====================================================
-// STAT MERGE
-// =====================================================
-    private static final Set<String> NO_SUM_KEYS =
-            Collections.singleton("crit_multiplier");
+    // DAMAGE INDICATOR CONFIG CHECK
+    // =====================================================
+    private boolean shouldShowDamageNumbers(Player p, ConfigurationSection combatCfg) {
+        if (combatCfg == null) return false;
 
-    private Map<String, Double> merge(
-            Map<String, Double> base,
-            Map<String, Double> add
-    ) {
-        Map<String, Double> out = new HashMap<>();
-        if (base != null) out.putAll(base);
+        ConfigurationSection sec = combatCfg.getConfigurationSection("damage-indicator");
+        if (sec == null) return false;
 
-        if (add != null) {
-            add.forEach((k, v) -> {
-                if (NO_SUM_KEYS.contains(k)) {
-                    out.put(k, v);
-                } else {
-                    out.merge(k, v, Double::sum);
-                }
-            });
-        }
-        return out;
+        if (!sec.getBoolean("enabled", false)) return false;
+
+        List<String> showTo = sec.getStringList("show-to");
+        if (showTo == null || showTo.isEmpty()) return false;
+
+        if (p.isOp() && showTo.contains("op")) return true;
+        return showTo.contains("admin") && p.hasPermission("themob.admin");
     }
 
-
-
     // =====================================================
-    // ITEM STATS
+    // HELPERS
     // =====================================================
+    private Player resolveAttacker(Entity damager) {
+        if (damager instanceof Player p) return p;
+
+        if (damager instanceof Projectile proj && proj.getShooter() instanceof Player p) return p;
+
+        if (damager instanceof Tameable tame && tame.getOwner() instanceof Player p) return p;
+
+        return null;
+    }
+
     private Map<String, Double> collectItemStats(Player p) {
         if (enchants == null) return Map.of();
 
@@ -200,18 +193,13 @@ public final class CombatListener implements Listener {
         return enchants.collect(meta);
     }
 
-    // =====================================================
-    // HELPERS
-    // =====================================================
-    private Player resolveAttacker(Entity damager) {
-        if (damager instanceof Player p) return p;
+    private Map<String, Double> merge(Map<String, Double> base, Map<String, Double> add) {
+        Map<String, Double> out = new HashMap<>();
+        if (base != null) out.putAll(base);
 
-        if (damager instanceof Projectile proj &&
-                proj.getShooter() instanceof Player p) return p;
-
-        if (damager instanceof Tameable tame &&
-                tame.getOwner() instanceof Player p) return p;
-
-        return null;
+        if (add != null) {
+            add.forEach((k, v) -> out.merge(k, v, Double::sum));
+        }
+        return out;
     }
 }

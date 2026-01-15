@@ -15,6 +15,7 @@ import org.plugin.theMob.boss.bar.BossBarService;
 import org.plugin.theMob.boss.behavior.BossBehaviorController;
 import org.plugin.theMob.boss.phase.BossPhaseController;
 import org.plugin.theMob.boss.phase.BossPhaseResolver;
+import org.plugin.theMob.boss.world.BossWorldEffectController;
 import org.plugin.theMob.combat.CombatBootstrap;
 import org.plugin.theMob.control.AutomationScalingSystem;
 import org.plugin.theMob.item.CustomEnchantSystem;
@@ -60,6 +61,7 @@ public final class TheMob extends JavaPlugin {
     private ConfigService configService;
     private KeyRegistry keys;
     private TickScheduler ticks;
+    private BossPhaseController phaseController;
 
     // Mobs
     private MobManager mobManager;
@@ -74,7 +76,7 @@ public final class TheMob extends JavaPlugin {
     // Boss
     private PlayerBarCoordinator playerBars;
     private BossBarService bossBars;
-    private BossPhaseController phaseController;
+
     private BossBehaviorController behaviorController;
     private BossActionEngine bossActionEngine;
     private BossLockService bossLocks;
@@ -168,6 +170,8 @@ public final class TheMob extends JavaPlugin {
 
         if (keys == null) {
             keys = new KeyRegistry(this);
+            Placeholder.init(keys);
+
         }
 
         // ✅ reload-safe: never leave old scheduled tasks running
@@ -212,8 +216,23 @@ public final class TheMob extends JavaPlugin {
         bossBars.restore();
         Bukkit.getPluginManager().registerEvents(bossBars, this);
 
-        phaseController = new BossPhaseController(resolver, bossActionEngine, bossBars);
-        behaviorController = new BossBehaviorController(this, mobManager, phaseController);
+        BossWorldEffectController worldEffects = new BossWorldEffectController(this);
+
+        phaseController = new BossPhaseController(
+                resolver,
+                bossActionEngine,
+                bossBars,
+                keys,
+                worldEffects
+        );
+
+
+        behaviorController = new BossBehaviorController(
+                this,
+                mobManager,
+                phaseController
+        );
+
 
         // ---------- Spawn Service ----------
         MobSpawnService spawnService = new MobSpawnService(

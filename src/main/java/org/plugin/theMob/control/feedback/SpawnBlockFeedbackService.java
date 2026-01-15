@@ -12,17 +12,16 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * Player/Admin-facing feedback so "nothing spawning" never feels like the plugin is broken.
- */
 public final class SpawnBlockFeedbackService {
 
-    private static final long TICK_INTERVAL = 20L;              // 1s
-    private static final long PLAYER_COOLDOWN_TICKS = 60L;      // 3s
-    private static final long GLOBAL_COOLDOWN_TICKS = 40L;      // 2s
+    private static final long TICK_INTERVAL = 20L;
+    private static final long PLAYER_COOLDOWN_TICKS = 60L;
+    private static final long GLOBAL_COOLDOWN_TICKS = 40L;
 
     private final Plugin plugin;
     private final AutomationScalingSystem sys;
+
+    private boolean showToPlayers;
 
     private long lastBlockedBudget;
     private long lastBlockedThrottle;
@@ -36,6 +35,14 @@ public final class SpawnBlockFeedbackService {
     public SpawnBlockFeedbackService(Plugin plugin, AutomationScalingSystem sys) {
         this.plugin = plugin;
         this.sys = sys;
+        reload();
+    }
+
+    public void reload() {
+        showToPlayers = plugin.getConfig().getBoolean(
+                "automation.feedback.show-to-players",
+                false
+        );
     }
 
     public void start() {
@@ -74,53 +81,42 @@ public final class SpawnBlockFeedbackService {
         var state = throttle.state(tps1m);
 
         if ("HARD_STOP".equalsIgnoreCase(state.name())) {
-            notifyAllPlayersRateLimited(
-                    "§4⛔ Spawns pausiert §7(§cTPS Schutz aktiv§7) §8– warte kurz…"
-            );
+            notifyRateLimited("§4⛔ Spawns paused §7(§cTPS protection active§7)");
         }
 
         long blockedBudget = safe(gateStats.getBlockedBudget());
         long blockedThrottle = safe(gateStats.getBlockedThrottle());
         long blockedCooldown = safe(gateStats.getBlockedCooldown());
 
-        long dBudget = blockedBudget - lastBlockedBudget;
-        long dThrottle = blockedThrottle - lastBlockedThrottle;
-        long dCooldown = blockedCooldown - lastBlockedCooldown;
+        if (blockedBudget > lastBlockedBudget) {
+            notifyRateLimited("§e⚠ Spawns blocked §7(§fMob budget§7)");
+        }
+        if (blockedThrottle > lastBlockedThrottle) {
+            notifyRateLimited("§e⚠ Spawns blocked §7(§fTPS throttle§7)");
+        }
+        if (blockedCooldown > lastBlockedCooldown) {
+            notifyRateLimited("§e⚠ Boss spawn blocked §7(§fCooldown active§7)");
+        }
 
         lastBlockedBudget = blockedBudget;
         lastBlockedThrottle = blockedThrottle;
         lastBlockedCooldown = blockedCooldown;
-
-        if (dBudget > 0) {
-            notifyAdminsRateLimited("§e⚠ Spawns blockiert §7(§fMob-Cap/Budget§7)");
-        }
-        if (dThrottle > 0) {
-            notifyAdminsRateLimited("§e⚠ Spawns blockiert §7(§fTPS Throttle§7)");
-        }
-        if (dCooldown > 0) {
-            notifyAdminsRateLimited("§e⚠ Boss-Spawn blockiert §7(§fCooldown aktiv§7)");
-        }
     }
 
-    private void notifyAllPlayersRateLimited(String msg) {
+    private void notifyRateLimited(String msg) {
         long now = Bukkit.getCurrentTick();
         if (now - lastGlobalNotifyTick < GLOBAL_COOLDOWN_TICKS) return;
         lastGlobalNotifyTick = now;
 
         for (Player p : Bukkit.getOnlinePlayers()) {
+            if (!isAllowed(p)) continue;
             sendActionBarRateLimited(p, msg);
         }
     }
 
-    private void notifyAdminsRateLimited(String msg) {
-        long now = Bukkit.getCurrentTick();
-        if (now - lastGlobalNotifyTick < GLOBAL_COOLDOWN_TICKS) return;
-        lastGlobalNotifyTick = now;
-
-        for (Player p : Bukkit.getOnlinePlayers()) {
-            if (!p.hasPermission("themob.admin")) continue;
-            sendActionBarRateLimited(p, msg);
-        }
+    private boolean isAllowed(Player p) {
+        if (showToPlayers) return true;
+        return p.isOp() || p.hasPermission("themob.admin");
     }
 
     private void sendActionBarRateLimited(Player p, String msg) {

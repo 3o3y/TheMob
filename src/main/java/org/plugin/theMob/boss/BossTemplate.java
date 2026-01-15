@@ -1,23 +1,25 @@
 package org.plugin.theMob.boss;
 
-import java.util.Collection;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Objects;
+import org.bukkit.configuration.ConfigurationSection;
+
+import java.util.*;
 
 public final class BossTemplate {
 
     private final String mobId;
+
+    // Reihenfolge behalten (YAML Ordnung)
     private final Map<String, BossPhase> phases = new LinkedHashMap<>();
+    private final Map<String, ConfigurationSection> phaseConfigs = new HashMap<>();
 
     public BossTemplate(String mobId) {
         this.mobId = Objects.requireNonNull(mobId, "mobId");
     }
 
-    public void addPhase(BossPhase phase) {
-        if (phase == null) return;
+    public void addPhase(BossPhase phase, ConfigurationSection cfg) {
+        if (phase == null || cfg == null) return;
         phases.put(phase.id(), phase);
+        phaseConfigs.put(phase.id(), cfg);
     }
 
     public boolean hasPhases() {
@@ -35,6 +37,10 @@ public final class BossTemplate {
             }
         }
         return null;
+    }
+
+    public ConfigurationSection phaseConfig(String phaseId) {
+        return phaseConfigs.get(phaseId);
     }
 
     public String mobId() {

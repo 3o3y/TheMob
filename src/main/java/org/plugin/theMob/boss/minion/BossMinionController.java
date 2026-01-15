@@ -68,6 +68,7 @@ public final class BossMinionController implements Listener {
                 .computeIfAbsent(phaseId, k -> ConcurrentHashMap.newKeySet())
                 .add(minionId);
 
+        // Minions never drop items
         minion.getPersistentDataContainer().set(
                 plugin.keys().NO_DROPS,
                 PersistentDataType.INTEGER,
@@ -99,6 +100,40 @@ public final class BossMinionController implements Listener {
     }
 
     // =====================================================
+    // TICK (DEFENSIVE CLEANUP)
+    // =====================================================
+
+    /**
+     * Called periodically from BossActionEngine
+     * Ensures no orphaned minions exist
+     */
+    public void tick() {
+
+        // validate bosses
+        for (Iterator<UUID> it = bossToMinions.keySet().iterator(); it.hasNext();) {
+            UUID bossId = it.next();
+
+            LivingEntity boss = findLiving(bossId);
+            if (boss == null || boss.isDead() || !boss.isValid()) {
+                cleanupBoss(bossId);
+                it.remove();
+            }
+        }
+
+        // validate minions
+        for (Iterator<Map.Entry<UUID, UUID>> it = minionToBoss.entrySet().iterator(); it.hasNext();) {
+            Map.Entry<UUID, UUID> e = it.next();
+            UUID minionId = e.getKey();
+
+            LivingEntity minion = findLiving(minionId);
+            if (minion == null || minion.isDead() || !minion.isValid()) {
+                unregister(minionId);
+                it.remove();
+            }
+        }
+    }
+
+    // =====================================================
     // HARD CLEANUP
     // =====================================================
 
@@ -113,12 +148,8 @@ public final class BossMinionController implements Listener {
         for (UUID mid : new HashSet<>(minions)) {
             minionToBoss.remove(mid);
 
-            for (org.bukkit.World w : Bukkit.getWorlds()) {
-                org.bukkit.entity.Entity e = w.getEntity(mid);
-                if (e instanceof LivingEntity le && le.isValid()) {
-                    le.remove();
-                }
-            }
+            LivingEntity le = findLiving(mid);
+            if (le != null) le.remove();
         }
     }
 
@@ -141,5 +172,32 @@ public final class BossMinionController implements Listener {
         bossToMinions.clear();
         bossPhaseToMinions.clear();
         minionToBoss.clear();
+    }
+
+    // =====================================================
+// GLOBAL CLEANUP (API ALIAS)
+// =====================================================
+
+    /**
+     * Clears ALL tracked minions and internal state.
+     * Safe to call on plugin shutdown or reload.
+     */
+    public void clearAll() {
+        shutdown();
+    }
+
+
+    // =====================================================
+    // UTIL
+    // =====================================================
+
+    private LivingEntity findLiving(UUID id) {
+        for (org.bukkit.World w : Bukkit.getWorlds()) {
+            var e = w.getEntity(id);
+            if (e instanceof LivingEntity le && le.isValid()) {
+                return le;
+            }
+        }
+        return null;
     }
 }

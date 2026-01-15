@@ -27,7 +27,7 @@ public final class MobListener implements Listener {
     private final BossActionEngine bossActions;
     private final KeyRegistry keys;
     private final AutoSpawnManager autoSpawn;
-    private final MobAIService mobAI; // ✅ NEW
+    private final MobAIService mobAI;
 
     public MobListener(
             MobManager mobs,
@@ -99,12 +99,14 @@ public final class MobListener implements Listener {
             Player killer = mob.getKiller();
 
             for (String raw : deathCommands) {
-                String resolved = Placeholder.resolve(
-                        raw,
-                        mob,
-                        null,
-                        killer
-                );
+
+                // If command requires {player} but no killer exists -> skip
+                if (killer == null && raw != null && raw.contains("{player}")) {
+                    Bukkit.getLogger().info("[TheMob] Skipped death-command (no killer): " + raw);
+                    continue;
+                }
+
+                String resolved = Placeholder.resolve(raw, mob, null, killer);
 
                 Bukkit.dispatchCommand(
                         Bukkit.getConsoleSender(),

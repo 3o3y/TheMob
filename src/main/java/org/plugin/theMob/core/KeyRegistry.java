@@ -29,6 +29,8 @@ public final class KeyRegistry {
     public final NamespacedKey KNOCKBACK_RESISTANCE;
     public final NamespacedKey LUCK;
     public final NamespacedKey DROPS_DONE;
+    public final NamespacedKey BOSS_DEATH_HANDLED;
+
 
     public final Map<String, NamespacedKey> ALL_STATS;
 
@@ -55,6 +57,7 @@ public final class KeyRegistry {
         ATTACK_SPEED = new NamespacedKey(plugin, "attack_speed");
         KNOCKBACK_RESISTANCE = new NamespacedKey(plugin, "knockback_resistance");
         LUCK = new NamespacedKey(plugin, "luck");
+        BOSS_DEATH_HANDLED = new NamespacedKey(plugin, "boss_death_handled");
 
         DROPS_DONE = new NamespacedKey(plugin, "drops_done");
 

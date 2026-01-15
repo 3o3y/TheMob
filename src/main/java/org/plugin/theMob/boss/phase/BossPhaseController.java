@@ -3,6 +3,7 @@ package org.plugin.theMob.boss.phase;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.title.Title;
 import org.bukkit.Bukkit;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.plugin.theMob.boss.BossActionEngine;
@@ -10,6 +11,10 @@ import org.plugin.theMob.boss.BossPhase;
 import org.plugin.theMob.boss.BossTemplate;
 import org.plugin.theMob.boss.Placeholder;
 import org.plugin.theMob.boss.bar.BossBarService;
+import org.plugin.theMob.boss.combat.PhaseCombatEngine;
+import org.plugin.theMob.boss.world.BossWorldEffectController;
+import org.plugin.theMob.core.KeyRegistry;
+import org.plugin.theMob.mob.ability.AbilityEngine;
 
 import java.time.Duration;
 import java.util.*;
@@ -19,6 +24,10 @@ public final class BossPhaseController {
     private final BossPhaseResolver resolver;
     private final BossActionEngine actionEngine;
     private final BossBarService bars;
+    private final PhaseBuffEngine buffEngine;
+    private final AbilityEngine abilityEngine;
+    private final PhaseCombatEngine combatEngine;
+    private final BossWorldEffectController worldEffects;
 
     // MAIN THREAD ONLY
     private final Map<UUID, BossPhase> lastPhase = new HashMap<>();
@@ -27,11 +36,17 @@ public final class BossPhaseController {
     public BossPhaseController(
             BossPhaseResolver resolver,
             BossActionEngine actionEngine,
-            BossBarService bars
+            BossBarService bars,
+            KeyRegistry keys,
+            BossWorldEffectController worldEffects
     ) {
         this.resolver = resolver;
         this.actionEngine = actionEngine;
         this.bars = bars;
+        this.buffEngine = new PhaseBuffEngine(keys);
+        this.abilityEngine = new AbilityEngine(keys);
+        this.combatEngine = new PhaseCombatEngine(keys);
+        this.worldEffects = worldEffects;
     }
 
     // =====================================================
@@ -44,16 +59,25 @@ public final class BossPhaseController {
         UUID id = boss.getUniqueId();
         templates.put(id, template);
 
-        if (bars != null) bars.registerBoss(boss);
-
         BossPhase phase = resolver.resolve(boss, template);
         if (phase == null) return;
 
         lastPhase.put(id, phase);
 
         if (bars != null) {
+            bars.registerBoss(boss);
             bars.setPhaseTitle(boss, phase.title()); // raw title
             bars.markDirty(boss);
+        }
+
+        // APPLY BUFFS FOR INITIAL PHASE
+        applyPhaseBuffs(boss, template, phase);
+
+        ConfigurationSection cfg = template.phaseConfig(phase.id());
+        if (cfg != null) {
+            abilityEngine.apply(boss, cfg);
+            combatEngine.apply(boss, cfg);
+            applyWorldEffectsFromPhaseCfg(boss, cfg);
         }
 
         actionEngine.onPhaseEnter(boss, phase);
@@ -61,6 +85,11 @@ public final class BossPhaseController {
 
     public void onBossUpdate(LivingEntity boss) {
         if (boss == null || !boss.isValid() || boss.isDead()) return;
+
+        // keep world effects stable while boss is alive
+        if (worldEffects != null) {
+            worldEffects.tick();
+        }
 
         UUID id = boss.getUniqueId();
         BossTemplate template = templates.get(id);
@@ -73,6 +102,16 @@ public final class BossPhaseController {
 
         if (previous == null || !previous.id().equals(next.id())) {
 
+            // rollback old phase buffs first
+            combatEngine.rollback(boss);
+            abilityEngine.rollback(boss);
+            buffEngine.rollbackPhase(boss);
+
+            // reset old world effects (phase change)
+            if (worldEffects != null) {
+                worldEffects.resetAll();
+            }
+
             if (previous != null) {
                 actionEngine.onPhaseLeave(boss, previous);
             }
@@ -82,6 +121,16 @@ public final class BossPhaseController {
             if (bars != null) {
                 bars.setPhaseTitle(boss, next.title());
                 bars.markDirty(boss);
+            }
+
+            // apply new phase buffs
+            applyPhaseBuffs(boss, template, next);
+
+            ConfigurationSection cfg = template.phaseConfig(next.id());
+            if (cfg != null) {
+                abilityEngine.apply(boss, cfg);
+                combatEngine.apply(boss, cfg);
+                applyWorldEffectsFromPhaseCfg(boss, cfg);
             }
 
             showPhaseTitle(boss, next);
@@ -100,6 +149,16 @@ public final class BossPhaseController {
         BossPhase previous = lastPhase.remove(id);
         templates.remove(id);
 
+        // rollback buffs on death too
+        combatEngine.rollback(boss);
+        abilityEngine.rollback(boss);
+        buffEngine.rollbackPhase(boss);
+
+        // reset world effects on death too
+        if (worldEffects != null) {
+            worldEffects.resetAll();
+        }
+
         if (previous != null) {
             actionEngine.onPhaseLeave(boss, previous);
         }
@@ -113,7 +172,7 @@ public final class BossPhaseController {
     }
 
     // =====================================================
-    // QUERIES
+    // QUERIES (NO SIDE EFFECTS)
     // =====================================================
 
     public BossPhase currentPhase(LivingEntity boss) {
@@ -137,7 +196,40 @@ public final class BossPhaseController {
     }
 
     // =====================================================
-    // VISUALS (PLACEHOLDER + MINIMESSAGE)
+    // BUFFS (APPLY)
+    // =====================================================
+
+    private void applyPhaseBuffs(LivingEntity boss, BossTemplate template, BossPhase phase) {
+        if (boss == null || template == null || phase == null) return;
+
+        ConfigurationSection phaseCfg = template.phaseConfig(phase.id());
+        if (phaseCfg != null) {
+            buffEngine.applyPhase(boss, phaseCfg);
+        }
+    }
+
+    // =====================================================
+    // WORLD EFFECTS (APPLY)
+    // =====================================================
+
+    private void applyWorldEffectsFromPhaseCfg(LivingEntity boss, ConfigurationSection phaseCfg) {
+        if (worldEffects == null || boss == null || phaseCfg == null) return;
+
+        ConfigurationSection world = phaseCfg.getConfigurationSection("world");
+        if (world == null) return;
+
+        double radius = world.getDouble("radius", 24.0);
+        String weather = world.getString("weather", null);
+        String time = world.getString("time", null);
+
+        // If none are set, do nothing (no reset here, because reset is handled on phase change/death)
+        if ((weather == null || weather.isBlank()) && (time == null || time.isBlank())) return;
+
+        worldEffects.apply(boss, radius, weather, time);
+    }
+
+    // =====================================================
+    // VISUALS
     // =====================================================
 
     private void showPhaseTitle(LivingEntity boss, BossPhase phase) {
@@ -175,5 +267,9 @@ public final class BossPhaseController {
     public void shutdown() {
         lastPhase.clear();
         templates.clear();
+
+        if (worldEffects != null) {
+            worldEffects.resetAll();
+        }
     }
 }

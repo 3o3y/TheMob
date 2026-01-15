@@ -8,7 +8,7 @@ import org.bukkit.entity.LivingEntity;
 import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.plugin.theMob.TheMob;
+import org.plugin.theMob.boss.BossActionEngine;
 import org.plugin.theMob.boss.BossTemplate;
 import org.plugin.theMob.boss.BossTemplateParser;
 import org.plugin.theMob.core.ConfigService;
@@ -30,6 +30,8 @@ public final class MobManager {
     private MobSpawnService spawnService;
     private AutoSpawnManager autoSpawn;
 
+    private BossActionEngine bossActionEngine;
+
     private final Map<String, FileConfiguration> mobConfigs = new HashMap<>();
     private final Map<String, BossTemplate> bossTemplates = new HashMap<>();
 
@@ -39,6 +41,10 @@ public final class MobManager {
         this.keys = keys;
     }
 
+    // =====================================================
+    // WIRING
+    // =====================================================
+
     public void setAutoSpawnManager(AutoSpawnManager autoSpawn) {
         this.autoSpawn = autoSpawn;
     }
@@ -46,6 +52,29 @@ public final class MobManager {
     public AutoSpawnManager getAutoSpawnManager() {
         return autoSpawn;
     }
+
+    public void setSpawnService(MobSpawnService spawnService) {
+        this.spawnService = spawnService;
+    }
+
+    public void setDropEngine(MobDropEngine dropEngine) {
+        this.dropEngine = dropEngine;
+        if (dropEngine == null) {
+            plugin.getLogger().warning("[TheMob] DropEngine cleared");
+        }
+    }
+
+    public void setHealthDisplay(MobHealthDisplay display) {
+        this.healthDisplay = display;
+    }
+
+    public void setBossActionEngine(BossActionEngine engine) {
+        this.bossActionEngine = engine;
+    }
+
+    // =====================================================
+    // CONFIG LOAD
+    // =====================================================
 
     public void reloadFromConfigs() {
         mobConfigs.clear();
@@ -65,6 +94,10 @@ public final class MobManager {
         );
     }
 
+    // =====================================================
+    // SPAWN
+    // =====================================================
+
     public LivingEntity spawnCustomMob(String mobId, String spawnId, Location loc) {
         if (spawnService == null) {
             plugin.getLogger().severe("[TheMob] SpawnService not set!");
@@ -73,9 +106,9 @@ public final class MobManager {
         return spawnService.spawn(mobId, spawnId, loc);
     }
 
-    public void setSpawnService(MobSpawnService spawnService) {
-        this.spawnService = spawnService;
-    }
+    // =====================================================
+    // LOOKUPS
+    // =====================================================
 
     public String baseNameOf(LivingEntity e) {
         if (e == null) return null;
@@ -156,10 +189,39 @@ public final class MobManager {
         return list != null ? list : List.of();
     }
 
-    // NUR ERGÄNZUNG in onMobDeath()
+    // =====================================================
+    // DEATH LIFECYCLE
+    // =====================================================
 
+    /**
+     * Single entry-point for custom mob death.
+     * Called by your EntityDeath listener/service.
+     */
     public void onMobDeath(LivingEntity mob, EntityDeathEvent e) {
+        if (mob == null) return;
 
+        // -----------------------------
+        // BOSS DEATH (RUN ONCE)
+        // -----------------------------
+        if (bossActionEngine != null && isBoss(mob)) {
+
+            // Guard: never run twice (some servers / plugins re-trigger logic)
+            Integer done = mob.getPersistentDataContainer()
+                    .get(keys.BOSS_DEATH_HANDLED, PersistentDataType.INTEGER);
+
+            if (done == null || done != 1) {
+                mob.getPersistentDataContainer().set(
+                        keys.BOSS_DEATH_HANDLED,
+                        PersistentDataType.INTEGER,
+                        1
+                );
+                bossActionEngine.onBossDeath(mob);
+            }
+        }
+
+        // -----------------------------
+        // DROPS / UI
+        // -----------------------------
         if (dropEngine != null) {
             dropEngine.handleDeath(mob, e);
         }
@@ -167,25 +229,17 @@ public final class MobManager {
             healthDisplay.onDeath(mob);
         }
 
-        // v1.7 BUDGET CLEANUP
-        if (plugin instanceof TheMob tm && tm.automation() != null) {
-            // BudgetManager hört zusätzlich per Listener,
-            // das hier ist nur defensive safety
+        // -----------------------------
+        // AUTOSPAWN / BUDGET CLEANUP
+        // -----------------------------
+        if (autoSpawn != null) {
+            autoSpawn.onMobDeath(mob);
         }
     }
 
-
-    public void setDropEngine(MobDropEngine dropEngine) {
-        this.dropEngine = dropEngine;
-        if (dropEngine == null) {
-            plugin.getLogger().warning("[TheMob] DropEngine cleared");
-        }
-    }
-
-
-    public void setHealthDisplay(MobHealthDisplay display) {
-        this.healthDisplay = display;
-    }
+    // =====================================================
+    // ADMIN
+    // =====================================================
 
     public int killAll() {
         int removed = 0;
@@ -207,13 +261,12 @@ public final class MobManager {
     }
 
     public void hardReset() {
-        // ensure mobs are gone
         killAll();
 
         spawnService = null;
         dropEngine = null;
         healthDisplay = null;
         autoSpawn = null;
+        bossActionEngine = null;
     }
 }
-

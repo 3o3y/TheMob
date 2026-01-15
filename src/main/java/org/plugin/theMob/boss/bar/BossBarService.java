@@ -158,7 +158,7 @@ public final class BossBarService implements Listener {
     }
 
     // =====================================================
-    // PLAYER UPDATE (PER PLAYER RENDER)
+    // PLAYER UPDATE
     // =====================================================
 
     private void updatePlayer(Player p) {
@@ -224,15 +224,15 @@ public final class BossBarService implements Listener {
         String phase = phaseTitle.get(boss.getUniqueId());
 
         if (phase != null && !phase.isBlank()) {
-            rawTitle = "{mob_name} | {phase_title} | {distance}m";
+            rawTitle = "{mob_name} | {phase_title}";
         } else {
-            rawTitle = "{mob_name} | {distance}m";
+            rawTitle = "{mob_name}";
         }
 
         String rendered = Placeholder.resolve(
                 rawTitle,
                 boss,
-                null, // phase handled via stored title
+                null,
                 p
         );
 

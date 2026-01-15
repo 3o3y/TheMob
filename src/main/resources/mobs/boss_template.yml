@@ -105,10 +105,10 @@ stats:
   health:
     max: 750.0                   # Maximum health (1 heart = 2.0)
     current: 750.0               # Health value when the mob spawns
-  movement-speed: 0.3          # Base movement speed (vanilla zombie ≈ 0.23)
+  movement-speed: 0.20          # Base movement speed (vanilla zombie ≈ 0.23)
   attack:
     damage: 16.0                 # Base melee attack damage
-    speed: 4.0                  # Attack speed (higher = faster attacks)
+    speed: 1.0                  # Attack speed (higher = faster attacks)
     knockback: 20.0              # Extra knockback applied on hit
   defense:
     armor: 20.0                  # Flat armor value (reduces incoming damage)
@@ -297,14 +297,14 @@ phases:                               #This will make your Mob as a Boss Mob
           title: "&c&lNext Phase"
           subtitle: "&4I'll smell BLOOD!"
     buffs:
-      movement-speed: +0.02           # Faster movement
+      movement-speed: +0              # Faster movement
       damage: +2                      # Increased attack damage
       armor: +2                       # Increased armor
       armor-toughness: +1
       knockback-resistance: +0.1
       max-health: +0
     effects:
-      speed: 1                        # Speed I
+      speed: 0                        # Speed I
       strength: 1                     # Strength I
       resistance: 0
       regeneration: 0
@@ -360,14 +360,14 @@ phases:                               #This will make your Mob as a Boss Mob
     hp-range: "50-25"
     title: "Phase 3 – Royal Frenzy"
     buffs:
-      movement-speed: +0.05           # Very fast movement
+      movement-speed: +0              # Very fast movement
       damage: +4                      # High damage bonus
       armor: +5
       armor-toughness: +2
       knockback-resistance: +0.3
       max-health: +0
     effects:
-      speed: 2                        # Speed II
+      speed: 0                        # Speed II
       strength: 2                     # Strength II
       resistance: 1                  # Resistance I
       regeneration: 1                # Regeneration I
@@ -440,14 +440,14 @@ phases:                               #This will make your Mob as a Boss Mob
           title: "&c&lFINAL PHASE"
           subtitle: "&4KILL THE BOSS"
     buffs:
-      movement-speed: +0.08           # Extremely fast movement
+      movement-speed: +0              # Extremely fast movement
       damage: +6
       armor: +8
       armor-toughness: +4
       knockback-resistance: +1.0      # Full knockback immunity
       max-health: +0
     effects:
-      speed: 2
+      speed: 0
       strength: 3
       resistance: 2
       regeneration: 2

@@ -48,8 +48,10 @@ public final class BossTemplateParser {
                             max,
                             title,
                             p
-                    )
+                    ),
+                    p
             );
+
         }
 
         return template.hasPhases() ? template : null;

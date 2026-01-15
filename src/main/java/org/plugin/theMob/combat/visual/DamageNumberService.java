@@ -17,8 +17,11 @@ public final class DamageNumberService {
 
     private static final int LIFETIME_TICKS = 16;
 
-    // etwas schneller -> besser sichtbar
+    // Float speed
     private static final Vector FLOAT_VELOCITY = new Vector(0, 0.045, 0);
+
+    // 🔥 VISUAL CRIT MULTIPLIER (DISPLAY ONLY)
+    private static final double VISUAL_CRIT_MULTIPLIER = 1.35;
 
     private DamageNumberService() {}
 
@@ -39,18 +42,23 @@ public final class DamageNumberService {
                 0
         );
 
+        // =========================
+        // VISUAL DAMAGE VALUE
+        // =========================
+        double displayDamage = crit
+                ? damage * VISUAL_CRIT_MULTIPLIER
+                : damage;
+
         TextDisplay text = world.spawn(loc, TextDisplay.class, td -> {
-            td.setText(format(damage, crit));
+            td.setText(format(displayDamage, crit));
             td.setBillboard(Display.Billboard.CENTER);
             td.setShadowed(true);
             td.setSeeThrough(true);
             td.setBackgroundColor(Color.fromARGB(0, 0, 0, 0));
 
-            // WICHTIG: kleinere LineWidth = größere Glyphs
             td.setLineWidth(80);
             td.setTextOpacity((byte) 255);
 
-            // 🔥 REAL SCALE FIX
             float scale = crit ? 2.4f : 1.8f;
 
             td.setTransformation(new Transformation(
@@ -123,7 +131,6 @@ public final class DamageNumberService {
             }
         }.runTaskTimer(plugin, 1L, 1L);
     }
-
 
     private static String format(double dmg, boolean crit) {
         String value = dmg >= 100

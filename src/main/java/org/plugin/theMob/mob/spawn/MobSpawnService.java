@@ -23,6 +23,7 @@ import org.plugin.theMob.item.ItemBuilderFromConfig;
 import org.plugin.theMob.mob.MobManager;
 import org.plugin.theMob.mob.ai.MobAIProfile;
 import org.plugin.theMob.mob.ai.MobAIService;
+import org.plugin.theMob.mob.stats.BaseMobStatApplier;
 import org.plugin.theMob.mob.stats.MobEquipmentStatApplier;
 import org.plugin.theMob.ui.MobHealthDisplay;
 import org.plugin.theMob.visual.MobVisualService;
@@ -40,6 +41,8 @@ public final class MobSpawnService {
     private final BossBarService bossBars;
     private final BossPhaseController phaseController;
     private final MobAIService mobAI;
+    private final BaseMobStatApplier baseStatApplier;
+
 
     private final ItemBuilderFromConfig itemBuilder;
     private final MobEquipmentStatApplier statApplier;
@@ -60,6 +63,8 @@ public final class MobSpawnService {
         this.bossBars = bossBars;
         this.phaseController = phaseController;
         this.mobAI = mobAI;
+
+        this.baseStatApplier = new BaseMobStatApplier(keys);
 
         this.itemBuilder = new ItemBuilderFromConfig(plugin);
         this.statApplier = new MobEquipmentStatApplier(plugin.itemStats(), keys);
@@ -165,6 +170,13 @@ public final class MobSpawnService {
 
             statApplier.apply(mob, items);
         }
+// =========================
+// APPLY BASE MOB STATS
+// =========================
+        baseStatApplier.apply(
+                mob,
+                cfg.getConfigurationSection("stats")
+        );
 
         // =====================================================
         // UI / AI

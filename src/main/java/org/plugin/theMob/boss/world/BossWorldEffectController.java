@@ -4,12 +4,19 @@ import org.bukkit.Bukkit;
 import org.bukkit.WeatherType;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
+import org.bukkit.event.player.PlayerChangedWorldEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.plugin.Plugin;
 
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 
-public final class BossWorldEffectController {
+public final class BossWorldEffectController implements Listener {
+
+    private final Plugin plugin;
 
     // MAIN THREAD ONLY
     private LivingEntity activeBoss;
@@ -20,11 +27,21 @@ public final class BossWorldEffectController {
 
     private final Set<UUID> affectedPlayers = new HashSet<>();
 
+    public BossWorldEffectController(Plugin plugin) {
+        this.plugin = plugin;
+        Bukkit.getPluginManager().registerEvents(this, plugin);
+    }
+
     // =====================================================
     // APPLY (PHASE ENTER)
     // =====================================================
 
-    public void apply(LivingEntity boss, double radius, String weather, String time) {
+    public void apply(
+            LivingEntity boss,
+            double radius,
+            String weather,
+            String time
+    ) {
         resetAll();
 
         if (boss == null || !boss.isValid() || boss.isDead()) return;
@@ -40,7 +57,7 @@ public final class BossWorldEffectController {
     }
 
     // =====================================================
-    // TICK (CALLED FROM ENGINE)
+    // TICK (CALL FROM ENGINE)
     // =====================================================
 
     public void tick() {
@@ -70,8 +87,8 @@ public final class BossWorldEffectController {
             Player p = Bukkit.getPlayer(id);
             if (p != null) reset(p);
         }
-        affectedPlayers.clear();
 
+        affectedPlayers.clear();
         activeBoss = null;
         radiusSq = 0.0;
         weather = null;
@@ -85,13 +102,29 @@ public final class BossWorldEffectController {
     }
 
     // =====================================================
+    // EVENTS (PLAYER LIFECYCLE SAFETY)
+    // =====================================================
+
+    @EventHandler
+    public void onQuit(PlayerQuitEvent e) {
+        reset(e.getPlayer());
+    }
+
+    @EventHandler
+    public void onWorldChange(PlayerChangedWorldEvent e) {
+        reset(e.getPlayer());
+    }
+
+    // =====================================================
     // INTERNAL
     // =====================================================
 
     private boolean isInside(Player p) {
         if (p == null || activeBoss == null) return false;
         if (!p.getWorld().equals(activeBoss.getWorld())) return false;
-        return p.getLocation().distanceSquared(activeBoss.getLocation()) <= radiusSq;
+
+        return p.getLocation()
+                .distanceSquared(activeBoss.getLocation()) <= radiusSq;
     }
 
     private void applyToPlayer(Player p) {
