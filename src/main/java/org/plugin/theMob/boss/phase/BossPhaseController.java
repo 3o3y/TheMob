@@ -21,6 +21,8 @@ import java.util.*;
 
 public final class BossPhaseController {
 
+    private static final int BLOCKS_PER_CHUNK = 16;
+
     private final BossPhaseResolver resolver;
     private final BossActionEngine actionEngine;
     private final BossBarService bars;
@@ -66,48 +68,40 @@ public final class BossPhaseController {
 
         if (bars != null) {
             bars.registerBoss(boss);
-            bars.setPhaseTitle(boss, phase.title()); // raw title
+            bars.setPhaseTitle(boss, phase.title());
             bars.markDirty(boss);
         }
 
-        // APPLY BUFFS FOR INITIAL PHASE
         applyPhaseBuffs(boss, template, phase);
 
         ConfigurationSection cfg = template.phaseConfig(phase.id());
         if (cfg != null) {
             abilityEngine.apply(boss, cfg);
             combatEngine.apply(boss, cfg);
-            applyWorldEffectsFromPhaseCfg(boss, cfg);
+            applyWorldEffectsFromPhaseCfg(boss, template, cfg);
         }
 
         actionEngine.onPhaseEnter(boss, phase);
+        showPhaseTitle(boss, phase, template);
     }
 
     public void onBossUpdate(LivingEntity boss) {
         if (boss == null || !boss.isValid() || boss.isDead()) return;
 
-        // keep world effects stable while boss is alive
-        if (worldEffects != null) {
-            worldEffects.tick();
-        }
-
-        UUID id = boss.getUniqueId();
-        BossTemplate template = templates.get(id);
+        BossTemplate template = templates.get(boss.getUniqueId());
         if (template == null) return;
 
         BossPhase next = resolver.resolve(boss, template);
         if (next == null) return;
 
-        BossPhase previous = lastPhase.get(id);
+        BossPhase previous = lastPhase.get(boss.getUniqueId());
 
         if (previous == null || !previous.id().equals(next.id())) {
 
-            // rollback old phase buffs first
             combatEngine.rollback(boss);
             abilityEngine.rollback(boss);
             buffEngine.rollbackPhase(boss);
 
-            // reset old world effects (phase change)
             if (worldEffects != null) {
                 worldEffects.resetAll();
             }
@@ -116,24 +110,23 @@ public final class BossPhaseController {
                 actionEngine.onPhaseLeave(boss, previous);
             }
 
-            lastPhase.put(id, next);
+            lastPhase.put(boss.getUniqueId(), next);
 
             if (bars != null) {
                 bars.setPhaseTitle(boss, next.title());
                 bars.markDirty(boss);
             }
 
-            // apply new phase buffs
             applyPhaseBuffs(boss, template, next);
 
             ConfigurationSection cfg = template.phaseConfig(next.id());
             if (cfg != null) {
                 abilityEngine.apply(boss, cfg);
                 combatEngine.apply(boss, cfg);
-                applyWorldEffectsFromPhaseCfg(boss, cfg);
+                applyWorldEffectsFromPhaseCfg(boss, template, cfg);
             }
 
-            showPhaseTitle(boss, next);
+            showPhaseTitle(boss, next, template);
             actionEngine.onPhaseEnter(boss, next);
 
         } else {
@@ -144,17 +137,13 @@ public final class BossPhaseController {
     public void onBossDeath(LivingEntity boss) {
         if (boss == null) return;
 
-        UUID id = boss.getUniqueId();
+        BossPhase previous = lastPhase.remove(boss.getUniqueId());
+        templates.remove(boss.getUniqueId());
 
-        BossPhase previous = lastPhase.remove(id);
-        templates.remove(id);
-
-        // rollback buffs on death too
         combatEngine.rollback(boss);
         abilityEngine.rollback(boss);
         buffEngine.rollbackPhase(boss);
 
-        // reset world effects on death too
         if (worldEffects != null) {
             worldEffects.resetAll();
         }
@@ -172,92 +161,99 @@ public final class BossPhaseController {
     }
 
     // =====================================================
-    // QUERIES (NO SIDE EFFECTS)
+    // VISUALS (ARENA ONLY)
     // =====================================================
 
-    public BossPhase currentPhase(LivingEntity boss) {
-        if (boss == null) return null;
-        return lastPhase.get(boss.getUniqueId());
-    }
+    private void showPhaseTitle(LivingEntity boss, BossPhase phase, BossTemplate template) {
+        int radiusBlocks = resolveArenaRadiusBlocks(template);
+        double radiusSq = (double) radiusBlocks * radiusBlocks;
 
-    public Collection<LivingEntity> activeBosses() {
-        List<LivingEntity> list = new ArrayList<>(templates.size());
+        var bossLoc = boss.getLocation();
 
-        for (UUID id : templates.keySet()) {
-            for (var world : Bukkit.getWorlds()) {
-                var e = world.getEntity(id);
-                if (e instanceof LivingEntity le && le.isValid()) {
-                    list.add(le);
-                    break;
-                }
-            }
-        }
-        return list;
-    }
-
-    // =====================================================
-    // BUFFS (APPLY)
-    // =====================================================
-
-    private void applyPhaseBuffs(LivingEntity boss, BossTemplate template, BossPhase phase) {
-        if (boss == null || template == null || phase == null) return;
-
-        ConfigurationSection phaseCfg = template.phaseConfig(phase.id());
-        if (phaseCfg != null) {
-            buffEngine.applyPhase(boss, phaseCfg);
-        }
-    }
-
-    // =====================================================
-    // WORLD EFFECTS (APPLY)
-    // =====================================================
-
-    private void applyWorldEffectsFromPhaseCfg(LivingEntity boss, ConfigurationSection phaseCfg) {
-        if (worldEffects == null || boss == null || phaseCfg == null) return;
-
-        ConfigurationSection world = phaseCfg.getConfigurationSection("world");
-        if (world == null) return;
-
-        double radius = world.getDouble("radius", 24.0);
-        String weather = world.getString("weather", null);
-        String time = world.getString("time", null);
-
-        // If none are set, do nothing (no reset here, because reset is handled on phase change/death)
-        if ((weather == null || weather.isBlank()) && (time == null || time.isBlank())) return;
-
-        worldEffects.apply(boss, radius, weather, time);
-    }
-
-    // =====================================================
-    // VISUALS
-    // =====================================================
-
-    private void showPhaseTitle(LivingEntity boss, BossPhase phase) {
         for (Player p : boss.getWorld().getPlayers()) {
-            if (p.getLocation().distanceSquared(boss.getLocation()) > 30 * 30) continue;
+            if (!p.isOnline()) continue;
+            if (p.getLocation().distanceSquared(bossLoc) > radiusSq) continue;
             showPhaseTitleToPlayer(p, boss, phase);
         }
     }
 
+    private int resolveArenaRadiusBlocks(BossTemplate template) {
+        int chunks = Math.max(1, template.arenaRadiusChunks());
+        return chunks * BLOCKS_PER_CHUNK;
+    }
+
     private void showPhaseTitleToPlayer(Player player, LivingEntity boss, BossPhase phase) {
-
-        String rawTitle = "{phase_title}";
-        String rawSubtitle = "{mob_name}";
-
-        Component title = Placeholder.resolveComponent(rawTitle, boss, phase, player);
-        Component subtitle = Placeholder.resolveComponent(rawSubtitle, boss, phase, player);
+        Component title = Placeholder.resolveComponent("{phase_title}", boss, phase, player);
+        Component subtitle = Placeholder.resolveComponent("{mob_name}", boss, phase, player);
 
         player.showTitle(
                 Title.title(
                         title,
                         subtitle,
                         Title.Times.times(
-                                Duration.ofMillis(500),
-                                Duration.ofMillis(2000),
-                                Duration.ofMillis(500)
+                                Duration.ofMillis(300),
+                                Duration.ofMillis(1800),
+                                Duration.ofMillis(300)
                         )
                 )
         );
+    }
+
+    // =====================================================
+    // BUFFS
+    // =====================================================
+
+    private void applyPhaseBuffs(LivingEntity boss, BossTemplate template, BossPhase phase) {
+        if (boss == null || template == null || phase == null) return;
+
+        ConfigurationSection cfg = template.phaseConfig(phase.id());
+        if (cfg != null) {
+            buffEngine.applyPhase(boss, cfg);
+        }
+    }
+
+    // =====================================================
+    // WORLD EFFECTS (ARENA ONLY)
+    // =====================================================
+
+    private void applyWorldEffectsFromPhaseCfg(
+            LivingEntity boss,
+            BossTemplate template,
+            ConfigurationSection phaseCfg
+    ) {
+        if (worldEffects == null || boss == null || phaseCfg == null) return;
+
+        ConfigurationSection world = phaseCfg.getConfigurationSection("world");
+        if (world == null) return;
+
+        String weather = world.getString("weather");
+        String time = world.getString("time");
+
+        if ((weather == null || weather.isBlank()) && (time == null || time.isBlank())) return;
+
+        int radiusBlocks = resolveArenaRadiusBlocks(template);
+
+        worldEffects.apply(boss, radiusBlocks, weather, time);
+    }
+
+    public BossPhase currentPhase(LivingEntity boss) {
+        if (boss == null) return null;
+        return lastPhase.get(boss.getUniqueId());
+    }
+    public Collection<LivingEntity> activeBosses() {
+        List<LivingEntity> list = new ArrayList<>(templates.size());
+
+        for (UUID id : templates.keySet()) {
+            for (var world : Bukkit.getWorlds()) {
+                var e = world.getEntity(id);
+                if (e instanceof LivingEntity le && le.isValid() && !le.isDead()) {
+                    list.add(le);
+                    break;
+                }
+            }
+        }
+
+        return list;
     }
 
     // =====================================================
@@ -272,4 +268,5 @@ public final class BossPhaseController {
             worldEffects.resetAll();
         }
     }
+
 }

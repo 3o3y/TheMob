@@ -120,6 +120,8 @@ stats:
   scale: 1.8                    # Entity size multiplier (1.0 = default size)
   step-height: 0.6              # Max block height the mob can step up without jumping
   gravity: true                 # true = affected by gravity, false = floating entity
+arena:
+  radius-chunks: 3
 # ---------------------------------------------------------
 # Abilities & Flags !!!IN PROGRESS!!! NOT EVERYTHING IS WORKING!!!
 # ---------------------------------------------------------

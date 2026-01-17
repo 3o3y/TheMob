@@ -49,6 +49,9 @@ public final class MobHealthDisplay {
         if (mob == null || !mob.isValid() || mob.isDead()) return;
         if (!mobs.isCustomMob(mob)) return;
 
+        var cfg = mobs.mobConfigOf(mob);
+        boolean displayHealth = cfg == null || cfg.getBoolean("display-health", true);
+
         Visibility vis = resolveVisibility(mob);
         if (!vis.visible) {
             mob.setCustomNameVisible(false);
@@ -57,6 +60,12 @@ public final class MobHealthDisplay {
 
         String base = mobs.baseNameOf(mob);
         if (base == null || base.isBlank()) base = mob.getType().name();
+
+        if (!displayHealth) {
+            mob.setCustomName(base);
+            mob.setCustomNameVisible(true);
+            return;
+        }
 
         String name;
         if (vis.full) {
@@ -69,9 +78,12 @@ public final class MobHealthDisplay {
             name = base;
         }
 
-        if (!name.equals(mob.getCustomName())) mob.setCustomName(name);
+        if (!name.equals(mob.getCustomName())) {
+            mob.setCustomName(name);
+        }
         mob.setCustomNameVisible(true);
     }
+
 
     private void startMoveUpdater() {
         moveTask = new BukkitRunnable() {

@@ -1,5 +1,6 @@
 package org.plugin.theMob.command;
 
+import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -10,6 +11,7 @@ import org.plugin.theMob.control.command.MobDiagCommand;
 import org.plugin.theMob.control.command.TheMobDebugCommand;
 import org.plugin.theMob.mob.MobManager;
 import org.plugin.theMob.spawn.SpawnController;
+import org.plugin.theMob.spawn.SpawnLocationResolver;
 import org.plugin.theMob.spawn.type.SpawnMode;
 
 import java.util.Arrays;
@@ -94,9 +96,8 @@ public final class MobCommand implements CommandExecutor {
             return true;
         }
 
-        // -------------------------------------------------
-        // /mob spawn <mob-id>
-        // -------------------------------------------------
+        // NUR der relevante Teil geändert – rest bleibt IDENTISCH
+// -------------------------------------------------
         if (args[0].equalsIgnoreCase("spawn")) {
             if (!(sender instanceof Player p)) {
                 sender.sendMessage("§cOnly players can spawn mobs.");
@@ -114,17 +115,24 @@ public final class MobCommand implements CommandExecutor {
                 return true;
             }
 
-            mobs.spawnCustomMob(
-                    id,
-                    null,
-                    p.getLocation().add(
-                            p.getLocation().getDirection().normalize().multiply(2)
-                    )
+            Location base = p.getLocation().clone()
+                    .add(p.getLocation().getDirection().normalize().multiply(2.2));
+
+            Location safe = SpawnLocationResolver.resolveSafe(
+                    plugin.getConfig(),
+                    base,
+                    null
             );
+
+            mobs.spawnCustomMob(id, null, safe);
+
+
+
 
             p.sendMessage("§aSpawned mob: §e" + id);
             return true;
         }
+
 
         // -------------------------------------------------
         // LEGACY: /mob autospawn <id> <seconds> <maxSpawns>

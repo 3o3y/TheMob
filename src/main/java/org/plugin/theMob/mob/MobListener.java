@@ -11,6 +11,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.persistence.PersistentDataType;
+import org.plugin.theMob.TheMob;
 import org.plugin.theMob.boss.BossActionEngine;
 import org.plugin.theMob.boss.Placeholder;
 import org.plugin.theMob.boss.bar.BossBarService;
@@ -28,8 +29,11 @@ public final class MobListener implements Listener {
     private final KeyRegistry keys;
     private final AutoSpawnManager autoSpawn;
     private final MobAIService mobAI;
+    private final TheMob plugin;
+
 
     public MobListener(
+            TheMob plugin,
             MobManager mobs,
             org.plugin.theMob.ui.MobHealthDisplay ignored,
             BossBarService bossBars,
@@ -38,6 +42,7 @@ public final class MobListener implements Listener {
             AutoSpawnManager autoSpawn,
             MobAIService mobAI
     ) {
+        this.plugin = plugin;
         this.mobs = mobs;
         this.bossBars = bossBars;
         this.bossActions = bossActions;
@@ -45,6 +50,7 @@ public final class MobListener implements Listener {
         this.autoSpawn = autoSpawn;
         this.mobAI = mobAI;
     }
+
 
     @EventHandler
     public void onDeath(EntityDeathEvent e) {

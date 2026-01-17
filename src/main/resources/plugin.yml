@@ -1,5 +1,5 @@
 name: TheMob
-version: "1.7.3_Beta"
+version: "1.8.2"
 main: org.plugin.theMob.TheMob
 api-version: "1.21"
 author: 3o3y
@@ -41,6 +41,8 @@ commands:
 
       /mob list autospawn
       /mob list all
+      
+      /mob get base64
     permission: themob.use
     permission-message: "&cYou do not have permission to use this command."
 

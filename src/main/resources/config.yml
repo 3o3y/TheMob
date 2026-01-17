@@ -39,6 +39,23 @@ plugin:
 # Budgets never force-despawn mobs – they only block spawns.
 # =========================================================
 
+spawn:
+  offset:
+    x: 0.0
+    y: 0.6
+    z: 0.0
+  snap-to-ground: true
+  scan-down: 8
+  scan-up: 6
+
+death-messages:
+  disable-vanilla: true
+  custom:
+    enabled: true
+    message: "&c{player} &7was slain by &6{mob}"
+
+
+
 global-budgets:
   enabled: true
   total-mobs: 500

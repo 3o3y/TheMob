@@ -17,8 +17,24 @@ public final class BossTemplateParser {
             return null;
         }
 
-        BossTemplate template = new BossTemplate(mobId.toLowerCase(Locale.ROOT));
+        // =====================================================
+        // ARENA (GLOBAL, NOT PHASE-DEPENDENT)
+        // =====================================================
+        int arenaRadiusChunks = 1; // default = 1 chunk
 
+        ConfigurationSection arenaSec = cfg.getConfigurationSection("arena");
+        if (arenaSec != null) {
+            arenaRadiusChunks = arenaSec.getInt("radius-chunks", 1);
+        }
+
+        BossTemplate template = new BossTemplate(
+                mobId.toLowerCase(Locale.ROOT),
+                arenaRadiusChunks
+        );
+
+        // =====================================================
+        // PHASES
+        // =====================================================
         for (String phaseId : phasesSec.getKeys(false)) {
             ConfigurationSection p = phasesSec.getConfigurationSection(phaseId);
             if (p == null) continue;
@@ -51,7 +67,6 @@ public final class BossTemplateParser {
                     ),
                     p
             );
-
         }
 
         return template.hasPhases() ? template : null;

@@ -21,6 +21,7 @@ import org.plugin.theMob.spawn.type.SpawnMode;
 import org.plugin.theMob.spawn.type.SpawnType;
 import org.plugin.theMob.control.SpawnGateResult;
 import org.plugin.theMob.control.SpawnRole;
+import org.plugin.theMob.world.ChunkTicketTracker;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -36,6 +37,8 @@ public final class AutoSpawnManager {
     private final MobManager mobs;
     private final KeyRegistry keys;
     private final BossLockService bossLocks;
+    private final ChunkTicketTracker chunkTickets;
+
 
     private final Random rnd = new Random();
 
@@ -62,7 +65,9 @@ public final class AutoSpawnManager {
         this.mobs = mobs;
         this.keys = keys;
         this.bossLocks = bossLocks;
+        this.chunkTickets = new ChunkTicketTracker(plugin);
     }
+
 
     public void start() {
         if (started) return;
@@ -83,6 +88,7 @@ public final class AutoSpawnManager {
         }
         started = false;
 
+
         for (String id : new ArrayList<>(points.keySet())) {
             hardKillAll(id);
             releaseArenaChunks(id);
@@ -98,6 +104,8 @@ public final class AutoSpawnManager {
         coldSince.clear();
         forcedChunks.clear();
         randomWorldAnchor.clear();
+        chunkTickets.releaseAll();
+
 
         for (Integer taskId : messageTasks.values()) {
             Bukkit.getScheduler().cancelTask(taskId);
@@ -526,8 +534,9 @@ public final class AutoSpawnManager {
         for (int x = -r; x <= r; x++) {
             for (int z = -r; z <= r; z++) {
                 Chunk chunk = w.getChunkAt(cx + x, cz + z);
-                chunk.addPluginChunkTicket(plugin);
+                chunkTickets.add(chunk);
                 set.add(chunk);
+
             }
         }
 
@@ -537,10 +546,12 @@ public final class AutoSpawnManager {
     private void releaseArenaChunks(String spawnId) {
         Set<Chunk> set = forcedChunks.remove(spawnId);
         if (set == null) return;
+
         for (Chunk c : set) {
-            c.removePluginChunkTicket(plugin);
+            chunkTickets.remove(c);
         }
     }
+
 
     public void onMobDeath(LivingEntity mob) {
         String spawnId = mob.getPersistentDataContainer().get(keys.AUTO_SPAWN_ID, PersistentDataType.STRING);
@@ -651,6 +662,8 @@ public final class AutoSpawnManager {
 
         bossLocks.clearAll();
         purgeAllStaleEntities();
+        chunkTickets.releaseAll();
+
     }
 
     private void purgeAllStaleEntities() {

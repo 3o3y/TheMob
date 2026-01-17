@@ -35,6 +35,7 @@ import org.plugin.theMob.metrics.MetricsService;
 import org.plugin.theMob.mob.MobDropEngine;
 import org.plugin.theMob.mob.MobListener;
 import org.plugin.theMob.mob.MobManager;
+import org.plugin.theMob.mob.PlayerDeathListener;
 import org.plugin.theMob.mob.ai.MobAIService;
 import org.plugin.theMob.mob.spawn.AutoSpawnManager;
 import org.plugin.theMob.mob.spawn.MobSpawnService;
@@ -104,17 +105,28 @@ public final class TheMob extends JavaPlugin {
 
     @Override
     public void onEnable() {
+
         // =====================
         // bStats Metrics
         // =====================
         MetricsService.init(this);
         registerMetricsCharts();
 
-        saveDefaultConfig();
+        // =====================
+        // Config bootstrap
+        // =====================
+        saveDefaultConfig(); // config.yml ONLY
+
+        this.configService = new ConfigService(this);
+        configService.ensureFoldersAndDefaults();
+        configService.reloadAll();
+
         cleanupStaleHudBars();
         boot(true);
+
         getLogger().info("[TheMob] Enabled.");
     }
+
     private void registerMetricsCharts() {
         if (MetricsService.chartsRegistered()) return;
 
@@ -129,13 +141,23 @@ public final class TheMob extends JavaPlugin {
         MetricsService.markChartsRegistered();
     }
 
-
     @Override
     public void onDisable() {
-        cleanupStaleHudBars(); // extra safety for crashy reloads
+
+        // 1️⃣ Stop AutoSpawn & release chunk tickets
+        if (autoSpawnManager != null) {
+            autoSpawnManager.stop();
+        }
+
+        // 2️⃣ Cleanup HUD / BossBars (reload-sicher)
+        cleanupStaleHudBars();
+
+        // 3️⃣ Hard shutdown aller Systeme
         hardShutdown();
+
         getLogger().info("[TheMob] Disabled cleanly.");
     }
+
 
     // =====================================================
     // RELOAD
@@ -171,10 +193,8 @@ public final class TheMob extends JavaPlugin {
         if (keys == null) {
             keys = new KeyRegistry(this);
             Placeholder.init(keys);
-
         }
 
-        // ✅ reload-safe: never leave old scheduled tasks running
         if (ticks != null) {
             try { ticks.shutdown(); } catch (Throwable ignored) {}
             ticks = null;
@@ -198,8 +218,6 @@ public final class TheMob extends JavaPlugin {
         this.dropEngine = new MobDropEngine(this);
         this.dropEngine.bind(mobManager);
         mobManager.setDropEngine(this.dropEngine);
-
-
 
         // ---------- Health Display ----------
         healthDisplay = new MobHealthDisplay(this, mobManager);
@@ -226,13 +244,11 @@ public final class TheMob extends JavaPlugin {
                 worldEffects
         );
 
-
         behaviorController = new BossBehaviorController(
                 this,
                 mobManager,
                 phaseController
         );
-
 
         // ---------- Spawn Service ----------
         MobSpawnService spawnService = new MobSpawnService(
@@ -262,11 +278,14 @@ public final class TheMob extends JavaPlugin {
         mobManager.setAutoSpawnManager(autoSpawnManager);
 
         // ---------- HUD ----------
-        boolean hudEnabled = getConfig().getBoolean("plugin.navigation-hud.enabled", true);
+        boolean hudEnabled = isNavigationHudEnabled();
         if (hudEnabled) {
             hud = new NaviHudService(this, mobManager);
             hud.start();
             Bukkit.getPluginManager().registerEvents(new NaviHudListener(hud), this);
+        } else {
+            // Safety: falls nach Reload noch ein BossBar-Key hängt
+            cleanupStaleHudBars();
         }
 
         // ---------- v1.7 Automation & Scaling ----------
@@ -309,6 +328,15 @@ public final class TheMob extends JavaPlugin {
                 new BossCombatListener(this, mobManager, phaseController),
                 this
         );
+    }
+
+    private boolean isNavigationHudEnabled() {
+        // ✅ Primary (deine Config aus Screenshot)
+        if (getConfig().isSet("navigation-hud.enabled")) {
+            return getConfig().getBoolean("navigation-hud.enabled", true);
+        }
+        // ✅ Backwards compatibility (falls du irgendwo das Prefix "plugin." hattest)
+        return getConfig().getBoolean("plugin.navigation-hud.enabled", true);
     }
 
     // =====================================================
@@ -389,12 +417,18 @@ public final class TheMob extends JavaPlugin {
     private void registerAllListeners() {
 
         Bukkit.getPluginManager().registerEvents(
-                new BossBarListenerAdapter(mobManager, phaseController),
+                new BossBarListenerAdapter(
+                        mobManager,
+                        phaseController,
+                        healthDisplay
+                ),
                 this
         );
 
+
         Bukkit.getPluginManager().registerEvents(
                 new MobListener(
+                        this,
                         mobManager,
                         healthDisplay,
                         bossBars,
@@ -403,6 +437,11 @@ public final class TheMob extends JavaPlugin {
                         autoSpawnManager,
                         mobAI
                 ),
+                this
+        );
+
+        Bukkit.getPluginManager().registerEvents(
+                new PlayerDeathListener(this, mobManager),
                 this
         );
 
@@ -465,7 +504,9 @@ public final class TheMob extends JavaPlugin {
         Iterator<KeyedBossBar> it = Bukkit.getBossBars();
         while (it.hasNext()) {
             KeyedBossBar bar = it.next();
-            if (BOSSBAR_KEY.equals(bar.getKey())) {
+
+            // ✅ remove BOTH systems
+            if (BOSSBAR_KEY.equals(bar.getKey()) || HUD_KEY.equals(bar.getKey())) {
                 bar.removeAll();
                 toRemove.add(bar.getKey());
             }
@@ -474,7 +515,5 @@ public final class TheMob extends JavaPlugin {
         for (NamespacedKey key : toRemove) {
             Bukkit.removeBossBar(key);
         }
-
     }
-
 }

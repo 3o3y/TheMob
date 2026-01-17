@@ -25,8 +25,10 @@ import org.plugin.theMob.mob.ai.MobAIProfile;
 import org.plugin.theMob.mob.ai.MobAIService;
 import org.plugin.theMob.mob.stats.BaseMobStatApplier;
 import org.plugin.theMob.mob.stats.MobEquipmentStatApplier;
+import org.plugin.theMob.spawn.SpawnLocationResolver;
 import org.plugin.theMob.ui.MobHealthDisplay;
 import org.plugin.theMob.visual.MobVisualService;
+import org.plugin.theMob.spawn.SpawnUtil;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -74,7 +76,17 @@ public final class MobSpawnService {
 
         if (mobId == null || loc == null || loc.getWorld() == null) return null;
 
+        // ✅ HIER
+        loc = SpawnLocationResolver.resolveSafe(
+                plugin.getConfig(),
+                loc,
+                null
+        );
+        // ✅ GLOBAL SAFE SPAWN
+        loc = SpawnUtil.resolveSafeSpawn(loc);
+
         mobId = mobId.toLowerCase(Locale.ROOT);
+
         FileConfiguration cfg = mobs.mobConfigById(mobId);
         if (cfg == null) return null;
 

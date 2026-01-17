@@ -16,6 +16,8 @@ import org.plugin.theMob.core.KeyRegistry;
 import org.plugin.theMob.mob.spawn.AutoSpawnManager;
 import org.plugin.theMob.mob.spawn.MobSpawnService;
 import org.plugin.theMob.ui.MobHealthDisplay;
+import org.bukkit.entity.Player;
+
 
 import java.util.*;
 
@@ -245,9 +247,19 @@ public final class MobManager {
         int removed = 0;
 
         for (World world : Bukkit.getWorlds()) {
-            List<LivingEntity> entities = new ArrayList<>(world.getLivingEntities());
-            for (LivingEntity entity : entities) {
-                if (!isCustomMob(entity)) continue;
+            for (LivingEntity entity : world.getLivingEntities()) {
+
+                // Skip players always
+                if (entity instanceof Player) continue;
+
+                // Ultra-fast ownership check
+                var pdc = entity.getPersistentDataContainer();
+                boolean owned =
+                        pdc.has(keys.MOB_ID, PersistentDataType.STRING)
+                                || pdc.has(keys.AUTO_SPAWN_ID, PersistentDataType.STRING);
+
+                if (!owned) continue;
+
                 entity.remove();
                 removed++;
             }
@@ -259,6 +271,7 @@ public final class MobManager {
 
         return removed;
     }
+
 
     public void hardReset() {
         killAll();

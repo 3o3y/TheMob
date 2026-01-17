@@ -1,5 +1,7 @@
 package org.plugin.theMob.mob.ai;
 
+import org.bukkit.GameMode;
+import org.bukkit.Location;
 import org.bukkit.entity.Mob;
 import org.bukkit.entity.Player;
 
@@ -13,68 +15,94 @@ public final class MobAIController {
 
     private long lastSwitchTick;
     private long fleeUntil;
-    private long disengageUntil; // 🔒 NEW
+    private long disengageUntil;
+    private long disengageGraceUntil;
 
     public MobAIController(Mob mob, MobAIProfile profile) {
         this.mob = mob;
         this.profile = profile;
     }
 
+    public Mob mob() {
+        return mob;
+    }
+
+    public MobAIProfile profile() {
+        return profile;
+    }
+
+    // =====================================================
+    // MAIN AI TICK
+    // =====================================================
     public void tick(long tick) {
         if (!mob.isValid() || mob.isDead()) return;
 
-        // =================================================
-        // FLEE
-        // =================================================
+        // ---------- FLEE ----------
         if (profile.fleeEnabled()
                 && mob.getHealth() / mob.getMaxHealth() <= profile.fleeThreshold()) {
 
-            state = BehaviorState.FLEE;
-            fleeUntil = tick + profile.regroupTicks();
-            mob.setTarget(null);
+            if (state != BehaviorState.FLEE) {
+                state = BehaviorState.FLEE;
+                fleeUntil = tick + profile.regroupTicks();
+                mob.setTarget(null);
+            }
             return;
         }
 
         if (state == BehaviorState.FLEE) {
-            if (tick < fleeUntil) {
-                mob.setTarget(null);
-                return;
-            }
+            if (tick < fleeUntil) return;
             state = BehaviorState.REGROUP;
         }
 
-        // =================================================
-        // TARGET RESOLUTION
-        // =================================================
         Player target = resolveTarget(tick);
         if (target == null) {
-            state = BehaviorState.IDLE;
-            mob.setTarget(null);
+            if (state != BehaviorState.IDLE) {
+                state = BehaviorState.IDLE;
+                mob.setTarget(null);
+            }
             return;
         }
 
-        double dist = target.getLocation().distance(mob.getLocation());
+        double distSq = mob.getLocation().distanceSquared(target.getLocation());
+        double disengageSq = profile.disengageDistance() * profile.disengageDistance();
 
-        if (dist <= profile.engageDistance()) {
-            state = BehaviorState.ENGAGE;
-            mob.setTarget(target);
-            return;
-        }
+        // ---------- DISENGAGE (GRACE) ----------
+        if (distSq >= disengageSq) {
+            if (disengageGraceUntil == 0) {
+                disengageGraceUntil = tick + 40; // 2s
+            }
+            if (tick < disengageGraceUntil) return;
 
-        if (dist >= profile.disengageDistance()) {
+            disengageGraceUntil = 0;
             state = BehaviorState.IDLE;
             currentTarget = null;
-            disengageUntil = tick + profile.switchCooldown(); // 🔒 HARD GATE
+            disengageUntil = tick + profile.switchCooldown();
             mob.setTarget(null);
+            return;
+        }
+
+        disengageGraceUntil = 0;
+
+        // ---------- ENGAGE ----------
+        if (state != BehaviorState.ENGAGE) {
+            state = BehaviorState.ENGAGE;
+            mob.setTarget(target);
+
+            // Rotation nur beim Wechsel
+            Location loc = mob.getLocation();
+            loc.setDirection(
+                    target.getLocation().toVector().subtract(loc.toVector())
+            );
+            mob.teleport(loc);
         }
     }
 
+    // =====================================================
+    // TARGET RESOLUTION
+    // =====================================================
     private Player resolveTarget(long tick) {
 
-        // 🔒 do NOT re-aggro immediately after disengage
-        if (tick < disengageUntil) {
-            return null;
-        }
+        if (tick < disengageUntil) return null;
 
         if (currentTarget != null
                 && tick - lastSwitchTick < profile.switchCooldown()
@@ -84,11 +112,15 @@ public final class MobAIController {
         }
 
         Player p = profile.targeting().findTarget(mob);
-        if (p != null) {
-            currentTarget = p;
-            lastSwitchTick = tick;
+        if (p == null) return null;
+
+        if (p.getGameMode() == GameMode.CREATIVE
+                || p.getGameMode() == GameMode.SPECTATOR) {
+            return null;
         }
 
+        currentTarget = p;
+        lastSwitchTick = tick;
         return p;
     }
 

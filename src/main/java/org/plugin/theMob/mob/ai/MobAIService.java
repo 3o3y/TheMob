@@ -9,6 +9,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class MobAIService {
 
     private final Map<UUID, MobAIController> controllers = new ConcurrentHashMap<>();
+    private final SmartRepathService repath = new SmartRepathService();
     private long tick;
 
     public void register(Mob mob, MobAIProfile profile) {
@@ -24,11 +25,19 @@ public final class MobAIService {
     public void tick() {
         tick++;
 
-        for (MobAIController ai : controllers.values()) {
+        controllers.entrySet().removeIf(entry -> {
+            MobAIController ai = entry.getValue();
+            Mob mob = ai.mob();
+
+            if (!mob.isValid() || mob.isDead()) return true;
+
             if (tick % ai.tickRate() == 0) {
                 ai.tick(tick);
             }
-        }
+
+            repath.tick(mob);
+            return false;
+        });
     }
 
     public void clearAll() {

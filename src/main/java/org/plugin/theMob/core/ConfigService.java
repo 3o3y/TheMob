@@ -51,6 +51,11 @@ public final class ConfigService {
 
         if (!autoSpawnFile.exists()) plugin.saveResource("auto_spawn.yml", false);
         if (!statsFile.exists()) plugin.saveResource("stats.yml", false);
+        File mainConfig = new File(plugin.getDataFolder(), "config.yml");
+        if (!mainConfig.exists()) {
+            plugin.saveResource("config.yml", false);
+        }
+
 
         copyDefaultMobConfigs();
     }
