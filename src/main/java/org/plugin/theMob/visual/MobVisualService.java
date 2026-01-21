@@ -41,21 +41,20 @@ public final class MobVisualService {
         new BukkitRunnable() {
 
             Entity visual;
-            float yaw;
             boolean active;
             int tick;
 
             @Override
             public void run() {
 
-                // ❌ Mob endgültig tot → Task beenden
+                // ❌ Mob tot → cleanup
                 if (mob.isDead()) {
                     if (visual != null) visual.remove();
                     cancel();
                     return;
                 }
 
-                // ⚠ Chunk unloaded → Mob temporär invalid → warten, NICHT canceln
+                // ⚠ Chunk unloaded → warten
                 if (!mob.isValid()) {
                     if (visual != null) {
                         visual.remove();
@@ -65,6 +64,7 @@ public final class MobVisualService {
                     return;
                 }
 
+                // Sichtprüfung nur alle 5 Ticks
                 if ((tick++ % 5) == 0) {
                     boolean inRange = mob.getWorld().getPlayers().stream()
                             .anyMatch(p ->
@@ -117,11 +117,15 @@ public final class MobVisualService {
 
                 if (!active || visual == null) return;
 
+                // =========================
+                // FOLLOW MOB EXACTLY
+                // =========================
                 double y = mob.getHeight() + 0.5;
                 Location t = mob.getLocation().clone().add(0, y, 0);
 
-                yaw = (yaw + 4f) % 360f;
-                t.setYaw(yaw);
+                // 🔒 WICHTIG: Yaw vom Mob übernehmen
+                t.setYaw(mob.getLocation().getYaw());
+                t.setPitch(0f);
 
                 visual.teleport(t);
             }

@@ -37,7 +37,7 @@ public final class BossPhaseReadStage implements DamageStage {
         if (maxAttr == null || maxAttr.getValue() <= 0.0) return;
 
         double hpPercent = (boss.getHealth() / maxAttr.getValue()) * 100.0;
-        BossPhase phase = tpl.findPhase(hpPercent);
+        BossPhase phase = tpl.resolvePhase(hpPercent);
         if (phase == null) return;
 
         ctx.setBossTemplate(tpl);

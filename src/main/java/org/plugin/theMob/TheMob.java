@@ -7,6 +7,7 @@ import org.bukkit.Location;
 import org.bukkit.NamespacedKey;
 import org.bukkit.boss.KeyedBossBar;
 import org.bukkit.command.PluginCommand;
+import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.HandlerList;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -36,7 +37,7 @@ import org.plugin.theMob.mob.MobDropEngine;
 import org.plugin.theMob.mob.MobListener;
 import org.plugin.theMob.mob.MobManager;
 import org.plugin.theMob.mob.PlayerDeathListener;
-import org.plugin.theMob.mob.ai.MobAIService;
+import org.plugin.theMob.mob.ability.StuckDefensePath;
 import org.plugin.theMob.mob.spawn.AutoSpawnManager;
 import org.plugin.theMob.mob.spawn.MobSpawnService;
 import org.plugin.theMob.player.stats.PlayerEquipListener;
@@ -63,12 +64,12 @@ public final class TheMob extends JavaPlugin {
     private KeyRegistry keys;
     private TickScheduler ticks;
     private BossPhaseController phaseController;
+    private StuckDefensePath stuckDefense;
 
     // Mobs
     private MobManager mobManager;
     private MobHealthDisplay healthDisplay;
     private MobDropEngine dropEngine;
-    private MobAIService mobAI;
 
     // Spawn
     private AutoSpawnManager autoSpawnManager;
@@ -77,6 +78,10 @@ public final class TheMob extends JavaPlugin {
     // Boss
     private PlayerBarCoordinator playerBars;
     private BossBarService bossBars;
+    public BossBehaviorController bossBehaviors() {
+        return behaviorController;
+    }
+    private BossPhaseController bossPhases;
 
     private BossBehaviorController behaviorController;
     private BossActionEngine bossActionEngine;
@@ -99,6 +104,7 @@ public final class TheMob extends JavaPlugin {
     // v1.7 Automation & Scaling
     private AutomationScalingSystem automationScaling;
 
+
     // v1.9 Progression (ADD ONLY)
     private ProgressionBootstrap progressionBootstrap;
     private ProgressionV19Bootstrap progressionV19;
@@ -120,6 +126,8 @@ public final class TheMob extends JavaPlugin {
         this.configService = new ConfigService(this);
         configService.ensureFoldersAndDefaults();
         configService.reloadAll();
+
+
 
         cleanupStaleHudBars();
         boot(true);
@@ -157,7 +165,6 @@ public final class TheMob extends JavaPlugin {
 
         getLogger().info("[TheMob] Disabled cleanly.");
     }
-
 
     // =====================================================
     // RELOAD
@@ -201,13 +208,19 @@ public final class TheMob extends JavaPlugin {
         }
         ticks = new TickScheduler(this);
 
-        // ---------- Mob AI ----------
-        mobAI = new MobAIService();
-        ticks.syncRepeating(mobAI::tick, 1L, 1L);
-
         // ---------- Mob Manager ----------
         mobManager = new MobManager(this, configService, keys);
         mobManager.reloadFromConfigs();
+        stuckDefense = new StuckDefensePath();
+
+        ticks.registerRepeatingTask(20, () -> {
+            if (mobManager == null) return;
+
+            for (LivingEntity mob : mobManager.getAllLivingMobs()) {
+                stuckDefense.tick(mob);
+            }
+        });
+
 
         // ---------- Items ----------
         itemBuilder = new ItemBuilderFromConfig(this);
@@ -218,10 +231,6 @@ public final class TheMob extends JavaPlugin {
         this.dropEngine = new MobDropEngine(this);
         this.dropEngine.bind(mobManager);
         mobManager.setDropEngine(this.dropEngine);
-
-        // ---------- Health Display ----------
-        healthDisplay = new MobHealthDisplay(this, mobManager);
-        mobManager.setHealthDisplay(healthDisplay);
 
         // ---------- Boss: Bars + Phases ----------
         playerBars = new PlayerBarCoordinator();
@@ -244,6 +253,25 @@ public final class TheMob extends JavaPlugin {
                 worldEffects
         );
 
+        // ---------- Health Display (BRAUCHT bossBars!) ----------
+        healthDisplay = new MobHealthDisplay(
+                this,
+                mobManager,
+                bossBars
+        );
+        mobManager.setHealthDisplay(healthDisplay);
+
+        // ---------- Boss Adapter (BRAUCHT phaseController + healthDisplay) ----------
+        Bukkit.getPluginManager().registerEvents(
+                new BossBarListenerAdapter(
+                        mobManager,
+                        phaseController,
+                        healthDisplay
+                ),
+                this
+        );
+
+        // ---------- Boss Behavior ----------
         behaviorController = new BossBehaviorController(
                 this,
                 mobManager,
@@ -257,8 +285,7 @@ public final class TheMob extends JavaPlugin {
                 keys,
                 healthDisplay,
                 bossBars,
-                phaseController,
-                mobAI
+                phaseController
         );
         mobManager.setSpawnService(spawnService);
 
@@ -284,7 +311,6 @@ public final class TheMob extends JavaPlugin {
             hud.start();
             Bukkit.getPluginManager().registerEvents(new NaviHudListener(hud), this);
         } else {
-            // Safety: falls nach Reload noch ein BossBar-Key hängt
             cleanupStaleHudBars();
         }
 
@@ -331,11 +357,9 @@ public final class TheMob extends JavaPlugin {
     }
 
     private boolean isNavigationHudEnabled() {
-        // ✅ Primary (deine Config aus Screenshot)
         if (getConfig().isSet("navigation-hud.enabled")) {
             return getConfig().getBoolean("navigation-hud.enabled", true);
         }
-        // ✅ Backwards compatibility (falls du irgendwo das Prefix "plugin." hattest)
         return getConfig().getBoolean("plugin.navigation-hud.enabled", true);
     }
 
@@ -347,6 +371,7 @@ public final class TheMob extends JavaPlugin {
 
             progressionV19 = null;
             progressionBootstrap = null;
+
 
             if (automationScaling != null) {
                 automationScaling.shutdown();
@@ -368,11 +393,6 @@ public final class TheMob extends JavaPlugin {
                 autoSpawnManager = null;
             }
 
-            if (mobAI != null) {
-                mobAI.clearAll();
-                mobAI = null;
-            }
-
             if (hud != null) {
                 hud.shutdown();
                 hud = null;
@@ -381,6 +401,11 @@ public final class TheMob extends JavaPlugin {
             if (bossBars != null) {
                 bossBars.shutdown();
                 bossBars = null;
+            }
+
+            if (behaviorController != null) {
+                behaviorController.shutdown();
+                behaviorController = null;
             }
 
             if (bossActionEngine != null) {
@@ -402,6 +427,11 @@ public final class TheMob extends JavaPlugin {
                 ticks.shutdown();
                 ticks = null;
             }
+            if (stuckDefense != null) {
+                stuckDefense.clear();
+                stuckDefense = null;
+            }
+
 
         } catch (Throwable t) {
             getLogger().severe("[TheMob] HARD SHUTDOWN FAILED");
@@ -417,16 +447,6 @@ public final class TheMob extends JavaPlugin {
     private void registerAllListeners() {
 
         Bukkit.getPluginManager().registerEvents(
-                new BossBarListenerAdapter(
-                        mobManager,
-                        phaseController,
-                        healthDisplay
-                ),
-                this
-        );
-
-
-        Bukkit.getPluginManager().registerEvents(
                 new MobListener(
                         this,
                         mobManager,
@@ -434,8 +454,7 @@ public final class TheMob extends JavaPlugin {
                         bossBars,
                         bossActionEngine,
                         keys,
-                        autoSpawnManager,
-                        mobAI
+                        autoSpawnManager
                 ),
                 this
         );
@@ -505,7 +524,6 @@ public final class TheMob extends JavaPlugin {
         while (it.hasNext()) {
             KeyedBossBar bar = it.next();
 
-            // ✅ remove BOTH systems
             if (BOSSBAR_KEY.equals(bar.getKey()) || HUD_KEY.equals(bar.getKey())) {
                 bar.removeAll();
                 toRemove.add(bar.getKey());
@@ -516,4 +534,8 @@ public final class TheMob extends JavaPlugin {
             Bukkit.removeBossBar(key);
         }
     }
+    public StuckDefensePath getStuckDefense() {
+        return stuckDefense;
+    }
+
 }

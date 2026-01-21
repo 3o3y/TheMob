@@ -8,12 +8,15 @@ public final class BossTemplate {
 
     private final String mobId;
 
-    // ✅ Arena definition (in chunks)
+    // Arena definition (in chunks)
     private final int arenaRadiusChunks;
 
-    // Reihenfolge behalten (YAML Ordnung)
+    // Reihenfolge behalten (YAML Ordnung!)
     private final Map<String, BossPhase> phases = new LinkedHashMap<>();
     private final Map<String, ConfigurationSection> phaseConfigs = new HashMap<>();
+
+    // 🔒 PHASE LOCK STATE
+    private BossPhase lastResolvedPhase;
 
     public BossTemplate(String mobId, int arenaRadiusChunks) {
         this.mobId = Objects.requireNonNull(mobId, "mobId");
@@ -46,13 +49,32 @@ public final class BossTemplate {
         return Collections.unmodifiableCollection(phases.values());
     }
 
-    public BossPhase findPhase(double hpPercent0to100) {
+    /**
+     * Phase resolution with monotonic lock.
+     * Phase can ONLY move forward (down in HP).
+     */
+    public BossPhase resolvePhase(double hpPercent0to100) {
+        BossPhase matched = null;
+
         for (BossPhase p : phases.values()) {
             if (p.matches(hpPercent0to100)) {
-                return p;
+                matched = p;
+                break;
             }
         }
-        return null;
+
+        if (matched == null) {
+            // Fallback: keep last phase (prevents flicker)
+            return lastResolvedPhase;
+        }
+
+        // 🔒 LOCK: never go backwards
+        if (lastResolvedPhase == null
+                || matched.min() < lastResolvedPhase.min()) {
+            lastResolvedPhase = matched;
+        }
+
+        return lastResolvedPhase;
     }
 
     public ConfigurationSection phaseConfig(String phaseId) {
@@ -65,5 +87,13 @@ public final class BossTemplate {
 
     public String mobId() {
         return mobId;
+    }
+
+    // =====================================================
+    // RESET (on respawn)
+    // =====================================================
+
+    public void resetPhaseState() {
+        lastResolvedPhase = null;
     }
 }

@@ -7,7 +7,6 @@ import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Zombie;
 import org.bukkit.persistence.PersistentDataType;
-import org.bukkit.plugin.Plugin;
 import org.plugin.theMob.core.KeyRegistry;
 
 public final class ZombieBossFactory {
@@ -15,13 +14,11 @@ public final class ZombieBossFactory {
     private ZombieBossFactory() {}
 
     public static Zombie spawnZombieBoss(
-            Plugin plugin,
             Location loc,
             String bossId,
             KeyRegistry keys,
             FileConfiguration cfg
     ) {
-        if (plugin == null) throw new IllegalArgumentException("plugin is null");
         if (keys == null) throw new IllegalArgumentException("keys is null");
         if (bossId == null || bossId.isBlank())
             throw new IllegalArgumentException("bossId is null/blank");
@@ -30,12 +27,20 @@ public final class ZombieBossFactory {
 
         Zombie zombie = (Zombie) loc.getWorld().spawnEntity(loc, EntityType.ZOMBIE);
 
+        // =====================================================
+        // ENTITY BASICS
+        // =====================================================
         zombie.setAdult();
         zombie.setPersistent(true);
         zombie.setRemoveWhenFarAway(false);
         zombie.setCanPickupItems(false);
+        zombie.setAI(true);                 // 🔒 explizit
+        zombie.setAware(true);              // 🔒 verhindert „Moonwalk“-Bugs
         zombie.addScoreboardTag("themob_boss");
 
+        // =====================================================
+        // PDC IDENTITY
+        // =====================================================
         zombie.getPersistentDataContainer().set(
                 keys.MOB_ID,
                 PersistentDataType.STRING,
@@ -52,6 +57,9 @@ public final class ZombieBossFactory {
                 System.currentTimeMillis()
         );
 
+        // =====================================================
+        // HEALTH (BASE ONLY – PHASE SYSTEM WILL ADJUST LATER)
+        // =====================================================
         if (cfg != null && cfg.contains("stats.health.max")) {
             double max = Math.max(1.0, cfg.getDouble("stats.health.max"));
             AttributeInstance attr = zombie.getAttribute(Attribute.MAX_HEALTH);

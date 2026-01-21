@@ -23,9 +23,9 @@ public final class BossPhase {
         this.title = title != null ? title : "";
         this.section = section;
 
-        // clamp + normalize
-        double min = Math.max(0.0, Math.min(100.0, minHpPercent));
-        double max = Math.max(0.0, Math.min(100.0, maxHpPercent));
+        // Normalize & clamp to [0–100]
+        double min = clamp(minHpPercent);
+        double max = clamp(maxHpPercent);
 
         if (min > max) {
             double tmp = min;
@@ -41,8 +41,17 @@ public final class BossPhase {
         return id;
     }
 
+    /**
+     * Inclusive min, exclusive max
+     * Example:
+     * 100–75 → hp >= 75 && hp < 100
+     * 25–0   → hp >= 0  && hp < 25
+     */
     public boolean matches(double hpPercent) {
-        return hpPercent > minHpPercent && hpPercent <= maxHpPercent;
+        if (Double.isNaN(hpPercent)) return false;
+
+        double hp = clamp(hpPercent);
+        return hp >= minHpPercent && hp < maxHpPercent;
     }
 
     public String title() {
@@ -59,5 +68,9 @@ public final class BossPhase {
 
     public ConfigurationSection cfg() {
         return section;
+    }
+
+    private double clamp(double v) {
+        return Math.max(0.0, Math.min(100.0, v));
     }
 }

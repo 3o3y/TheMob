@@ -282,4 +282,17 @@ public final class MobManager {
         autoSpawn = null;
         bossActionEngine = null;
     }
+    public Collection<LivingEntity> getAllLivingMobs() {
+        List<LivingEntity> result = new ArrayList<>();
+
+        for (World world : Bukkit.getWorlds()) {
+            for (LivingEntity e : world.getLivingEntities()) {
+                if (isCustomMob(e)) {
+                    result.add(e);
+                }
+            }
+        }
+        return result;
+    }
+
 }

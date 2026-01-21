@@ -7,6 +7,7 @@ import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.ExperienceOrb;
 import org.bukkit.entity.LivingEntity;
+import org.bukkit.entity.Mob;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Listener;
 import org.bukkit.potion.PotionEffect;
@@ -36,11 +37,9 @@ public final class BossActionEngine implements Listener {
         this.minionController = new BossMinionController(plugin);
         this.minionSpawner = new BossMinionSpawner(plugin, minionController);
 
-        // Only minion lifecycle / timed logic
         tickTask = new BukkitRunnable() {
             @Override
             public void run() {
-                // keep minion system stable over long uptimes
                 minionController.tick();
             }
         };
@@ -57,21 +56,16 @@ public final class BossActionEngine implements Listener {
         ConfigurationSection cfg = phase.cfg();
         if (cfg == null) return;
 
-        // -------------------------------------------------
-        // IMPORTANT:
-        // - NO attribute changes here (handled by PhaseBuffEngine)
-        // - NO world effects here (handled by BossPhaseController / WorldController)
-        // -------------------------------------------------
-
         applyAbilities(boss, cfg.getConfigurationSection("abilities"));
         applyEffects(boss, cfg.getConfigurationSection("effects"));
         applyPhysics(boss, cfg.getConfigurationSection("physics"));
 
-        // on-enter visuals (particles/sound/message)
+        // 🔥 NEW: behavior overrides (FLEE = BLINDNESS)
+        applyBehaviorOverrides(boss, cfg.getConfigurationSection("behavior"));
+
         ConfigurationSection onEnter = cfg.getConfigurationSection("on-enter");
         if (onEnter != null) runOnEnterEffects(boss, onEnter);
 
-        // actions (minions)
         ConfigurationSection actions = cfg.getConfigurationSection("actions");
         if (actions != null) {
             ConfigurationSection summon = actions.getConfigurationSection("summon-minions");
@@ -83,11 +77,29 @@ public final class BossActionEngine implements Listener {
 
     public void onPhaseLeave(LivingEntity boss, BossPhase phase) {
         if (boss == null || phase == null) return;
+
+        boss.removePotionEffect(PotionEffectType.BLINDNESS);
+        boss.removePotionEffect(PotionEffectType.SLOWNESS);
+
+        if (boss instanceof org.bukkit.entity.Mob mob) {
+            mob.setAware(true);
+        }
+
         minionSpawner.onPhaseLeave(boss, phase);
     }
 
+
     public void onBossDeath(LivingEntity boss) {
         if (boss == null) return;
+
+        boss.removePotionEffect(PotionEffectType.BLINDNESS);
+        boss.removePotionEffect(PotionEffectType.SLOWNESS);
+
+        if (boss instanceof Mob mob) {
+            mob.setTarget(null);
+            mob.setAware(true);
+            mob.setAI(false); // verhindert letzte Ticks
+        }
 
         UUID id = boss.getUniqueId();
 
@@ -96,6 +108,51 @@ public final class BossActionEngine implements Listener {
 
         spawnBossXpExplosion(boss);
     }
+
+    // =====================================================
+    // BEHAVIOR OVERRIDES (🔥 CORE CHANGE)
+    // =====================================================
+
+    private void applyBehaviorOverrides(LivingEntity boss, ConfigurationSection cfg) {
+        if (cfg == null) return;
+
+        String mode = cfg.getString("mode", "aggressive").toLowerCase(Locale.ROOT);
+
+        if (!"flee".equals(mode)) return;
+
+        // =========================
+        // PANIC / BLINDNESS DESIGN
+        // =========================
+
+        // Blindness = Orientierungslos
+        boss.addPotionEffect(new PotionEffect(
+                PotionEffectType.BLINDNESS,
+                Integer.MAX_VALUE,
+                1,
+                false,
+                false
+        ));
+
+        // Optional: zusätzlich Slow für "taumeln"
+        boss.addPotionEffect(new PotionEffect(
+                PotionEffectType.SLOWNESS,
+                Integer.MAX_VALUE,
+                1,
+                false,
+                false
+        ));
+
+        // -------------------------
+        // Mob-spezifische Kontrolle
+        // -------------------------
+        if (boss instanceof Mob mob) {
+            mob.setTarget(null);
+            mob.setAware(true);
+            mob.setAI(true);
+        }
+
+    }
+
 
     // =====================================================
     // ABILITIES / EFFECTS / PHYSICS
@@ -110,8 +167,6 @@ public final class BossActionEngine implements Listener {
         boss.setGlowing(cfg.getBoolean("glowing", false));
         boss.setInvisible(cfg.getBoolean("invisibility", false));
         boss.setGravity(cfg.getBoolean("gravity", true));
-
-        // prevent vanilla despawn weirdness
         boss.setPersistent(true);
     }
 
@@ -135,7 +190,7 @@ public final class BossActionEngine implements Listener {
     }
 
     // =====================================================
-    // ON-ENTER EFFECTS (Particles / Sound / Message)
+    // ON-ENTER EFFECTS
     // =====================================================
 
     private void runOnEnterEffects(LivingEntity boss, ConfigurationSection onEnter) {
@@ -144,7 +199,6 @@ public final class BossActionEngine implements Listener {
 
         Location loc = boss.getLocation().add(0, 1, 0);
 
-        // -------- PARTICLES --------
         ConfigurationSection particles = effects.getConfigurationSection("particles");
         if (particles != null) {
             try {
@@ -152,38 +206,33 @@ public final class BossActionEngine implements Listener {
                         particles.getString("type", "FLAME").toUpperCase(Locale.ROOT)
                 );
 
-                int amount = particles.getInt("amount", 20);
-                double radius = particles.getDouble("radius", 1.0);
-                double height = particles.getDouble("height", 1.0);
-                double speed = particles.getDouble("speed", 0.02);
-
                 boss.getWorld().spawnParticle(
                         type,
                         loc,
-                        amount,
-                        radius,
-                        height,
-                        radius,
-                        speed
+                        particles.getInt("amount", 40),
+                        particles.getDouble("radius", 1.5),
+                        particles.getDouble("height", 1.5),
+                        particles.getDouble("radius", 1.5),
+                        particles.getDouble("speed", 0.03)
                 );
             } catch (Exception ignored) {}
         }
 
-        // -------- SOUND --------
         ConfigurationSection sound = effects.getConfigurationSection("sound");
         if (sound != null) {
             try {
                 Sound s = Sound.valueOf(
                         sound.getString("type", "ENTITY_WITHER_SPAWN").toUpperCase(Locale.ROOT)
                 );
-                float volume = (float) sound.getDouble("volume", 1.0);
-                float pitch = (float) sound.getDouble("pitch", 1.0);
-
-                boss.getWorld().playSound(boss.getLocation(), s, volume, pitch);
+                boss.getWorld().playSound(
+                        boss.getLocation(),
+                        s,
+                        (float) sound.getDouble("volume", 1.0),
+                        (float) sound.getDouble("pitch", 1.0)
+                );
             } catch (Exception ignored) {}
         }
 
-        // -------- MESSAGE --------
         ConfigurationSection msg = effects.getConfigurationSection("message");
         if (msg != null) sendPhaseEnterMessage(boss, msg);
     }
@@ -192,24 +241,23 @@ public final class BossActionEngine implements Listener {
         String raw = msg.getString("text", "");
         if (raw == null || raw.isEmpty()) return;
 
-        double radius = msg.getDouble("radius", 32.0);
-        double r2 = radius * radius;
+        double r2 = Math.pow(msg.getDouble("radius", 32.0), 2);
 
         for (Player p : boss.getWorld().getPlayers()) {
             if (p.getLocation().distanceSquared(boss.getLocation()) > r2) continue;
 
             String resolved = Placeholder.resolve(raw, boss, null, p);
-            String legacy = ChatColor.translateAlternateColorCodes('&', resolved);
-
             p.spigot().sendMessage(
                     ChatMessageType.ACTION_BAR,
-                    TextComponent.fromLegacyText(legacy)
+                    TextComponent.fromLegacyText(
+                            ChatColor.translateAlternateColorCodes('&', resolved)
+                    )
             );
         }
     }
 
     // =====================================================
-    // XP EXPLOSION (Boss Death Reward)
+    // XP EXPLOSION
     // =====================================================
 
     private void spawnBossXpExplosion(LivingEntity boss) {
@@ -230,12 +278,7 @@ public final class BossActionEngine implements Listener {
         int xpPerOrb = Math.max(1, totalXp / orbCount);
 
         for (int i = 0; i < orbCount; i++) {
-            Location l = c.clone().add(
-                    rnd.nextGaussian() * 1.2,
-                    rnd.nextDouble() * 0.8,
-                    rnd.nextGaussian() * 1.2
-            );
-            ExperienceOrb orb = w.spawn(l, ExperienceOrb.class);
+            ExperienceOrb orb = w.spawn(c, ExperienceOrb.class);
             orb.setExperience(xpPerOrb);
         }
     }
@@ -249,8 +292,6 @@ public final class BossActionEngine implements Listener {
             tickTask.cancel();
             tickTask = null;
         }
-
-        // hard cleanup
         minionController.clearAll();
     }
 }

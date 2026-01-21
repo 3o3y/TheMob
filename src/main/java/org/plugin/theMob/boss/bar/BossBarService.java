@@ -11,6 +11,7 @@ import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.plugin.theMob.TheMob;
+import org.plugin.theMob.boss.BossTemplate;
 import org.plugin.theMob.boss.Placeholder;
 import org.plugin.theMob.core.context.PlayerBarCoordinator;
 import org.plugin.theMob.mob.MobManager;
@@ -24,8 +25,7 @@ public final class BossBarService implements Listener {
     public static final NamespacedKey BOSSBAR_KEY =
             new NamespacedKey("themob", "bossbar");
 
-    private static final double RANGE = 24.0;
-    private static final double RANGE_SQ = RANGE * RANGE;
+    private static final int BLOCKS_PER_CHUNK = 16;
 
     private final TheMob plugin;
     private final MobManager mobs;
@@ -95,8 +95,33 @@ public final class BossBarService implements Listener {
     }
 
     public void unregisterBoss(LivingEntity boss) {
-        if (boss != null) removeBoss(boss.getUniqueId());
+        if (boss == null) return;
+
+        UUID bid = boss.getUniqueId();
+
+        // Boss aus Tracking entfernen
+        bosses.remove(bid);
+        dirty.remove(bid);
+        phaseTitle.remove(bid);
+
+        // BossBar von ALLEN Spielern entfernen
+        for (UUID pid : new HashSet<>(playerBoss.keySet())) {
+            UUID current = playerBoss.get(pid);
+            if (!bid.equals(current)) continue;
+
+            Player p = Bukkit.getPlayer(pid);
+            if (p != null && p.isOnline()) {
+                PlayerBarCoordinator.Ctx ctx = playerBars.of(p);
+                BossBar bar = ctx.bossBar();
+                if (bar != null) {
+                    bar.removePlayer(p);
+                }
+            }
+
+            playerBoss.remove(pid);
+        }
     }
+
 
     public void setPhaseTitle(LivingEntity boss, String title) {
         if (boss == null) return;
@@ -158,40 +183,68 @@ public final class BossBarService implements Listener {
     }
 
     // =====================================================
-    // PLAYER UPDATE
+    // PLAYER UPDATE (ARENA-BASED)
     // =====================================================
 
     private void updatePlayer(Player p) {
-        LivingEntity nearest = null;
-        double best = RANGE_SQ;
-
-        for (LivingEntity boss : bosses.values()) {
-            if (boss.getWorld() != p.getWorld()) continue;
-
-            double d = boss.getLocation().distanceSquared(p.getLocation());
-            if (d > best) continue;
-
-            best = d;
-            nearest = boss;
-        }
-
         UUID pid = p.getUniqueId();
         UUID current = playerBoss.get(pid);
 
-        if (nearest == null) {
-            if (current != null) clear(p);
+        LivingEntity activeBoss = null;
+
+        for (LivingEntity boss : bosses.values()) {
+            if (boss.getWorld() != p.getWorld()) continue;
+            if (!isInsideArena(p, boss)) continue;
+
+            activeBoss = boss;
+            break;
+        }
+
+        // ❌ Kein Boss mehr → BossBar sauber entfernen
+        if (activeBoss == null) {
+
+            if (current != null) {
+                PlayerBarCoordinator.Ctx ctx = playerBars.of(p);
+                BossBar bar = ctx.bossBar();
+
+                if (bar != null) {
+                    bar.removePlayer(p);
+                    ctx.setBossBar(null);
+                }
+
+                playerBoss.remove(pid);
+            }
+
             return;
         }
 
-        UUID nid = nearest.getUniqueId();
-        if (current != null && current.equals(nid)) {
-            if (dirty.contains(nid)) updateBar(p, nearest);
+
+        UUID bid = activeBoss.getUniqueId();
+
+        if (current != null && current.equals(bid)) {
+            if (dirty.contains(bid)) updateBar(p, activeBoss);
             return;
         }
 
-        playerBoss.put(pid, nid);
-        showBar(p, nearest);
+        playerBoss.put(pid, bid);
+        showBar(p, activeBoss);
     }
+
+    private boolean isInsideArena(Player p, LivingEntity boss) {
+        BossTemplate tpl = mobs.getBossTemplate(boss);
+        if (tpl == null) return false;
+
+        int chunks = Math.max(1, tpl.arenaRadiusChunks());
+        double radius = chunks * BLOCKS_PER_CHUNK;
+        double radiusSq = radius * radius;
+
+        return p.getWorld() == boss.getWorld()
+                && p.getLocation().distanceSquared(boss.getLocation()) <= (radiusSq + 4);
+    }
+
+    // =====================================================
+    // BAR RENDERING
+    // =====================================================
 
     private void showBar(Player p, LivingEntity boss) {
         PlayerBarCoordinator.Ctx ctx = playerBars.of(p);
@@ -220,39 +273,31 @@ public final class BossBarService implements Listener {
         bar.setProgress(hp);
         bar.setColor(colorFor(hp));
 
-        String rawTitle;
-        String phase = phaseTitle.get(boss.getUniqueId());
-
-        if (phase != null && !phase.isBlank()) {
-            rawTitle = "{mob_name} | {phase_title}";
-        } else {
-            rawTitle = "{mob_name}";
-        }
-
-        String rendered = Placeholder.resolve(
-                rawTitle,
-                boss,
-                null,
-                p
-        );
-
-        bar.setTitle(rendered);
+        bar.setTitle(Placeholder.resolve("{mob_name}", boss, null, p));
         dirty.remove(boss.getUniqueId());
-    }
 
-    private void clear(Player p) {
-        playerBoss.remove(p.getUniqueId());
-
-        PlayerBarCoordinator.Ctx ctx = playerBars.of(p);
-        BossBar bar = ctx.bossBar();
-        if (bar != null) bar.removePlayer(p);
-        ctx.setBossBar(null);
     }
 
     private void removeBoss(UUID id) {
         bosses.remove(id);
         dirty.remove(id);
         phaseTitle.remove(id);
+    }
+    // BossBarService.java
+    public double getBossProgress(LivingEntity boss) {
+        if (boss == null) return -1;
+
+        UUID id = boss.getUniqueId();
+        if (!bosses.containsKey(id)) return -1;
+
+        // BossBar wird pro Player gerendert,
+        // Progress ist aber global identisch
+        var attr = boss.getAttribute(Attribute.MAX_HEALTH);
+        if (attr == null || attr.getValue() <= 0) return -1;
+
+        return Math.max(0.0, Math.min(1.0,
+                boss.getHealth() / attr.getValue()
+        ));
     }
 
     // =====================================================
@@ -282,4 +327,27 @@ public final class BossBarService implements Listener {
         if (p > 0.25) return BarColor.YELLOW;
         return BarColor.RED;
     }
+    public void removeBossCompletely(LivingEntity boss) {
+        if (boss == null) return;
+
+        UUID bid = boss.getUniqueId();
+
+        // Boss aus Registry
+        removeBoss(bid);
+
+        // BossBar von ALLEN Spielern entfernen
+        for (Player p : Bukkit.getOnlinePlayers()) {
+            PlayerBarCoordinator.Ctx ctx = playerBars.of(p);
+            BossBar bar = ctx.bossBar();
+
+            if (bar != null) {
+                bar.removePlayer(p);
+                ctx.setBossBar(null);
+            }
+        }
+
+        // Player → Boss Mapping löschen
+        playerBoss.values().removeIf(id -> id.equals(bid));
+    }
+
 }

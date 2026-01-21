@@ -168,7 +168,7 @@ abilities:
 phases:                               #This will make your Mob as a Boss Mob
   phase1:
     hp-range: "100-75"                # Active while boss health is between 100% and 75%
-    title: "Phase 1 – Royal Calm"     # Title shown when this phase starts
+    title: "&61 &f– Royal Calm"     # Title shown when this phase starts
     on-enter:
       effects:
         particles:
@@ -460,6 +460,10 @@ phases:                               #This will make your Mob as a Boss Mob
       water-breathing: true
     behavior:
       mode: flee                     # Tries to escape instead of fighting
+      flee:
+        fear-radius: 10
+        distance: 12
+        zigzag: 3.0
       follow-range: +0
       forget-target-after: 5         # Stops targeting after 5 seconds
     combat:

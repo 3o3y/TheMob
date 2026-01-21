@@ -22,6 +22,7 @@ public final class BehaviorRegistry {
 
     public static BossBehavior get(String id) {
         if (id == null) return null;
+
         return MODES.get(id.toLowerCase());
     }
 

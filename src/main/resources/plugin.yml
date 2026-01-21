@@ -1,5 +1,5 @@
 name: TheMob
-version: "1.8.2"
+version: "1.8.3_Alpha"
 main: org.plugin.theMob.TheMob
 api-version: "1.21"
 author: 3o3y

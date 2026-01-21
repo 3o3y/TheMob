@@ -1,6 +1,5 @@
 package org.plugin.theMob.mob.spawn;
 
-import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.attribute.Attribute;
@@ -13,6 +12,7 @@ import org.bukkit.entity.Mob;
 import org.bukkit.inventory.EntityEquipment;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.persistence.PersistentDataType;
+import org.bukkit.potion.PotionEffectType;
 import org.plugin.theMob.TheMob;
 import org.plugin.theMob.boss.BossTemplate;
 import org.plugin.theMob.boss.bar.BossBarService;
@@ -21,14 +21,12 @@ import org.plugin.theMob.boss.spawn.ZombieBossFactory;
 import org.plugin.theMob.core.KeyRegistry;
 import org.plugin.theMob.item.ItemBuilderFromConfig;
 import org.plugin.theMob.mob.MobManager;
-import org.plugin.theMob.mob.ai.MobAIProfile;
-import org.plugin.theMob.mob.ai.MobAIService;
 import org.plugin.theMob.mob.stats.BaseMobStatApplier;
 import org.plugin.theMob.mob.stats.MobEquipmentStatApplier;
 import org.plugin.theMob.spawn.SpawnLocationResolver;
+import org.plugin.theMob.spawn.SpawnUtil;
 import org.plugin.theMob.ui.MobHealthDisplay;
 import org.plugin.theMob.visual.MobVisualService;
-import org.plugin.theMob.spawn.SpawnUtil;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -42,9 +40,7 @@ public final class MobSpawnService {
     private final MobHealthDisplay healthDisplay;
     private final BossBarService bossBars;
     private final BossPhaseController phaseController;
-    private final MobAIService mobAI;
     private final BaseMobStatApplier baseStatApplier;
-
 
     private final ItemBuilderFromConfig itemBuilder;
     private final MobEquipmentStatApplier statApplier;
@@ -55,8 +51,7 @@ public final class MobSpawnService {
             KeyRegistry keys,
             MobHealthDisplay healthDisplay,
             BossBarService bossBars,
-            BossPhaseController phaseController,
-            MobAIService mobAI
+            BossPhaseController phaseController
     ) {
         this.plugin = plugin;
         this.mobs = mobs;
@@ -64,7 +59,6 @@ public final class MobSpawnService {
         this.healthDisplay = healthDisplay;
         this.bossBars = bossBars;
         this.phaseController = phaseController;
-        this.mobAI = mobAI;
 
         this.baseStatApplier = new BaseMobStatApplier(keys);
 
@@ -73,16 +67,10 @@ public final class MobSpawnService {
     }
 
     public LivingEntity spawn(String mobId, String spawnId, Location loc) {
-
         if (mobId == null || loc == null || loc.getWorld() == null) return null;
 
-        // ✅ HIER
-        loc = SpawnLocationResolver.resolveSafe(
-                plugin.getConfig(),
-                loc,
-                null
-        );
-        // ✅ GLOBAL SAFE SPAWN
+        // SAFE SPAWN
+        loc = SpawnLocationResolver.resolveSafe(plugin.getConfig(), loc, null);
         loc = SpawnUtil.resolveSafeSpawn(loc);
 
         mobId = mobId.toLowerCase(Locale.ROOT);
@@ -98,127 +86,113 @@ public final class MobSpawnService {
         }
 
         boolean isBoss = mobs.hasBossTemplate(mobId);
-        LivingEntity mob;
 
+        LivingEntity mob;
         if (isBoss && type == EntityType.ZOMBIE) {
-            mob = ZombieBossFactory.spawnZombieBoss(plugin, loc, mobId, keys, cfg);
+            mob = ZombieBossFactory.spawnZombieBoss(loc, mobId, keys, cfg);
         } else {
             mob = (LivingEntity) loc.getWorld().spawnEntity(loc, type);
         }
-
         if (mob == null) return null;
 
-        // =====================================================
-        // PDC IDENTITY
-        // =====================================================
+        // PDC IDENTITY (MUSS vor Boss init gesetzt sein!)
         mob.getPersistentDataContainer().set(keys.MOB_ID, PersistentDataType.STRING, mobId);
         mob.getPersistentDataContainer().set(keys.IS_BOSS, PersistentDataType.INTEGER, isBoss ? 1 : 0);
 
-        String name = ChatColor.translateAlternateColorCodes('&',
-                cfg.getString("name", type.name()));
+        String name = ChatColor.translateAlternateColorCodes('&', cfg.getString("name", type.name()));
         mob.getPersistentDataContainer().set(keys.BASE_NAME, PersistentDataType.STRING, name);
 
         if (spawnId != null) {
             mob.getPersistentDataContainer().set(keys.AUTO_SPAWN_ID, PersistentDataType.STRING, spawnId);
         }
 
-        // =====================================================
-        // BASE STATS FIRST (so equipment ADDS on top)
-        // =====================================================
+        // BASE STATS
         if (cfg.contains("stats.scale")) {
-            double scale = Math.max(0.25, Math.min(5.0, cfg.getDouble("stats.scale", 1.0)));
-            AttributeInstance scaleAttr = mob.getAttribute(Attribute.SCALE);
-            if (scaleAttr != null) scaleAttr.setBaseValue(scale);
-        }
-
-        if (cfg.contains("stats.health.max")) {
-            double max = cfg.getDouble("stats.health.max");
-            AttributeInstance hp = mob.getAttribute(Attribute.MAX_HEALTH);
-            if (hp != null) {
-                hp.setBaseValue(max);
-                mob.setHealth(max);
+            AttributeInstance scale = mob.getAttribute(Attribute.SCALE);
+            if (scale != null) {
+                scale.setBaseValue(Math.max(0.25, Math.min(5.0, cfg.getDouble("stats.scale", 1.0))));
             }
         }
 
-        // Small armor floor (optional)
-        AttributeInstance armor = mob.getAttribute(Attribute.ARMOR);
-        if (armor != null && armor.getBaseValue() <= 0.0) {
-            armor.setBaseValue(0.01);
+        if (cfg.contains("stats.health.max")) {
+            AttributeInstance hp = mob.getAttribute(Attribute.MAX_HEALTH);
+            if (hp != null) {
+                double max = cfg.getDouble("stats.health.max");
+                hp.setBaseValue(max);
+                mob.setHealth(Math.min(max, Math.max(1.0, cfg.getDouble("stats.health.current", max))));
+            }
         }
 
-        // =====================================================
+        AttributeInstance armor = mob.getAttribute(Attribute.ARMOR);
+        if (armor != null && armor.getBaseValue() <= 0.0) armor.setBaseValue(0.01);
+
         // EQUIPMENT
-        // =====================================================
-        EntityEquipment e = mob.getEquipment();
+        EntityEquipment eqp = mob.getEquipment();
         ConfigurationSection eq = cfg.getConfigurationSection("equipment");
 
-        if (eq != null && e != null) {
+        if (eq != null && eqp != null) {
+            eqp.setHelmet(rollEquipment(eq.getConfigurationSection("helmet")));
+            eqp.setChestplate(rollEquipment(eq.getConfigurationSection("chestplate")));
+            eqp.setLeggings(rollEquipment(eq.getConfigurationSection("leggings")));
+            eqp.setBoots(rollEquipment(eq.getConfigurationSection("boots")));
+            eqp.setItemInMainHand(rollEquipment(eq.getConfigurationSection("main-hand")));
+            eqp.setItemInOffHand(rollEquipment(eq.getConfigurationSection("off-hand")));
 
-            e.setHelmet(rollEquipment(eq.getConfigurationSection("helmet")));
-            e.setChestplate(rollEquipment(eq.getConfigurationSection("chestplate")));
-            e.setLeggings(rollEquipment(eq.getConfigurationSection("leggings")));
-            e.setBoots(rollEquipment(eq.getConfigurationSection("boots")));
-            e.setItemInMainHand(rollEquipment(eq.getConfigurationSection("main-hand")));
-            e.setItemInOffHand(rollEquipment(eq.getConfigurationSection("off-hand")));
+            eqp.setHelmetDropChance(0f);
+            eqp.setChestplateDropChance(0f);
+            eqp.setLeggingsDropChance(0f);
+            eqp.setBootsDropChance(0f);
+            eqp.setItemInMainHandDropChance(0f);
+            eqp.setItemInOffHandDropChance(0f);
 
-            // 🔒 DROP SAFETY
-            e.setHelmetDropChance(0f);
-            e.setChestplateDropChance(0f);
-            e.setLeggingsDropChance(0f);
-            e.setBootsDropChance(0f);
-            e.setItemInMainHandDropChance(0f);
-            e.setItemInOffHandDropChance(0f);
-
-            // =================================================
-            // APPLY EQUIPMENT STATS
-            // =================================================
             List<ItemStack> items = new ArrayList<>(6);
-            if (e.getHelmet() != null) items.add(e.getHelmet());
-            if (e.getChestplate() != null) items.add(e.getChestplate());
-            if (e.getLeggings() != null) items.add(e.getLeggings());
-            if (e.getBoots() != null) items.add(e.getBoots());
-            if (e.getItemInMainHand() != null) items.add(e.getItemInMainHand());
-            if (e.getItemInOffHand() != null) items.add(e.getItemInOffHand());
+            if (eqp.getHelmet() != null) items.add(eqp.getHelmet());
+            if (eqp.getChestplate() != null) items.add(eqp.getChestplate());
+            if (eqp.getLeggings() != null) items.add(eqp.getLeggings());
+            if (eqp.getBoots() != null) items.add(eqp.getBoots());
+            if (eqp.getItemInMainHand() != null) items.add(eqp.getItemInMainHand());
+            if (eqp.getItemInOffHand() != null) items.add(eqp.getItemInOffHand());
 
             statApplier.apply(mob, items);
         }
-// =========================
-// APPLY BASE MOB STATS
-// =========================
-        baseStatApplier.apply(
-                mob,
-                cfg.getConfigurationSection("stats")
-        );
 
-        // =====================================================
-        // UI / AI
-        // =====================================================
-        if (healthDisplay != null) {
-            healthDisplay.onSpawn(mob);
-        }
+        baseStatApplier.apply(mob, cfg.getConfigurationSection("stats"));
 
-        if (mob instanceof Mob bukkitMob) {
-            MobAIProfile profile = MobAIProfile.fromConfig(cfg.getConfigurationSection("ai"));
-            mobAI.register(bukkitMob, profile);
-        }
+        // UI
+        if (healthDisplay != null) healthDisplay.onSpawn(mob);
 
-        // =====================================================
-        // BOSS HOOKS
-        // =====================================================
+        // =========================
+        // 🔥 HARD RESET BEHAVIOR STATE (WICHTIG!)
+        // =========================
         if (isBoss) {
-            BossTemplate tpl = mobs.bossTemplate(mobId);
-            Bukkit.getScheduler().runTask(plugin, () -> {
-                if (!mob.isValid()) return;
-                if (bossBars != null) bossBars.registerBoss(mob);
-                if (tpl != null && phaseController != null) {
-                    phaseController.onBossSpawn(mob, tpl);
-                }
-            });
+            plugin.bossBehaviors().onBossSpawn(mob); // ✅ DAS FEHLTE (Spawn-Reset)
         }
 
-        // =====================================================
+        // =========================
+        // BOSS INIT (EINZIGE STELLE)
+        // =========================
+        if (isBoss) {
+            bossBars.registerBoss(mob);
+            bossBars.markDirty(mob);
+
+            BossTemplate tpl = mobs.bossTemplate(mobId);
+            if (tpl != null && phaseController != null) {
+                phaseController.onBossSpawn(mob, tpl);
+            }
+        }
+
+        // HARD BOSS RESET
+        if (isBoss && mob instanceof Mob m) {
+            m.setAI(true);
+            m.setAware(true);
+            m.setTarget(null);
+
+            m.removePotionEffect(PotionEffectType.BLINDNESS);
+            m.removePotionEffect(PotionEffectType.SLOWNESS);
+            m.removePotionEffect(PotionEffectType.WEAKNESS);
+        }
+
         // VISUALS
-        // =====================================================
         if (cfg.contains("visual.helmet.type")) {
             MobVisualService.attachVisual(plugin, mob, cfg, keys);
         }

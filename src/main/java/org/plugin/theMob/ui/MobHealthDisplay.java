@@ -8,6 +8,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.Vector;
+import org.plugin.theMob.boss.bar.BossBarService;
 import org.plugin.theMob.mob.MobManager;
 
 import java.util.HashSet;
@@ -23,15 +24,22 @@ public final class MobHealthDisplay {
 
     private final JavaPlugin plugin;
     private final MobManager mobs;
+    private final BossBarService bossBars;
 
     private final Set<UUID> tracked = new HashSet<>();
     private BukkitRunnable moveTask;
 
-    public MobHealthDisplay(JavaPlugin plugin, MobManager mobs) {
+    public MobHealthDisplay(
+            JavaPlugin plugin,
+            MobManager mobs,
+            BossBarService bossBars
+    ) {
         this.plugin = plugin;
         this.mobs = mobs;
+        this.bossBars = bossBars;
         startMoveUpdater();
     }
+
 
     public void onSpawn(LivingEntity mob) {
         if (mob == null) return;
@@ -68,12 +76,28 @@ public final class MobHealthDisplay {
         }
 
         String name;
+
         if (vis.full) {
+
             AttributeInstance maxAttr = mob.getAttribute(Attribute.MAX_HEALTH);
             if (maxAttr == null) return;
-            int hp = (int) Math.max(0, mob.getHealth());
+
             int max = (int) Math.max(1, maxAttr.getValue());
+            int hp;
+
+            // =========================
+            // 🔥 BOSS → BOSSBAR % IST QUELLE
+            // =========================
+            if (mobs.isBoss(mob)) {
+                double progress = bossBars.getBossProgress(mob);
+                if (progress < 0) return;
+                hp = (int) Math.round(progress * max);
+            } else {
+                hp = (int) Math.max(0, mob.getHealth());
+            }
+
             name = base + " §c❤ §f" + hp + "/" + max;
+
         } else {
             name = base;
         }
@@ -84,6 +108,9 @@ public final class MobHealthDisplay {
         mob.setCustomNameVisible(true);
     }
 
+    // =====================================================
+    // UPDATE LOOP
+    // =====================================================
 
     private void startMoveUpdater() {
         moveTask = new BukkitRunnable() {
@@ -100,15 +127,18 @@ public final class MobHealthDisplay {
                 });
             }
         };
-        moveTask.runTaskTimer(plugin, 10L, 10L); // every 0.5s
+        moveTask.runTaskTimer(plugin, 10L, 10L);
     }
+
+    // =====================================================
+    // VISIBILITY
+    // =====================================================
 
     private Visibility resolveVisibility(LivingEntity mob) {
         boolean visible = false;
         boolean full = false;
 
         for (Player p : Bukkit.getOnlinePlayers()) {
-            if (!p.isOnline()) continue;
             if (p.getWorld() != mob.getWorld()) continue;
 
             double d = p.getLocation().distanceSquared(mob.getLocation());

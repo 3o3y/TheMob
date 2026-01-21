@@ -42,7 +42,7 @@ public final class BossWorldEffectController implements Listener {
             String weather,
             String time
     ) {
-        resetAll();
+        reset(boss); // reset previous boss safely
 
         if (boss == null || !boss.isValid() || boss.isDead()) return;
 
@@ -57,12 +57,12 @@ public final class BossWorldEffectController implements Listener {
     }
 
     // =====================================================
-    // TICK (CALL FROM ENGINE)
+    // TICK (OPTIONAL, SAFE TO CALL EACH TICK)
     // =====================================================
 
     public void tick() {
         if (activeBoss == null || !activeBoss.isValid() || activeBoss.isDead()) {
-            resetAll();
+            reset(activeBoss);
             return;
         }
 
@@ -73,19 +73,23 @@ public final class BossWorldEffectController implements Listener {
             if (inside && !affected) {
                 applyToPlayer(p);
             } else if (!inside && affected) {
-                reset(p);
+                resetPlayer(p);
             }
         }
     }
 
     // =====================================================
-    // RESET
+    // RESET API (PUBLIC, BOSS-SCOPED)
     // =====================================================
 
-    public void resetAll() {
+    public void reset(LivingEntity boss) {
+        if (boss == null) return;
+        if (activeBoss == null) return;
+        if (!boss.getUniqueId().equals(activeBoss.getUniqueId())) return;
+
         for (UUID id : new HashSet<>(affectedPlayers)) {
             Player p = Bukkit.getPlayer(id);
-            if (p != null) reset(p);
+            if (p != null) resetPlayer(p);
         }
 
         affectedPlayers.clear();
@@ -95,24 +99,28 @@ public final class BossWorldEffectController implements Listener {
         time = null;
     }
 
-    private void reset(Player p) {
+    // =====================================================
+    // PLAYER RESET (PRIVATE)
+    // =====================================================
+
+    private void resetPlayer(Player p) {
         p.resetPlayerWeather();
         p.resetPlayerTime();
         affectedPlayers.remove(p.getUniqueId());
     }
 
     // =====================================================
-    // EVENTS (PLAYER LIFECYCLE SAFETY)
+    // EVENTS (PLAYER SAFETY)
     // =====================================================
 
     @EventHandler
     public void onQuit(PlayerQuitEvent e) {
-        reset(e.getPlayer());
+        resetPlayer(e.getPlayer());
     }
 
     @EventHandler
     public void onWorldChange(PlayerChangedWorldEvent e) {
-        reset(e.getPlayer());
+        resetPlayer(e.getPlayer());
     }
 
     // =====================================================
