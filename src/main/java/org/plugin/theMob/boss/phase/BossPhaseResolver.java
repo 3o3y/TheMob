@@ -21,6 +21,11 @@ public final class BossPhaseResolver {
         double hp = Math.max(0.0, boss.getHealth());
         double hpPercent = (hp / max) * 100.0;
 
+        if (hpPercent >= 100.0) {
+            hpPercent = 99.999;
+        }
+
         return tpl.resolvePhase(hpPercent);
+
     }
 }

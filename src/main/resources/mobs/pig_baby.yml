@@ -9,10 +9,10 @@
 # are fully configurable.
 #
 # =========================================================
-mob-id: pig_lvl_1
+mob-id: pig_baby
 base-type: PIG
-baby: false
-name: "&bPig King"
+baby: true
+name: "&bPig Baby"
 display-health: true
 visual:
   helmet:
@@ -22,7 +22,7 @@ stats:
     max: 12
     current: 12
   movement-speed: 0.205
-  scale: 2.5
+  scale: 1.0
 xp: 2
 drops:
   - item: PORKCHOP

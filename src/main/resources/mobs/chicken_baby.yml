@@ -1,0 +1,51 @@
+# =========================================================
+# TheMob – Mob Configuration Example
+# =========================================================
+#
+# This file defines a CUSTOM MOB.
+# It can be used for arenas, events or RPG worlds.
+#
+# The mob behavior, stats, drops and rewards
+# are fully configurable.
+#
+# =========================================================
+mob-id: chicken_baby
+base-type: CHICKEN
+baby: true
+name: "&bChicken Baby"
+display-health: false
+stats:
+  health:
+    max: 12
+    current: 12
+  movement-speed: 0.205
+  scale: 1.0
+xp: 2
+drops:
+  - item: CHICKEN
+    amount: 1
+    chance: 1.0
+  - item: FEATHER
+    amount: 1
+    chance: 1.0
+  - item: EGG
+    amount: 1
+    chance: 0.05
+  - item: BONE
+    amount: 1
+    chance: 0.10
+  - item: BONE_MEAL
+    amount: 1
+    chance: 0.03
+  - item: WHEAT_SEEDS
+    amount: 1
+    chance: 0.20
+  - item: BEETROOT_SEEDS
+    amount: 1
+    chance: 0.10
+  - item: MELON_SEEDS
+    amount: 1
+    chance: 0.05
+  - item: PUMPKIN_SEEDS
+    amount: 1
+    chance: 0.05

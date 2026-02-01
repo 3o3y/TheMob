@@ -42,6 +42,9 @@ public final class BossPhaseController {
     private final Map<UUID, BossPhase> lastPhase = new HashMap<>();
     private final Map<UUID, BossTemplate> templates = new HashMap<>();
 
+    // ✅ NEW: marks if current phase has been fully applied at least once
+    private final Set<UUID> phaseApplied = new HashSet<>();
+
     public BossPhaseController(
             BossPhaseResolver resolver,
             BossActionEngine actionEngine,
@@ -83,6 +86,9 @@ public final class BossPhaseController {
         lastPhase.remove(id);
         templates.put(id, template);
 
+        // ✅ IMPORTANT: force first onBossUpdate() to "apply" even if phase id matches
+        phaseApplied.remove(id);
+
         BossPhase phase = resolver.resolve(boss, template);
         if (phase == null) return;
 
@@ -94,6 +100,7 @@ public final class BossPhaseController {
             bars.markDirty(boss);
         }
 
+        // Note: we still apply everything here (keeps old behavior)
         applyPhaseBuffs(boss, template, phase);
 
         ConfigurationSection cfg = template.phaseConfig(phase.id());
@@ -107,7 +114,11 @@ public final class BossPhaseController {
 
         actionEngine.onPhaseEnter(boss, phase);
         showPhaseTitle(boss, phase, template);
+
+        // ✅ Mark as applied (spawn path already applied systems)
+        phaseApplied.add(id);
     }
+
     public void onBossUpdate(LivingEntity boss) {
         if (boss == null || !boss.isValid() || boss.isDead()) return;
 
@@ -120,8 +131,11 @@ public final class BossPhaseController {
 
         BossPhase previous = lastPhase.get(id);
 
-        // Phase changed?
-        if (previous == null || !previous.id().equals(next.id())) {
+        // ✅ First update after spawn should still fully apply, even if same phase-id
+        boolean firstApply = !phaseApplied.contains(id);
+        boolean phaseChanged = previous == null || !previous.id().equals(next.id());
+
+        if (firstApply || phaseChanged) {
 
             // Rollback old phase systems first
             combatEngine.rollback(boss);
@@ -132,12 +146,14 @@ public final class BossPhaseController {
                 worldEffects.reset(boss);
             }
 
-            if (previous != null) {
+            if (!firstApply && previous != null) {
+                // Only "leave" if we truly changed phase, not for initial apply
                 actionEngine.onPhaseLeave(boss, previous);
             }
 
             // Set new phase
             lastPhase.put(id, next);
+            phaseApplied.add(id);
 
             if (bars != null) {
                 bars.setPhaseTitle(boss, next.title());
@@ -187,6 +203,7 @@ public final class BossPhaseController {
 
         BossPhase previous = lastPhase.remove(id);
         templates.remove(id);
+        phaseApplied.remove(id);
 
         // rollback everything regardless
         combatEngine.rollback(boss);

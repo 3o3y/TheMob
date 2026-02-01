@@ -40,26 +40,47 @@ public final class BossBehaviorController {
                     BossPhase phase = phases.currentPhase(boss);
                     if (phase == null || phase.cfg() == null) continue;
 
+                    UUID id = boss.getUniqueId();
+
+                    BossBehavior previous = activeBehavior.get(id);
+                    BossPhase previousPhase = lastPhase.get(id);
+
+                    boolean phaseChanged =
+                            previousPhase == null
+                                    || previousPhase.id() == null
+                                    || !previousPhase.id().equals(phase.id());
+
+                    // -------- OVERRIDE --------
+                    if (previous != null) {
+                        String override = previous.requestNextBehavior(boss, phase);
+                        if (override != null) {
+                            BossBehavior forced = registry.get(override.toLowerCase(Locale.ROOT));
+                            if (forced != null && forced != previous) {
+                                safeExit(previous, boss, previousPhase);
+                                safeEnter(forced, boss, phase);
+                                activeBehavior.put(id, forced);
+                                lastPhase.put(id, phase);
+                                safeTick(forced, boss, phase);
+                                continue;
+                            }
+                        }
+                    }
+
+                    // -------- NORMAL --------
                     String mode = phase.cfg()
                             .getString("behavior.mode", "aggressive")
                             .toLowerCase(Locale.ROOT);
 
                     BossBehavior next = registry.get(mode);
-                    UUID id = boss.getUniqueId();
-                    BossBehavior previous = activeBehavior.get(id);
 
-                    BossPhase currentPhase = phase;
-                    BossPhase previousPhase = lastPhase.get(id);
-
-                    if (next != previous) {
-                        if (previous != null) previous.onExit(boss, previousPhase);
-                        if (next != null) next.onEnter(boss, currentPhase);
+                    if (next != previous || phaseChanged) {
+                        if (previous != null) safeExit(previous, boss, previousPhase);
+                        if (next != null) safeEnter(next, boss, phase);
                         activeBehavior.put(id, next);
                     }
 
-                    lastPhase.put(id, currentPhase);
-
-                    if (next != null) next.tick(boss, currentPhase);
+                    lastPhase.put(id, phase);
+                    if (next != null) safeTick(next, boss, phase);
                 }
             }
         };
@@ -76,7 +97,8 @@ public final class BossBehaviorController {
         for (Map.Entry<UUID, BossBehavior> e : activeBehavior.entrySet()) {
             LivingEntity boss = (LivingEntity) Bukkit.getEntity(e.getKey());
             if (boss != null && boss.isValid()) {
-                e.getValue().onExit(boss, lastPhase.get(e.getKey()));
+                BossPhase p = lastPhase.get(e.getKey());
+                try { e.getValue().onExit(boss, p); } catch (Throwable ignored) {}
             }
         }
 
@@ -85,34 +107,57 @@ public final class BossBehaviorController {
         registry.clear();
     }
 
-    public void onBossSpawn(LivingEntity boss) {
-        if (boss == null) return;
+    // =========================
+    // SPAWN / DEATH
+    // =========================
+
+    public void onBossSpawn(LivingEntity boss, BossPhase phase) {
+        if (boss == null || phase == null || phase.cfg() == null) return;
+
         UUID id = boss.getUniqueId();
 
-        // ✅ absoluter Reset, egal was vorher war
-        activeBehavior.remove(id);
-        lastPhase.remove(id);
+        BossBehavior prev = activeBehavior.remove(id);
+        BossPhase prevPhase = lastPhase.remove(id);
+        if (prev != null) safeExit(prev, boss, prevPhase);
+
+        String mode = phase.cfg().getString("behavior.mode", "aggressive").toLowerCase(Locale.ROOT);
+        BossBehavior next = registry.get(mode);
+
+        if (next != null) {
+            safeEnter(next, boss, phase);
+            activeBehavior.put(id, next);
+            lastPhase.put(id, phase);
+            safeTick(next, boss, phase);
+        }
     }
 
     public void onBossDeath(LivingEntity boss) {
         if (boss == null) return;
         UUID id = boss.getUniqueId();
 
-        // ✅ EXIT erzwingen, sonst bleiben Flags/States hängen
         BossBehavior b = activeBehavior.remove(id);
         BossPhase p = lastPhase.remove(id);
+        if (b != null) safeExit(b, boss, p);
+    }
 
-        if (b != null) {
-            try {
-                b.onExit(boss, p);
-            } catch (Throwable ignored) {}
-        }
+    // =========================
+    // UTILS
+    // =========================
+
+    private void safeEnter(BossBehavior b, LivingEntity e, BossPhase p) {
+        try { b.onEnter(e, p); } catch (Throwable ignored) {}
+    }
+
+    private void safeExit(BossBehavior b, LivingEntity e, BossPhase p) {
+        try { b.onExit(e, p); } catch (Throwable ignored) {}
+    }
+
+    private void safeTick(BossBehavior b, LivingEntity e, BossPhase p) {
+        try { b.tick(e, p); } catch (Throwable ignored) {}
     }
 
     public void register(BossBehavior behavior) {
-        if (behavior == null) return;
-        String id = behavior.id();
-        if (id == null || id.isBlank()) return;
-        registry.put(id.toLowerCase(Locale.ROOT), behavior);
+        if (behavior == null || behavior.id() == null) return;
+        registry.put(behavior.id().toLowerCase(Locale.ROOT), behavior);
     }
 }

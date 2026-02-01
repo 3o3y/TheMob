@@ -13,6 +13,7 @@ import org.bukkit.inventory.EntityEquipment;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.potion.PotionEffectType;
+import org.bukkit.scheduler.BukkitRunnable;
 import org.plugin.theMob.TheMob;
 import org.plugin.theMob.boss.BossTemplate;
 import org.plugin.theMob.boss.bar.BossBarService;
@@ -27,6 +28,8 @@ import org.plugin.theMob.spawn.SpawnLocationResolver;
 import org.plugin.theMob.spawn.SpawnUtil;
 import org.plugin.theMob.ui.MobHealthDisplay;
 import org.plugin.theMob.visual.MobVisualService;
+import org.bukkit.entity.Ageable;
+
 
 import java.util.ArrayList;
 import java.util.List;
@@ -61,7 +64,6 @@ public final class MobSpawnService {
         this.phaseController = phaseController;
 
         this.baseStatApplier = new BaseMobStatApplier(keys);
-
         this.itemBuilder = new ItemBuilderFromConfig(plugin);
         this.statApplier = new MobEquipmentStatApplier(plugin.itemStats(), keys);
     }
@@ -80,7 +82,9 @@ public final class MobSpawnService {
 
         EntityType type;
         try {
-            type = EntityType.valueOf(cfg.getString("base-type", "ZOMBIE").toUpperCase(Locale.ROOT));
+            type = EntityType.valueOf(
+                    cfg.getString("base-type", "ZOMBIE").toUpperCase(Locale.ROOT)
+            );
         } catch (Exception e) {
             return null;
         }
@@ -95,22 +99,56 @@ public final class MobSpawnService {
         }
         if (mob == null) return null;
 
-        // PDC IDENTITY (MUSS vor Boss init gesetzt sein!)
-        mob.getPersistentDataContainer().set(keys.MOB_ID, PersistentDataType.STRING, mobId);
-        mob.getPersistentDataContainer().set(keys.IS_BOSS, PersistentDataType.INTEGER, isBoss ? 1 : 0);
-
-        String name = ChatColor.translateAlternateColorCodes('&', cfg.getString("name", type.name()));
-        mob.getPersistentDataContainer().set(keys.BASE_NAME, PersistentDataType.STRING, name);
-
-        if (spawnId != null) {
-            mob.getPersistentDataContainer().set(keys.AUTO_SPAWN_ID, PersistentDataType.STRING, spawnId);
+        // =========================
+        // BABY MOB SUPPORT (FIXED)
+        // =========================
+        if (cfg.getBoolean("baby", false) && mob instanceof Ageable ageable) {
+            ageable.setBaby();
+            ageable.setAgeLock(true); // optional: verhindert Aufwachsen
         }
 
-        // BASE STATS
+
+        // =========================
+        // PDC IDENTITY
+        // =========================
+        mob.getPersistentDataContainer().set(
+                keys.MOB_ID,
+                PersistentDataType.STRING,
+                mobId
+        );
+        mob.getPersistentDataContainer().set(
+                keys.IS_BOSS,
+                PersistentDataType.INTEGER,
+                isBoss ? 1 : 0
+        );
+
+        String name = ChatColor.translateAlternateColorCodes(
+                '&',
+                cfg.getString("name", type.name())
+        );
+        mob.getPersistentDataContainer().set(
+                keys.BASE_NAME,
+                PersistentDataType.STRING,
+                name
+        );
+
+        if (spawnId != null) {
+            mob.getPersistentDataContainer().set(
+                    keys.AUTO_SPAWN_ID,
+                    PersistentDataType.STRING,
+                    spawnId
+            );
+        }
+
+        // =========================
+        // BASE STATS (nach Baby!)
+        // =========================
         if (cfg.contains("stats.scale")) {
             AttributeInstance scale = mob.getAttribute(Attribute.SCALE);
             if (scale != null) {
-                scale.setBaseValue(Math.max(0.25, Math.min(5.0, cfg.getDouble("stats.scale", 1.0))));
+                scale.setBaseValue(
+                        Math.max(0.25, Math.min(5.0, cfg.getDouble("stats.scale", 1.0)))
+                );
             }
         }
 
@@ -119,14 +157,21 @@ public final class MobSpawnService {
             if (hp != null) {
                 double max = cfg.getDouble("stats.health.max");
                 hp.setBaseValue(max);
-                mob.setHealth(Math.min(max, Math.max(1.0, cfg.getDouble("stats.health.current", max))));
+                mob.setHealth(
+                        Math.min(max, Math.max(1.0,
+                                cfg.getDouble("stats.health.current", max)))
+                );
             }
         }
 
         AttributeInstance armor = mob.getAttribute(Attribute.ARMOR);
-        if (armor != null && armor.getBaseValue() <= 0.0) armor.setBaseValue(0.01);
+        if (armor != null && armor.getBaseValue() <= 0.0) {
+            armor.setBaseValue(0.01);
+        }
 
+        // =========================
         // EQUIPMENT
+        // =========================
         EntityEquipment eqp = mob.getEquipment();
         ConfigurationSection eq = cfg.getConfigurationSection("equipment");
 
@@ -158,30 +203,39 @@ public final class MobSpawnService {
 
         baseStatApplier.apply(mob, cfg.getConfigurationSection("stats"));
 
+        // =========================
         // UI
-        if (healthDisplay != null) healthDisplay.onSpawn(mob);
-
         // =========================
-        // 🔥 HARD RESET BEHAVIOR STATE (WICHTIG!)
-        // =========================
-        if (isBoss) {
-            plugin.bossBehaviors().onBossSpawn(mob); // ✅ DAS FEHLTE (Spawn-Reset)
+        if (healthDisplay != null) {
+            healthDisplay.onSpawn(mob);
         }
 
         // =========================
-        // BOSS INIT (EINZIGE STELLE)
+        // BOSS INIT (SPAWN)
         // =========================
         if (isBoss) {
             bossBars.registerBoss(mob);
             bossBars.markDirty(mob);
 
             BossTemplate tpl = mobs.bossTemplate(mobId);
-            if (tpl != null && phaseController != null) {
+            if (tpl != null) {
                 phaseController.onBossSpawn(mob, tpl);
             }
+
+            // ✅ SAUBERER MINI-FIX:
+            // Phase-Trigger ohne Damage, delayed
+            new BukkitRunnable() {
+                @Override
+                public void run() {
+                    if (!mob.isValid() || mob.isDead()) return;
+                    phaseController.onBossUpdate(mob);
+                }
+            }.runTaskLater(plugin, 10L);
         }
 
+        // =========================
         // HARD BOSS RESET
+        // =========================
         if (isBoss && mob instanceof Mob m) {
             m.setAI(true);
             m.setAware(true);
@@ -192,7 +246,9 @@ public final class MobSpawnService {
             m.removePotionEffect(PotionEffectType.WEAKNESS);
         }
 
+        // =========================
         // VISUALS
+        // =========================
         if (cfg.contains("visual.helmet.type")) {
             MobVisualService.attachVisual(plugin, mob, cfg, keys);
         }

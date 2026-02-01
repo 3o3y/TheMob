@@ -30,6 +30,8 @@ public final class ConfigService {
             "skeleton_normal.yml",
             "spider_normal.yml",
             "warden_normal.yml",
+            "pig_baby.yml",
+            "chicken_baby.yml",
             "pig_normal.yml"
     );
 

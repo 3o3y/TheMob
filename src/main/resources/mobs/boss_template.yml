@@ -105,20 +105,20 @@ stats:
   health:
     max: 750.0                   # Maximum health (1 heart = 2.0)
     current: 750.0               # Health value when the mob spawns
-  movement-speed: 0.20          # Base movement speed (vanilla zombie ≈ 0.23)
+  movement-speed: 0.25          # Base movement speed (vanilla zombie ≈ 0.23)
   attack:
-    damage: 16.0                 # Base melee attack damage
+    damage: 8.0                 # Base melee attack damage
     speed: 1.0                  # Attack speed (higher = faster attacks)
-    knockback: 20.0              # Extra knockback applied on hit
+    knockback: 1.0              # Extra knockback applied on hit
   defense:
-    armor: 20.0                  # Flat armor value (reduces incoming damage)
-    armor-toughness: 10.0        # Reduces effectiveness of high-damage hits
-    knockback-resistance: 3.0   # 0.0 = normal knockback, 1.0 = immune
-  follow-range: 5.0            # Detection range in blocks
+    armor: 1.0                  # Flat armor value (reduces incoming damage)
+    armor-toughness: 0.0        # Reduces effectiveness of high-damage hits
+    knockback-resistance: 0.0   # 0.0 = normal knockback, 1.0 = immune
+  follow-range: 25.0            # Detection range in blocks
   luck: 0.0                     # Influences loot tables and random outcomes
   flying-speed: 0.4             # Movement speed while flying (only applies to flying mobs)
   scale: 1.8                    # Entity size multiplier (1.0 = default size)
-  step-height: 0.6              # Max block height the mob can step up without jumping
+  step-height: 2.5              # Max block height the mob can step up without jumping
   gravity: true                 # true = affected by gravity, false = floating entity
 arena:
   radius-chunks: 3
@@ -133,12 +133,12 @@ abilities:
   fire-immunity: false          # Grants Fire Resistance (lava & fire immunity)
   water-breathing: false        # Allows breathing underwater
   invisibility: false           # Makes the entity invisible
-  glowing: true                # Makes the entity glow (outline visible through walls)
+  glowing: true                 # Makes the entity glow (outline visible through walls)
   no-ai: false                  # Disables all AI behavior (static mob)
   silent: false                 # Disables all sounds from the entity
   invulnerable: false           # Entity cannot take any damage
   gravity: true                 # Overrides gravity setting
-  knockback-resistant: true     # Sets knockback resistance to 100%
+  knockback-resistant: false     # Sets knockback resistance to 100%
   can-pickup-items: false       # Allows the mob to pick up dropped items
   persistent: true              # Prevents despawning when far from players
   immune:
@@ -206,7 +206,7 @@ phases:                               #This will make your Mob as a Boss Mob
       water-breathing: false          # Can breathe underwater
 # ===== AI / BEHAVIOR SETTINGS =====
     behavior:
-      mode: passive                # aggressive | passive | flee
+      mode: passive                   # aggressive | passive | flee
       follow-range: +0                # Extra target detection range in blocks
       forget-target-after: 0          # Seconds until target is forgotten (0 = never)
 # ===== COMBAT MODIFIERS =====
@@ -228,7 +228,7 @@ phases:                               #This will make your Mob as a Boss Mob
 # ===== PHASE ACTIONS (COOLDOWN BASED) =====
     actions:
       summon-minions:
-        enabled: true              # Enables minion summoning for this phase
+        enabled: false              # Enables minion summoning for this phase
 
         # -------------------------------------------------
         # MINION ENTITY SETUP
@@ -398,7 +398,7 @@ phases:                               #This will make your Mob as a Boss Mob
       explosion: false
     actions:
       summon-minions:
-        enabled: true                # Summons helper mobs
+        enabled: false                # Summons helper mobs
         type: ZOMBIE
         name: "&6Minion &fof Zombie King"
         amount: 3
@@ -482,9 +482,10 @@ phases:                               #This will make your Mob as a Boss Mob
       explosion: false
     actions:
       summon-minions:
-        enabled: false
+        enabled: true
         type: ZOMBIE
-        amount: 0
+        name: "&6Minion &fof Zombie King"
+        amount: 3
         radius: 6
         cooldown: 15
       blink:
