@@ -1,5 +1,5 @@
 name: TheMob
-version: "1.8.3_Beta"
+version: "1.8.4"
 main: org.plugin.theMob.TheMob
 api-version: "1.21"
 author: 3o3y
@@ -26,6 +26,9 @@ commands:
       /mob diag cooldown <boss-id>
 
       /mob debug
+
+      /mob egg <mob_key>
+      /mob spawner <amount>
 
       /mob autospawn <mob-id> <seconds> <maxSpawns>   (legacy)
 

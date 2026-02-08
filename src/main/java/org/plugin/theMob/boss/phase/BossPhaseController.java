@@ -16,6 +16,7 @@ import org.plugin.theMob.boss.BossPhase;
 import org.plugin.theMob.boss.BossTemplate;
 import org.plugin.theMob.boss.Placeholder;
 import org.plugin.theMob.boss.bar.BossBarService;
+import org.plugin.theMob.boss.behavior.BossBehaviorController;
 import org.plugin.theMob.boss.combat.PhaseCombatEngine;
 import org.plugin.theMob.boss.world.BossWorldEffectController;
 import org.plugin.theMob.core.KeyRegistry;
@@ -38,11 +39,14 @@ public final class BossPhaseController {
     private final PhaseCombatEngine combatEngine;
     private final BossWorldEffectController worldEffects;
 
+    // 🔥 Bound later (avoids constructor cycles)
+    private BossBehaviorController behaviorController;
+
     // MAIN THREAD ONLY
     private final Map<UUID, BossPhase> lastPhase = new HashMap<>();
     private final Map<UUID, BossTemplate> templates = new HashMap<>();
 
-    // ✅ NEW: marks if current phase has been fully applied at least once
+    // ✅ marks if current phase has been fully applied at least once
     private final Set<UUID> phaseApplied = new HashSet<>();
 
     public BossPhaseController(
@@ -62,6 +66,14 @@ public final class BossPhaseController {
     }
 
     // =====================================================
+    // BINDING
+    // =====================================================
+
+    public void bindBehaviorController(BossBehaviorController controller) {
+        this.behaviorController = controller;
+    }
+
+    // =====================================================
     // LIFECYCLE
     // =====================================================
 
@@ -69,8 +81,7 @@ public final class BossPhaseController {
         if (boss == null || template == null || !boss.isValid() || boss.isDead()) return;
 
         boss.setVelocity(new org.bukkit.util.Vector(0, 0, 0));
-        boss.getActivePotionEffects()
-                .forEach(e -> boss.removePotionEffect(e.getType()));
+        boss.getActivePotionEffects().forEach(e -> boss.removePotionEffect(e.getType()));
 
         if (boss instanceof Mob mob) {
             mob.setTarget(null);
@@ -86,7 +97,7 @@ public final class BossPhaseController {
         lastPhase.remove(id);
         templates.put(id, template);
 
-        // ✅ IMPORTANT: force first onBossUpdate() to "apply" even if phase id matches
+        // force first onBossUpdate() to apply even if phase id matches
         phaseApplied.remove(id);
 
         BossPhase phase = resolver.resolve(boss, template);
@@ -100,7 +111,7 @@ public final class BossPhaseController {
             bars.markDirty(boss);
         }
 
-        // Note: we still apply everything here (keeps old behavior)
+        // Apply phase systems on spawn
         applyPhaseBuffs(boss, template, phase);
 
         ConfigurationSection cfg = template.phaseConfig(phase.id());
@@ -110,12 +121,16 @@ public final class BossPhaseController {
             applyWorldEffectsFromPhaseCfg(boss, template, cfg);
         }
 
+        // ✅ Behavior init on spawn (THIS was missing)
+        if (behaviorController != null) {
+            behaviorController.onBossSpawn(boss, phase);
+        }
+
         normalizeHealthToMax(boss);
 
         actionEngine.onPhaseEnter(boss, phase);
         showPhaseTitle(boss, phase, template);
 
-        // ✅ Mark as applied (spawn path already applied systems)
         phaseApplied.add(id);
     }
 
@@ -131,13 +146,12 @@ public final class BossPhaseController {
 
         BossPhase previous = lastPhase.get(id);
 
-        // ✅ First update after spawn should still fully apply, even if same phase-id
         boolean firstApply = !phaseApplied.contains(id);
         boolean phaseChanged = previous == null || !previous.id().equals(next.id());
 
         if (firstApply || phaseChanged) {
 
-            // Rollback old phase systems first
+            // rollback old phase systems
             combatEngine.rollback(boss);
             abilityEngine.rollback(boss);
             buffEngine.rollbackPhase(boss);
@@ -147,20 +161,24 @@ public final class BossPhaseController {
             }
 
             if (!firstApply && previous != null) {
-                // Only "leave" if we truly changed phase, not for initial apply
                 actionEngine.onPhaseLeave(boss, previous);
             }
 
-            // Set new phase
+            // set new phase
             lastPhase.put(id, next);
             phaseApplied.add(id);
+
+            // ✅ Behavior rebind on phase change / first apply
+            if (behaviorController != null) {
+                behaviorController.onBossSpawn(boss, next);
+            }
 
             if (bars != null) {
                 bars.setPhaseTitle(boss, next.title());
                 bars.markDirty(boss);
             }
 
-            // Apply new phase systems
+            // apply new phase systems
             applyPhaseBuffs(boss, template, next);
 
             ConfigurationSection cfg = template.phaseConfig(next.id());
@@ -170,23 +188,16 @@ public final class BossPhaseController {
                 applyWorldEffectsFromPhaseCfg(boss, template, cfg);
             }
 
-            // IMPORTANT: normalize health AFTER max-health changes
             normalizeHealthToMax(boss);
 
-            // Hooks / UI
             showPhaseTitle(boss, next, template);
             actionEngine.onPhaseEnter(boss, next);
 
         } else {
-            // Same phase -> just keep bar sync
             if (bars != null) bars.markDirty(boss);
         }
     }
 
-    /**
-     * Muss beim Tod aufgerufen werden (EntityDeathEvent).
-     * Entfernt ALLES: state, buffs, abilities, world effects, bars.
-     */
     public void onBossDeath(LivingEntity boss) {
         if (boss == null) return;
 
@@ -196,7 +207,12 @@ public final class BossPhaseController {
         if (boss instanceof Mob mob) {
             mob.setTarget(null);
             mob.setAware(true);
-            mob.setAI(false); // verhindert letzte Ticks
+            mob.setAI(false);
+        }
+
+        // ✅ stop behavior
+        if (behaviorController != null) {
+            behaviorController.onBossDeath(boss);
         }
 
         UUID id = boss.getUniqueId();
@@ -205,7 +221,6 @@ public final class BossPhaseController {
         templates.remove(id);
         phaseApplied.remove(id);
 
-        // rollback everything regardless
         combatEngine.rollback(boss);
         abilityEngine.rollback(boss);
         buffEngine.rollbackPhase(boss);
@@ -245,12 +260,9 @@ public final class BossPhaseController {
     }
 
     private void showPhaseTitleToPlayer(Player player, LivingEntity boss, BossPhase phase) {
-
-        // 🔥 PHASE TITLE (from mob.yml, with & colors)
         String rawPhaseTitle = phase.title();
         Component title = LEGACY.deserialize(rawPhaseTitle);
 
-        // 🔥 MOB NAME (with placeholders + colors)
         String rawMobName = Placeholder.resolve("{mob_name}", boss, phase, player);
         Component subtitle = LEGACY.deserialize(rawMobName);
 

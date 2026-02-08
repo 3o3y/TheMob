@@ -1,7 +1,6 @@
 package org.plugin.theMob;
 
-import org.bstats.bukkit.Metrics;
-import org.bstats.charts.SimplePie;
+
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.NamespacedKey;
@@ -13,19 +12,16 @@ import org.bukkit.event.HandlerList;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.plugin.theMob.boss.*;
 import org.plugin.theMob.boss.bar.BossBarService;
-import org.plugin.theMob.boss.behavior.BossBehaviorController;
 import org.plugin.theMob.boss.phase.BossPhaseController;
 import org.plugin.theMob.boss.phase.BossPhaseResolver;
 import org.plugin.theMob.boss.world.BossWorldEffectController;
 import org.plugin.theMob.combat.CombatBootstrap;
+import org.plugin.theMob.command.*;
 import org.plugin.theMob.control.AutomationScalingSystem;
 import org.plugin.theMob.item.CustomEnchantSystem;
 import org.plugin.theMob.item.ItemBuilderFromConfig;
 import org.plugin.theMob.item.ItemLoreRenderer;
 import org.plugin.theMob.item.ItemStatReader;
-import org.plugin.theMob.command.MobCommand;
-import org.plugin.theMob.command.MobTabCompleter;
-import org.plugin.theMob.command.StatsCommand;
 import org.plugin.theMob.core.ConfigService;
 import org.plugin.theMob.core.KeyRegistry;
 import org.plugin.theMob.core.TickScheduler;
@@ -45,8 +41,14 @@ import org.plugin.theMob.player.stats.PlayerStatCache;
 import org.plugin.theMob.player.stats.menu.StatsMenuListener;
 import org.plugin.theMob.player.stats.menu.StatsMenuService;
 import org.plugin.theMob.spawn.SpawnController;
+import org.plugin.theMob.spawn.egg.SpawnEggItemFactory;
+import org.plugin.theMob.spawn.spawner.SpawnerFactory;
+import org.plugin.theMob.spawn.spawner.SpawnerListener;
+import org.plugin.theMob.spawn.spawner.SpawnerService;
+import org.plugin.theMob.spawn.spawner.SpawnerTickService;
 import org.plugin.theMob.ui.MobHealthDisplay;
 
+import org.plugin.theMob.spawn.egg.SpawnEggService;
 import org.plugin.theMob.progression.ProgressionBootstrap;
 import org.plugin.theMob.progression.ProgressionV19Bootstrap;
 
@@ -63,7 +65,6 @@ public final class TheMob extends JavaPlugin {
     private ConfigService configService;
     private KeyRegistry keys;
     private TickScheduler ticks;
-    private BossPhaseController phaseController;
     private StuckDefensePath stuckDefense;
 
     // Mobs
@@ -74,18 +75,20 @@ public final class TheMob extends JavaPlugin {
     // Spawn
     private AutoSpawnManager autoSpawnManager;
     private SpawnController spawnController;
+    // Spawn Egg Tools
+    private SpawnEggService spawnEggService;
+    private SpawnerFactory spawnerFactory;
+    private SpawnerService spawnerService;
 
     // Boss
     private PlayerBarCoordinator playerBars;
     private BossBarService bossBars;
-    public BossBehaviorController bossBehaviors() {
-        return behaviorController;
-    }
-    private BossPhaseController bossPhases;
-
-    private BossBehaviorController behaviorController;
+    private BossPhaseController phaseController;
     private BossActionEngine bossActionEngine;
     private BossLockService bossLocks;
+    private org.plugin.theMob.boss.behavior.BossBehaviorController behaviorController;
+    // Commands
+    private MobEggCommand eggCommand;
 
     // HUD
     private NaviHudService hud;
@@ -104,19 +107,12 @@ public final class TheMob extends JavaPlugin {
     // v1.7 Automation & Scaling
     private AutomationScalingSystem automationScaling;
 
-
     // v1.9 Progression (ADD ONLY)
     private ProgressionBootstrap progressionBootstrap;
     private ProgressionV19Bootstrap progressionV19;
 
     @Override
     public void onEnable() {
-
-        // =====================
-        // bStats Metrics
-        // =====================
-        MetricsService.init(this);
-        registerMetricsCharts();
 
         // =====================
         // Config bootstrap
@@ -127,40 +123,24 @@ public final class TheMob extends JavaPlugin {
         configService.ensureFoldersAndDefaults();
         configService.reloadAll();
 
-
-
         cleanupStaleHudBars();
         boot(true);
 
         getLogger().info("[TheMob] Enabled.");
     }
 
-    private void registerMetricsCharts() {
-        if (MetricsService.chartsRegistered()) return;
-
-        Metrics metrics = MetricsService.getMetrics();
-        if (metrics == null) return;
-
-        metrics.addCustomChart(new SimplePie(
-                "plugin_version",
-                () -> getDescription().getVersion()
-        ));
-
-        MetricsService.markChartsRegistered();
-    }
-
     @Override
     public void onDisable() {
 
-        // 1️⃣ Stop AutoSpawn & release chunk tickets
+        // 1) Stop AutoSpawn & release chunk tickets
         if (autoSpawnManager != null) {
             autoSpawnManager.stop();
         }
 
-        // 2️⃣ Cleanup HUD / BossBars (reload-sicher)
+        // 2) Cleanup HUD / BossBars (reload-sicher)
         cleanupStaleHudBars();
 
-        // 3️⃣ Hard shutdown aller Systeme
+        // 3) Hard shutdown aller Systeme
         hardShutdown();
 
         getLogger().info("[TheMob] Disabled cleanly.");
@@ -201,6 +181,12 @@ public final class TheMob extends JavaPlugin {
             keys = new KeyRegistry(this);
             Placeholder.init(keys);
         }
+        // ---------- Spawner ----------
+        spawnerFactory = new SpawnerFactory(keys);
+        // SpawnerService must be created AFTER mobManager is initialized (see below).
+        // Keeping these lines without removing them:
+        this.spawnerService = this.spawnerService; // no-op placeholder to preserve line count/structure
+        // (moved real initialization below)
 
         if (ticks != null) {
             try { ticks.shutdown(); } catch (Throwable ignored) {}
@@ -213,14 +199,32 @@ public final class TheMob extends JavaPlugin {
         mobManager.reloadFromConfigs();
         stuckDefense = new StuckDefensePath();
 
+// ---------- Spawner Service (MUSS ZUERST) ----------
+        this.spawnerService = new SpawnerService(
+                this,
+                mobManager,
+                keys,
+                configService
+        );
+
+// ---------- Spawner Tick (DANACH) ----------
+        new SpawnerTickService(
+                this,
+                spawnerService,
+                keys
+        ).start();
+
+
         ticks.registerRepeatingTask(20, () -> {
             if (mobManager == null) return;
-
             for (LivingEntity mob : mobManager.getAllLivingMobs()) {
                 stuckDefense.tick(mob);
             }
         });
-
+        eggCommand = new MobEggCommand(
+                new SpawnEggItemFactory(keys),
+                configService
+        );
 
         // ---------- Items ----------
         itemBuilder = new ItemBuilderFromConfig(this);
@@ -253,7 +257,20 @@ public final class TheMob extends JavaPlugin {
                 worldEffects
         );
 
-        // ---------- Health Display (BRAUCHT bossBars!) ----------
+// =====================
+// BOSS BEHAVIOR SYSTEM
+// =====================
+        behaviorController = new org.plugin.theMob.boss.behavior.BossBehaviorController(
+                this,
+                mobManager,
+                phaseController
+        );
+
+// 🔥 Phase → Behavior binden
+        phaseController.bindBehaviorController(behaviorController);
+
+
+        // ---------- Health Display (needs bossBars) ----------
         healthDisplay = new MobHealthDisplay(
                 this,
                 mobManager,
@@ -261,7 +278,7 @@ public final class TheMob extends JavaPlugin {
         );
         mobManager.setHealthDisplay(healthDisplay);
 
-        // ---------- Boss Adapter (BRAUCHT phaseController + healthDisplay) ----------
+        // ---------- Boss Adapter (needs phaseController + healthDisplay) ----------
         Bukkit.getPluginManager().registerEvents(
                 new BossBarListenerAdapter(
                         mobManager,
@@ -270,14 +287,6 @@ public final class TheMob extends JavaPlugin {
                 ),
                 this
         );
-
-        // ---------- Boss Behavior ----------
-        behaviorController = new BossBehaviorController(
-                this,
-                mobManager,
-                phaseController
-        );
-
         // ---------- Spawn Service ----------
         MobSpawnService spawnService = new MobSpawnService(
                 this,
@@ -303,6 +312,13 @@ public final class TheMob extends JavaPlugin {
         spawnController.start();
 
         mobManager.setAutoSpawnManager(autoSpawnManager);
+
+        // ---------- Spawn Egg Tools ----------
+        spawnEggService = new org.plugin.theMob.spawn.egg.SpawnEggService(
+                mobManager,
+                keys,
+                configService
+        );
 
         // ---------- HUD ----------
         boolean hudEnabled = isNavigationHudEnabled();
@@ -368,10 +384,8 @@ public final class TheMob extends JavaPlugin {
     // =====================================================
     private void hardShutdown() {
         try {
-
             progressionV19 = null;
             progressionBootstrap = null;
-
 
             if (automationScaling != null) {
                 automationScaling.shutdown();
@@ -381,6 +395,22 @@ public final class TheMob extends JavaPlugin {
             if (spawnController != null) {
                 spawnController.stop();
                 spawnController = null;
+            }
+            if (behaviorController != null) {
+                behaviorController.shutdown();
+                behaviorController = null;
+            }
+
+            // Clear boss phase runtime behavior/state cleanly (if possible)
+            if (phaseController != null) {
+                try {
+                    for (LivingEntity b : phaseController.activeBosses()) {
+                        if (b != null && b.isValid() && !b.isDead()) {
+                            phaseController.onBossDeath(b);
+                        }
+                    }
+                } catch (Throwable ignored) {}
+                phaseController = null;
             }
 
             if (mobManager != null) {
@@ -403,11 +433,6 @@ public final class TheMob extends JavaPlugin {
                 bossBars = null;
             }
 
-            if (behaviorController != null) {
-                behaviorController.shutdown();
-                behaviorController = null;
-            }
-
             if (bossActionEngine != null) {
                 bossActionEngine.shutdown();
                 bossActionEngine = null;
@@ -427,11 +452,25 @@ public final class TheMob extends JavaPlugin {
                 ticks.shutdown();
                 ticks = null;
             }
+
             if (stuckDefense != null) {
                 stuckDefense.clear();
                 stuckDefense = null;
             }
 
+            // These are lightweight; keep nulling for GC clarity
+            healthDisplay = null;
+            dropEngine = null;
+            itemBuilder = null;
+            loreRenderer = null;
+            itemStatReader = null;
+            playerStatCache = null;
+            statsMenu = null;
+            combat = null;
+            customEnchants = null;
+            spawnEggService = null;
+            spawnerService = null;
+            spawnerFactory = null;
 
         } catch (Throwable t) {
             getLogger().severe("[TheMob] HARD SHUTDOWN FAILED");
@@ -453,6 +492,7 @@ public final class TheMob extends JavaPlugin {
                         healthDisplay,
                         bossBars,
                         bossActionEngine,
+                        behaviorController,
                         keys,
                         autoSpawnManager
                 ),
@@ -477,13 +517,26 @@ public final class TheMob extends JavaPlugin {
         if (spawnController != null) {
             Bukkit.getPluginManager().registerEvents(spawnController, this);
         }
+        Bukkit.getPluginManager().registerEvents(
+                new org.plugin.theMob.spawn.egg.SpawnEggListener(spawnEggService),
+                this
+        );
+        Bukkit.getPluginManager().registerEvents(
+                new SpawnerListener(
+                        spawnerService,
+                        spawnEggService
+                ),
+                this
+        );
+
     }
 
     private void registerCommands() {
         PluginCommand mob = getCommand("mob");
         if (mob != null) {
             mob.setExecutor(new MobCommand(this, mobManager, spawnController));
-            mob.setTabCompleter(new MobTabCompleter(mobManager));
+            mob.setTabCompleter(new MobTabCompleter(mobManager, configService));
+
         }
     }
 
@@ -496,6 +549,7 @@ public final class TheMob extends JavaPlugin {
     public ItemStatReader itemStats() { return itemStatReader; }
     public BossPhaseController bossPhases() { return phaseController; }
     public AutomationScalingSystem automation() { return automationScaling; }
+    public StuckDefensePath getStuckDefense() { return stuckDefense; }
 
     // =====================================================
     // HELPERS
@@ -534,8 +588,4 @@ public final class TheMob extends JavaPlugin {
             Bukkit.removeBossBar(key);
         }
     }
-    public StuckDefensePath getStuckDefense() {
-        return stuckDefense;
-    }
-
 }

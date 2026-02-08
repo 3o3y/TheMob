@@ -32,6 +32,8 @@ plugin:
   #  • Throttle state changes
   #  • Boss cooldown checks
 
+use_spawn_egg: true
+
 # =========================================================
 #  GLOBAL SPAWN BUDGETS
 # =========================================================

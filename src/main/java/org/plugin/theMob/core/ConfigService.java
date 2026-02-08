@@ -19,7 +19,9 @@ public final class ConfigService {
     private File installedZipFolder;
     private File autoSpawnFile;
     private File statsFile;
+    private File spawnEggsFile;
 
+    private volatile FileConfiguration spawnEggsCfg;
     private volatile FileConfiguration autoSpawnCfg;
     private volatile FileConfiguration statsCfg;
     private volatile Map<String, FileConfiguration> mobConfigs = Map.of();
@@ -50,6 +52,10 @@ public final class ConfigService {
 
         autoSpawnFile = new File(plugin.getDataFolder(), "auto_spawn.yml");
         statsFile = new File(plugin.getDataFolder(), "stats.yml");
+        spawnEggsFile = new File(plugin.getDataFolder(), "spawneggs.yml");
+        if (!spawnEggsFile.exists()) {
+            plugin.saveResource("spawneggs.yml", false);
+        }
 
         if (!autoSpawnFile.exists()) plugin.saveResource("auto_spawn.yml", false);
         if (!statsFile.exists()) plugin.saveResource("stats.yml", false);
@@ -78,6 +84,8 @@ public final class ConfigService {
         reloadAutoSpawn();
         reloadStats();
         reloadMobsValidated();
+        reloadSpawnEggs();
+
     }
 
     private void installZipPacks() {
@@ -240,6 +248,16 @@ public final class ConfigService {
                     "[Config] Could not save auto_spawn.yml: " + e.getMessage()
             );
         }
+    }
+
+    public void reloadSpawnEggs() {
+        spawnEggsCfg = YamlConfiguration.loadConfiguration(spawnEggsFile);
+        if (!spawnEggsCfg.isConfigurationSection("spawn-eggs")) {
+            spawnEggsCfg.set("spawn-eggs", Map.of());
+        }
+    }
+    public FileConfiguration spawnEggs() {
+        return spawnEggsCfg;
     }
 
     public Map<String, FileConfiguration> mobConfigs() { return mobConfigs; }

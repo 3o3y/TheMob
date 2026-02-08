@@ -9,9 +9,11 @@ import org.bukkit.entity.Player;
 import org.plugin.theMob.TheMob;
 import org.plugin.theMob.control.command.MobDiagCommand;
 import org.plugin.theMob.control.command.TheMobDebugCommand;
+import org.plugin.theMob.core.ConfigService;
 import org.plugin.theMob.mob.MobManager;
 import org.plugin.theMob.spawn.SpawnController;
 import org.plugin.theMob.spawn.SpawnLocationResolver;
+import org.plugin.theMob.spawn.egg.SpawnEggItemFactory;
 import org.plugin.theMob.spawn.type.SpawnMode;
 
 import java.util.Arrays;
@@ -24,15 +26,32 @@ public final class MobCommand implements CommandExecutor {
     private final MobDiagCommand diag;
     private final TheMobDebugCommand debug;
     private final MobBase64Command base64; // ✅ NEU
+    private final MobEggCommand eggCommand;
+    private final MobSpawnerCommand spawnerCommand;
 
     public MobCommand(TheMob plugin, MobManager mobs, SpawnController spawns) {
         this.plugin = plugin;
         this.mobs = mobs;
         this.spawns = spawns;
+
         this.diag = new MobDiagCommand(plugin.automation());
         this.debug = new TheMobDebugCommand(plugin, mobs, spawns);
-        this.base64 = new MobBase64Command(plugin); // ✅ NEU
+        this.base64 = new MobBase64Command(plugin);
+
+        this.eggCommand = new MobEggCommand(
+                new SpawnEggItemFactory(plugin.keys()),
+                plugin.configs()
+        );
+
+        // ✅ HIER
+        this.spawnerCommand = new MobSpawnerCommand(
+                plugin.keys(),
+                plugin.configs()
+        );
     }
+
+
+
 
     @Override
     public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
@@ -50,6 +69,23 @@ public final class MobCommand implements CommandExecutor {
         if (args.length == 0) {
             help(sender);
             return true;
+        }
+        // -------------------------------------------------
+// /mob spawner <amount>
+// -------------------------------------------------
+        if (args[0].equalsIgnoreCase("spawner")) {
+            return spawnerCommand.onCommand(sender, cmd, label, args);
+        }
+
+// -------------------------------------------------
+// /mob egg <base-type>
+// -------------------------------------------------
+        if (args[0].equalsIgnoreCase("egg")) {
+            if (!(sender instanceof Player player)) {
+                sender.sendMessage("§cOnly players can use spawn eggs.");
+                return true;
+            }
+            return eggCommand.handle(player, args);
         }
 
         if (args[0].equalsIgnoreCase("debug")) {
@@ -494,6 +530,7 @@ public final class MobCommand implements CommandExecutor {
         s.sendMessage("§e/mob reload");
         s.sendMessage("§e/mob toggle hud");
         s.sendMessage("§e/mob debug");
+        s.sendMessage("§e/mob egg <base-type>");
         s.sendMessage("§7Legacy alias: /mob autospawn <mob-id> <seconds> <maxSpawns>");
     }
 

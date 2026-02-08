@@ -206,9 +206,7 @@ phases:                               #This will make your Mob as a Boss Mob
       water-breathing: false          # Can breathe underwater
 # ===== AI / BEHAVIOR SETTINGS =====
     behavior:
-      mode: passive                   # aggressive | passive | flee
-      follow-range: +0                # Extra target detection range in blocks
-      forget-target-after: 0          # Seconds until target is forgotten (0 = never)
+      mode: idle                      # vanilla | aggressive | passive | flee | idle
 # ===== COMBAT MODIFIERS =====
     combat:
       crit-chance: +0                 # Additional crit chance in percent

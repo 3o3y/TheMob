@@ -15,8 +15,10 @@ import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.plugin.theMob.TheMob;
+import org.plugin.theMob.boss.BossPhase;
 import org.plugin.theMob.boss.BossTemplate;
 import org.plugin.theMob.boss.bar.BossBarService;
+import org.plugin.theMob.boss.behavior.BossBehaviorController;
 import org.plugin.theMob.boss.phase.BossPhaseController;
 import org.plugin.theMob.boss.spawn.ZombieBossFactory;
 import org.plugin.theMob.core.KeyRegistry;
@@ -44,6 +46,7 @@ public final class MobSpawnService {
     private final BossBarService bossBars;
     private final BossPhaseController phaseController;
     private final BaseMobStatApplier baseStatApplier;
+    private BossBehaviorController behaviorController;
 
     private final ItemBuilderFromConfig itemBuilder;
     private final MobEquipmentStatApplier statApplier;
@@ -221,9 +224,6 @@ public final class MobSpawnService {
             if (tpl != null) {
                 phaseController.onBossSpawn(mob, tpl);
             }
-
-            // ✅ SAUBERER MINI-FIX:
-            // Phase-Trigger ohne Damage, delayed
             new BukkitRunnable() {
                 @Override
                 public void run() {

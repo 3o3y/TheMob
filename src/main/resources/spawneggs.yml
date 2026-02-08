@@ -1,0 +1,74 @@
+# =========================================================
+# TheMob – Spawn Eggs Configuration
+# =========================================================
+#
+# This file controls ALL TheMob spawn eggs.
+#
+# Spawn eggs created via:
+#   /mob egg <key>
+#
+# will use the mappings defined below.
+#
+# ---------------------------------------------------------
+# FORMAT
+# ---------------------------------------------------------
+# <spawn-key>: <mob-id>
+#
+# spawn-key
+#   - The key used in commands and items
+#   - Case-insensitive
+#   - Must be UNIQUE
+#   - example:
+
+#   spawn-eggs:
+#     zombie:
+#     enemy:
+#     death-lord:
+# ---------------------------------------------------------
+
+# mob-id
+#   - TheMob mob template ID
+#   - Must exist in /plugins/TheMob/mobs/
+#   - Defined via "mob-id:" inside the mob YAML
+#   - example:
+
+#   spawn-eggs:
+#     zombie: zombie_mob_template
+#     enemy: skeleton_normal
+#     death-lord: zombie_boss_template
+# ---------------------------------------------------------
+
+# ---------------------------------------------------------
+# EXAMPLE
+# ---------------------------------------------------------
+# /mob egg zombie
+# → Spawns the mob defined in "mob_template.yml"
+#
+# ---------------------------------------------------------
+# IMPORTANT
+# ---------------------------------------------------------
+# ✔ These are NOT vanilla spawn eggs
+# ✔ Eggs are THROWABLE items
+# ✔ Vanilla mobs will NEVER spawn
+# ✔ All stats, drops, phases and behaviors come from the template
+#
+# If a mob-id is missing or invalid:
+# ❌ The spawn will be canceled
+# ❌ No vanilla fallback will occur
+#
+# =========================================================
+messages:
+  enabled: true
+  receive-message: "&6You received &e{amount}x &a{mob_key} &6spawn eggs"
+  spawner-message: "&6Given &e{amount}x The Mob Spawner"
+  linked-message: "&6Spawner linked to {mob_key}"
+
+spawn-eggs:
+  boss-zombie: zombie_boss_template
+  baby-chicken: chicken_baby
+  baby-pig: pig_baby
+  pig: pig_lvl_1
+  skeleton: skeleton_normal
+  spider: spider_normal
+  warden: warden_normal
+  zombie: zombie_mob_template

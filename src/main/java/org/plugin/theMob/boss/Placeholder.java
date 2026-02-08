@@ -35,11 +35,11 @@ public final class Placeholder {
         keys = registry;
 
         try {
-            PAPI_PRESENT = Bukkit.getPluginManager().isPluginEnabled("PlaceholderAPI");
-            if (PAPI_PRESENT) {
+            if (Bukkit.getPluginManager().isPluginEnabled("PlaceholderAPI")) {
                 Class<?> papi = Class.forName("me.clip.placeholderapi.PlaceholderAPI");
                 PAPI_SET_PLACEHOLDERS =
                         papi.getMethod("setPlaceholders", Player.class, String.class);
+                PAPI_PRESENT = true;
             }
         } catch (Throwable ignored) {
             PAPI_PRESENT = false;
@@ -57,7 +57,6 @@ public final class Placeholder {
             Player viewer
     ) {
         if (input == null || input.isEmpty()) return input;
-        if (mob == null) return input;
 
         if (keys == null) {
             Bukkit.getLogger().warning("[TheMob] Placeholder used before init()");
@@ -100,16 +99,23 @@ public final class Placeholder {
             BossPhase phase,
             Player viewer
     ) {
-        Map<String, Supplier<String>> map = new HashMap<>(32);
+        Map<String, Supplier<String>> map = new LinkedHashMap<>(32);
 
         // -------- MOB --------
-        map.put("mob_name", () -> baseName(mob));
-        map.put("mob_type", () -> mob.getType().name().toLowerCase(Locale.ROOT));
-        map.put("mob_uuid", () -> mob.getUniqueId().toString());
+        map.put("mob_key", () -> mob != null ? spawnEggKey(mob) : "");
+        map.put("mob_name", () -> mob != null ? baseName(mob) : "");
+        map.put("mob_type", () -> mob != null
+                ? mob.getType().name().toLowerCase(Locale.ROOT)
+                : "");
+        map.put("mob_uuid", () -> mob != null ? mob.getUniqueId().toString() : "");
 
         // -------- HEALTH --------
-        map.put("health", () -> String.valueOf((int) Math.ceil(safeHealth(mob))));
+        map.put("health", () -> mob != null
+                ? String.valueOf((int) Math.ceil(safeHealth(mob)))
+                : "0");
+
         map.put("max_health", () -> {
+            if (mob == null) return "0";
             AttributeInstance a = mob.getAttribute(Attribute.MAX_HEALTH);
             return a != null ? String.valueOf((int) a.getValue()) : "0";
         });
@@ -123,10 +129,10 @@ public final class Placeholder {
         map.put("player_uuid", () -> viewer != null ? viewer.getUniqueId().toString() : "");
 
         // -------- LOCATION --------
-        map.put("world", () -> safeWorld(mob));
-        map.put("x", () -> String.valueOf(mob.getLocation().getBlockX()));
-        map.put("y", () -> String.valueOf(mob.getLocation().getBlockY()));
-        map.put("z", () -> String.valueOf(mob.getLocation().getBlockZ()));
+        map.put("world", () -> mob != null ? safeWorld(mob) : "");
+        map.put("x", () -> mob != null ? String.valueOf(mob.getLocation().getBlockX()) : "0");
+        map.put("y", () -> mob != null ? String.valueOf(mob.getLocation().getBlockY()) : "0");
+        map.put("z", () -> mob != null ? String.valueOf(mob.getLocation().getBlockZ()) : "0");
 
         return map;
     }
@@ -153,8 +159,9 @@ public final class Placeholder {
     // PLACEHOLDER API
     // =====================================================
     private static String applyPlaceholderAPI(String input, Player player) {
-        if (!PAPI_PRESENT || PAPI_SET_PLACEHOLDERS == null) return input;
-        if (player == null) return input;
+        if (!PAPI_PRESENT || PAPI_SET_PLACEHOLDERS == null || player == null) {
+            return input;
+        }
 
         try {
             return (String) PAPI_SET_PLACEHOLDERS.invoke(null, player, input);
@@ -190,4 +197,25 @@ public final class Placeholder {
             return "unknown";
         }
     }
+    // =====================================================
+// SPAWN EGG KEY
+// =====================================================
+    private static String spawnEggKey(LivingEntity mob) {
+        try {
+            String key = mob.getPersistentDataContainer()
+                    .get(keys.SPAWN_EGG_MOB_ID, PersistentDataType.STRING);
+
+            if (key != null && !key.isBlank()) {
+                return key;
+            }
+
+            // Fallback: mob base-name (template / display safe)
+            return baseName(mob);
+
+        } catch (Throwable ignored) {
+            return "";
+        }
+    }
+
+
 }

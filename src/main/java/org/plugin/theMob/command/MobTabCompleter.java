@@ -4,7 +4,9 @@ import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
+import org.plugin.theMob.core.ConfigService;
 import org.plugin.theMob.mob.MobManager;
 
 import java.util.ArrayList;
@@ -14,9 +16,11 @@ import java.util.stream.Collectors;
 public final class MobTabCompleter implements TabCompleter {
 
     private final MobManager mobs;
+    private final ConfigService configs;
 
-    public MobTabCompleter(MobManager mobs) {
+    public MobTabCompleter(MobManager mobs, ConfigService configs) {
         this.mobs = mobs;
+        this.configs = configs;
     }
 
     @Override
@@ -33,8 +37,13 @@ public final class MobTabCompleter implements TabCompleter {
         if (args.length == 1) {
             return filter(args[0],
                     "spawn", "set", "list", "del", "killall",
-                    "reload", "toggle", "diag", "debug", "get"
+                    "reload", "toggle", "diag", "debug", "get", "egg", "spawner"
             );
+        }
+
+
+        if (args.length == 2 && eq(args, 0, "spawner")) {
+            return List.of("1", "4", "8", "16", "32", "64");
         }
 
         // =========================
@@ -45,6 +54,19 @@ public final class MobTabCompleter implements TabCompleter {
                     "status", "tps", "budgets", "throttle", "alive", "cooldown"
             );
         }
+// =========================
+// EGG  ✅ AUS YAML
+// =========================
+        if (args.length == 2 && eq(args, 0, "egg")) {
+            return filter(args[1], spawnEggKeys());
+        }
+
+        if (args.length == 3 && eq(args, 0, "egg")) {
+            return numbers(args[2],
+                    "1", "4", "8", "16", "32", "64"
+            );
+        }
+
 
         // =========================
         // TOGGLE
@@ -137,12 +159,10 @@ public final class MobTabCompleter implements TabCompleter {
         }
 
         // =========================
-// GET
-// =========================
+        // GET
+        // =========================
         if (args.length == 2 && eq(args, 0, "get")) {
-            return filter(args[1],
-                    "base64" // ✅ NEU
-            );
+            return filter(args[1], "base64");
         }
 
         return List.of();
@@ -151,6 +171,16 @@ public final class MobTabCompleter implements TabCompleter {
     // =================================================
     // Helpers
     // =================================================
+
+    private List<String> spawnEggKeys() {
+        ConfigurationSection sec =
+                configs.spawnEggs().getConfigurationSection("spawn-eggs");
+
+        if (sec == null) return List.of();
+
+        return new ArrayList<>(sec.getKeys(false));
+    }
+
     private boolean eq(String[] args, int i, String v) {
         return args.length > i && args[i].equalsIgnoreCase(v);
     }
@@ -196,6 +226,15 @@ public final class MobTabCompleter implements TabCompleter {
         List<String> out = new ArrayList<>();
         for (String v : values) {
             if (v.startsWith(p)) out.add(v);
+        }
+        return out;
+    }
+
+    private List<String> filter(String prefix, List<String> values) {
+        String p = prefix == null ? "" : prefix.toLowerCase();
+        List<String> out = new ArrayList<>();
+        for (String v : values) {
+            if (v.toLowerCase().startsWith(p)) out.add(v);
         }
         return out;
     }

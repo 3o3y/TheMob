@@ -8,6 +8,9 @@ import java.util.Map;
 
 public final class KeyRegistry {
 
+    // =========================
+    // CORE MOB DATA
+    // =========================
     public final NamespacedKey MOB_ID;
     public final NamespacedKey BASE_NAME;
     public final NamespacedKey IS_BOSS;
@@ -16,6 +19,10 @@ public final class KeyRegistry {
     public final NamespacedKey SPAWN_TYPE;
     public final NamespacedKey AUTO_SPAWN_ID;
     public final NamespacedKey BOSS_SPAWN_TIME;
+
+    // =========================
+    // STATS
+    // =========================
     public final NamespacedKey DAMAGE;
     public final NamespacedKey EXTRA_DAMAGE;
     public final NamespacedKey CRIT;
@@ -28,14 +35,31 @@ public final class KeyRegistry {
     public final NamespacedKey ATTACK_SPEED;
     public final NamespacedKey KNOCKBACK_RESISTANCE;
     public final NamespacedKey LUCK;
+
+    // =========================
+    // RUNTIME FLAGS
+    // =========================
     public final NamespacedKey DROPS_DONE;
     public final NamespacedKey BOSS_DEATH_HANDLED;
 
+    // =========================
+    // SPAWN SYSTEM
+    // =========================
+    public final NamespacedKey SPAWN_EGG_MOB_ID;
+    public final NamespacedKey THEMOB_SPAWNER;
+    public final NamespacedKey THEMOB_SPAWNER_MOB;
 
+    // 🔥 NEW (Spawner Cooldown)
+    public final NamespacedKey THEMOB_SPAWNER_NEXT_TICK;
+
+    // =========================
+    // COLLECTIONS
+    // =========================
     public final Map<String, NamespacedKey> ALL_STATS;
 
     public KeyRegistry(Plugin plugin) {
 
+        // -------- CORE --------
         MOB_ID = new NamespacedKey(plugin, "mob_id");
         BASE_NAME = new NamespacedKey(plugin, "base_name");
         IS_BOSS = new NamespacedKey(plugin, "is_boss");
@@ -45,6 +69,7 @@ public final class KeyRegistry {
         AUTO_SPAWN_ID = new NamespacedKey(plugin, "auto_spawn_id");
         BOSS_SPAWN_TIME = new NamespacedKey(plugin, "boss_spawn_time");
 
+        // -------- STATS --------
         DAMAGE = new NamespacedKey(plugin, "damage");
         EXTRA_DAMAGE = new NamespacedKey(plugin, "extra_damage");
         CRIT = new NamespacedKey(plugin, "crit");
@@ -57,10 +82,21 @@ public final class KeyRegistry {
         ATTACK_SPEED = new NamespacedKey(plugin, "attack_speed");
         KNOCKBACK_RESISTANCE = new NamespacedKey(plugin, "knockback_resistance");
         LUCK = new NamespacedKey(plugin, "luck");
+
+        // -------- FLAGS --------
+        DROPS_DONE = new NamespacedKey(plugin, "drops_done");
         BOSS_DEATH_HANDLED = new NamespacedKey(plugin, "boss_death_handled");
 
-        DROPS_DONE = new NamespacedKey(plugin, "drops_done");
+        // -------- SPAWN --------
+        SPAWN_EGG_MOB_ID = new NamespacedKey(plugin, "spawn_egg_mob_id");
+        THEMOB_SPAWNER = new NamespacedKey(plugin, "themob_spawner");
+        THEMOB_SPAWNER_MOB = new NamespacedKey(plugin, "themob_spawner_mob");
 
+        // 🔥 NEW
+        THEMOB_SPAWNER_NEXT_TICK =
+                new NamespacedKey(plugin, "themob_spawner_next_tick");
+
+        // -------- MAP --------
         Map<String, NamespacedKey> map = new LinkedHashMap<>();
         map.put("damage", DAMAGE);
         map.put("extra_damage", EXTRA_DAMAGE);
@@ -79,10 +115,17 @@ public final class KeyRegistry {
     }
 
     // ============================================
-    // 🔥 HELPER FOR MOB / PLAYER STATS
+    // HELPERS
     // ============================================
+
     public NamespacedKey mobStat(String key) {
         if (key == null) return null;
         return ALL_STATS.get(key.toLowerCase());
+    }
+
+    public boolean isTheMobSpawnerKey(NamespacedKey key) {
+        return THEMOB_SPAWNER.equals(key)
+                || THEMOB_SPAWNER_MOB.equals(key)
+                || THEMOB_SPAWNER_NEXT_TICK.equals(key);
     }
 }
