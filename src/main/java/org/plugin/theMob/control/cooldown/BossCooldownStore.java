@@ -3,14 +3,15 @@ package org.plugin.theMob.control.cooldown;
 import java.util.Set;
 
 public interface BossCooldownStore {
+  void load();
 
-    void load();
-    void save();
+  void save();
 
-    long getNextSpawnEpochSeconds(String bossId);
-    void setNextSpawnEpochSeconds(String bossId, long epochSeconds);
+  long getNextSpawnEpochSeconds(String var1);
 
-    Set<String> getAllBossIds();
+  void setNextSpawnEpochSeconds(String var1, long var2);
 
-    void close();
+  Set<String> getAllBossIds();
+
+  void close();
 }

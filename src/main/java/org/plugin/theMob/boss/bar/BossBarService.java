@@ -1,8 +1,21 @@
 package org.plugin.theMob.boss.bar;
 
-import org.bukkit.*;
-import org.bukkit.attribute.Attribute;
-import org.bukkit.boss.*;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
+import java.util.UUID;
+import org.bukkit.Bukkit;
+import org.bukkit.NamespacedKey;
+import org.bukkit.World;
+import org.bukkit.attribute.AttributeInstance;
+import org.bukkit.boss.BarColor;
+import org.bukkit.boss.BarFlag;
+import org.bukkit.boss.BarStyle;
+import org.bukkit.boss.BossBar;
+import org.bukkit.boss.KeyedBossBar;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -18,336 +31,300 @@ import org.plugin.theMob.mob.MobManager;
 import org.plugin.theMob.spawn.SpawnPoint;
 import org.plugin.theMob.spawn.type.SpawnType;
 
-import java.util.*;
-
 public final class BossBarService implements Listener {
+  public static final NamespacedKey BOSSBAR_KEY = new NamespacedKey("themob", "bossbar");
+  private static final int BLOCKS_PER_CHUNK = 16;
+  private final TheMob plugin;
+  private final MobManager mobs;
+  private final PlayerBarCoordinator playerBars;
+  private final Map<UUID, LivingEntity> bosses = new HashMap<>();
+  private final Map<UUID, UUID> playerBoss = new HashMap<>();
+  private final Set<UUID> dirty = new HashSet<>();
+  private final Map<UUID, String> phaseTitle = new HashMap<>();
+  private BukkitRunnable task;
 
-    public static final NamespacedKey BOSSBAR_KEY =
-            new NamespacedKey("themob", "bossbar");
+  public BossBarService(TheMob plugin, MobManager mobs, PlayerBarCoordinator playerBars) {
+    this.plugin = plugin;
+    this.mobs = mobs;
+    this.playerBars = playerBars;
+  }
 
-    private static final int BLOCKS_PER_CHUNK = 16;
-
-    private final TheMob plugin;
-    private final MobManager mobs;
-    private final PlayerBarCoordinator playerBars;
-
-    // MAIN THREAD ONLY
-    private final Map<UUID, LivingEntity> bosses = new HashMap<>();
-    private final Map<UUID, UUID> playerBoss = new HashMap<>();
-    private final Set<UUID> dirty = new HashSet<>();
-    private final Map<UUID, String> phaseTitle = new HashMap<>();
-
-    private BukkitRunnable task;
-
-    public BossBarService(TheMob plugin, MobManager mobs, PlayerBarCoordinator playerBars) {
-        this.plugin = plugin;
-        this.mobs = mobs;
-        this.playerBars = playerBars;
-    }
-
-    // =====================================================
-    // LIFECYCLE
-    // =====================================================
-
-    public void start() {
-        if (task != null) return;
-
-        task = new BukkitRunnable() {
-            @Override
+  public void start() {
+    if (this.task == null) {
+      this.task =
+          new BukkitRunnable() {
             public void run() {
-                tick();
+              BossBarService.this.tick();
             }
-        };
-        task.runTaskTimer(plugin, 10L, 10L);
+          };
+      this.task.runTaskTimer(this.plugin, 10L, 10L);
+    }
+  }
+
+  public void shutdown() {
+    if (this.task != null) {
+      this.task.cancel();
+      this.task = null;
     }
 
-    public void shutdown() {
-        if (task != null) {
-            task.cancel();
-            task = null;
-        }
+    Iterator<KeyedBossBar> it = Bukkit.getBossBars();
 
-        Iterator<KeyedBossBar> it = Bukkit.getBossBars();
-        while (it.hasNext()) {
-            KeyedBossBar bar = it.next();
-            if (BOSSBAR_KEY.equals(bar.getKey())) {
-                bar.removeAll();
-                Bukkit.removeBossBar(bar.getKey());
-            }
-        }
-
-        bosses.clear();
-        playerBoss.clear();
-        dirty.clear();
-        phaseTitle.clear();
+    while (it.hasNext()) {
+      KeyedBossBar bar = it.next();
+      if (BOSSBAR_KEY.equals(bar.getKey())) {
+        bar.removeAll();
+        Bukkit.removeBossBar(bar.getKey());
+      }
     }
 
-    // =====================================================
-    // PUBLIC API
-    // =====================================================
+    this.bosses.clear();
+    this.playerBoss.clear();
+    this.dirty.clear();
+    this.phaseTitle.clear();
+  }
 
-    public void registerBoss(LivingEntity boss) {
-        if (boss == null || !mobs.isBoss(boss)) return;
-        if (isFollowPlayerMob(boss)) return;
-
-        bosses.putIfAbsent(boss.getUniqueId(), boss);
-        dirty.add(boss.getUniqueId());
+  public void registerBoss(LivingEntity boss) {
+    if (boss != null
+        && !org.plugin.theMob.core.CosmeticEntities.isVisual(boss)
+        && this.mobs.isBoss(boss)) {
+      if (!this.isFollowPlayerMob(boss)) {
+        this.bosses.putIfAbsent(boss.getUniqueId(), boss);
+        this.dirty.add(boss.getUniqueId());
+      }
     }
+  }
 
-    public void unregisterBoss(LivingEntity boss) {
-        if (boss == null) return;
+  public void unregisterBoss(LivingEntity boss) {
+    if (boss != null) {
+      UUID bid = boss.getUniqueId();
+      this.bosses.remove(bid);
+      this.dirty.remove(bid);
+      this.phaseTitle.remove(bid);
 
-        UUID bid = boss.getUniqueId();
-
-        // Boss aus Tracking entfernen
-        bosses.remove(bid);
-        dirty.remove(bid);
-        phaseTitle.remove(bid);
-
-        // BossBar von ALLEN Spielern entfernen
-        for (UUID pid : new HashSet<>(playerBoss.keySet())) {
-            UUID current = playerBoss.get(pid);
-            if (!bid.equals(current)) continue;
-
-            Player p = Bukkit.getPlayer(pid);
-            if (p != null && p.isOnline()) {
-                PlayerBarCoordinator.Ctx ctx = playerBars.of(p);
-                BossBar bar = ctx.bossBar();
-                if (bar != null) {
-                    bar.removePlayer(p);
-                }
-            }
-
-            playerBoss.remove(pid);
-        }
-    }
-
-
-    public void setPhaseTitle(LivingEntity boss, String title) {
-        if (boss == null) return;
-
-        UUID id = boss.getUniqueId();
-        if (title == null || title.isBlank()) phaseTitle.remove(id);
-        else phaseTitle.put(id, title);
-
-        dirty.add(id);
-    }
-
-    public void markDirty(LivingEntity boss) {
-        if (boss != null) dirty.add(boss.getUniqueId());
-    }
-
-    // =====================================================
-    // RESTORE
-    // =====================================================
-
-    public void restore() {
-        for (World w : Bukkit.getWorlds()) {
-            for (LivingEntity le : w.getLivingEntities()) {
-                if (!mobs.isBoss(le)) continue;
-                if (isFollowPlayerMob(le)) continue;
-
-                bosses.putIfAbsent(le.getUniqueId(), le);
-                dirty.add(le.getUniqueId());
-            }
-        }
-    }
-
-    @EventHandler
-    public void onJoin(PlayerJoinEvent e) {
-        Bukkit.getScheduler().runTask(plugin, () -> updatePlayer(e.getPlayer()));
-    }
-
-    // =====================================================
-    // TICK
-    // =====================================================
-
-    private void tick() {
-
-        Iterator<Map.Entry<UUID, LivingEntity>> it = bosses.entrySet().iterator();
-        while (it.hasNext()) {
-            Map.Entry<UUID, LivingEntity> entry = it.next();
-            LivingEntity b = entry.getValue();
-
-            if (b == null || !b.isValid() || b.isDead()) {
-                UUID id = entry.getKey();
-                it.remove();
-                dirty.remove(id);
-                phaseTitle.remove(id);
-            }
-        }
-
-        for (Player p : Bukkit.getOnlinePlayers()) {
-            updatePlayer(p);
-        }
-    }
-
-    // =====================================================
-    // PLAYER UPDATE (ARENA-BASED)
-    // =====================================================
-
-    private void updatePlayer(Player p) {
-        UUID pid = p.getUniqueId();
-        UUID current = playerBoss.get(pid);
-
-        LivingEntity activeBoss = null;
-
-        for (LivingEntity boss : bosses.values()) {
-            if (boss.getWorld() != p.getWorld()) continue;
-            if (!isInsideArena(p, boss)) continue;
-
-            activeBoss = boss;
-            break;
-        }
-
-        // ❌ Kein Boss mehr → BossBar sauber entfernen
-        if (activeBoss == null) {
-
-            if (current != null) {
-                PlayerBarCoordinator.Ctx ctx = playerBars.of(p);
-                BossBar bar = ctx.bossBar();
-
-                if (bar != null) {
-                    bar.removePlayer(p);
-                    ctx.setBossBar(null);
-                }
-
-                playerBoss.remove(pid);
-            }
-
-            return;
-        }
-
-
-        UUID bid = activeBoss.getUniqueId();
-
-        if (current != null && current.equals(bid)) {
-            if (dirty.contains(bid)) updateBar(p, activeBoss);
-            return;
-        }
-
-        playerBoss.put(pid, bid);
-        showBar(p, activeBoss);
-    }
-
-    private boolean isInsideArena(Player p, LivingEntity boss) {
-        BossTemplate tpl = mobs.getBossTemplate(boss);
-        if (tpl == null) return false;
-
-        int chunks = Math.max(1, tpl.arenaRadiusChunks());
-        double radius = chunks * BLOCKS_PER_CHUNK;
-        double radiusSq = radius * radius;
-
-        return p.getWorld() == boss.getWorld()
-                && p.getLocation().distanceSquared(boss.getLocation()) <= (radiusSq + 4);
-    }
-
-    // =====================================================
-    // BAR RENDERING
-    // =====================================================
-
-    private void showBar(Player p, LivingEntity boss) {
-        PlayerBarCoordinator.Ctx ctx = playerBars.of(p);
-        BossBar bar = ctx.bossBar();
-
-        if (bar == null) {
-            bar = Bukkit.createBossBar(
-                    BOSSBAR_KEY,
-                    "",
-                    BarColor.PURPLE,
-                    BarStyle.SOLID
-            );
-            ctx.setBossBar(bar);
-        }
-
-        if (!bar.getPlayers().contains(p)) bar.addPlayer(p);
-        updateBar(p, boss);
-    }
-
-    private void updateBar(Player p, LivingEntity boss) {
-        PlayerBarCoordinator.Ctx ctx = playerBars.of(p);
-        BossBar bar = ctx.bossBar();
-        if (bar == null) return;
-
-        double hp = hpProgress(boss);
-        bar.setProgress(hp);
-        bar.setColor(colorFor(hp));
-
-        bar.setTitle(Placeholder.resolve("{mob_name}", boss, null, p));
-        dirty.remove(boss.getUniqueId());
-
-    }
-
-    private void removeBoss(UUID id) {
-        bosses.remove(id);
-        dirty.remove(id);
-        phaseTitle.remove(id);
-    }
-    // BossBarService.java
-    public double getBossProgress(LivingEntity boss) {
-        if (boss == null) return -1;
-
-        UUID id = boss.getUniqueId();
-        if (!bosses.containsKey(id)) return -1;
-
-        // BossBar wird pro Player gerendert,
-        // Progress ist aber global identisch
-        var attr = boss.getAttribute(Attribute.MAX_HEALTH);
-        if (attr == null || attr.getValue() <= 0) return -1;
-
-        return Math.max(0.0, Math.min(1.0,
-                boss.getHealth() / attr.getValue()
-        ));
-    }
-
-    // =====================================================
-    // HELPERS
-    // =====================================================
-
-    private boolean isFollowPlayerMob(LivingEntity mob) {
-        if (mobs.getAutoSpawnManager() == null) return false;
-
-        String spawnId = mob.getPersistentDataContainer()
-                .get(mobs.keys().AUTO_SPAWN_ID, PersistentDataType.STRING);
-
-        if (spawnId == null) return false;
-        SpawnPoint sp = mobs.getAutoSpawnManager().get(spawnId);
-        return sp != null && sp.type() == SpawnType.FOLLOW_PLAYER;
-    }
-
-    private static double hpProgress(LivingEntity boss) {
-        var attr = boss.getAttribute(Attribute.MAX_HEALTH);
-        if (attr == null || attr.getValue() <= 0) return 0.0;
-        return Math.max(0.0, Math.min(1.0, boss.getHealth() / attr.getValue()));
-    }
-
-    private static BarColor colorFor(double p) {
-        if (p > 0.75) return BarColor.PURPLE;
-        if (p > 0.50) return BarColor.GREEN;
-        if (p > 0.25) return BarColor.YELLOW;
-        return BarColor.RED;
-    }
-    public void removeBossCompletely(LivingEntity boss) {
-        if (boss == null) return;
-
-        UUID bid = boss.getUniqueId();
-
-        // Boss aus Registry
-        removeBoss(bid);
-
-        // BossBar von ALLEN Spielern entfernen
-        for (Player p : Bukkit.getOnlinePlayers()) {
-            PlayerBarCoordinator.Ctx ctx = playerBars.of(p);
+      for (UUID pid : new HashSet<>(this.playerBoss.keySet())) {
+        UUID current = this.playerBoss.get(pid);
+        if (bid.equals(current)) {
+          Player p = Bukkit.getPlayer(pid);
+          if (p != null && p.isOnline()) {
+            PlayerBarCoordinator.Ctx ctx = this.playerBars.of(p);
             BossBar bar = ctx.bossBar();
-
             if (bar != null) {
-                bar.removePlayer(p);
-                ctx.setBossBar(null);
+              bar.removePlayer(p);
             }
-        }
+          }
 
-        // Player → Boss Mapping löschen
-        playerBoss.values().removeIf(id -> id.equals(bid));
+          this.playerBoss.remove(pid);
+        }
+      }
+    }
+  }
+
+  public void setPhaseTitle(LivingEntity boss, String title) {
+    if (boss != null) {
+      UUID id = boss.getUniqueId();
+      if (title != null && !title.isBlank()) {
+        this.phaseTitle.put(id, title);
+      } else {
+        this.phaseTitle.remove(id);
+      }
+
+      this.dirty.add(id);
+    }
+  }
+
+  public void markDirty(LivingEntity boss) {
+    if (boss != null) {
+      this.dirty.add(boss.getUniqueId());
+    }
+  }
+
+  public void restore() {
+    for (World w : Bukkit.getWorlds()) {
+      for (LivingEntity le : w.getLivingEntities()) {
+        if (!org.plugin.theMob.core.CosmeticEntities.isVisual(le)
+            && this.mobs.isBoss(le)
+            && !this.isFollowPlayerMob(le)) {
+          this.bosses.putIfAbsent(le.getUniqueId(), le);
+          this.dirty.add(le.getUniqueId());
+        }
+      }
+    }
+  }
+
+  @EventHandler
+  public void onJoin(PlayerJoinEvent e) {
+    Bukkit.getScheduler().runTask(this.plugin, () -> this.updatePlayer(e.getPlayer()));
+  }
+
+  private void tick() {
+    Iterator<Entry<UUID, LivingEntity>> it = this.bosses.entrySet().iterator();
+
+    while (it.hasNext()) {
+      Entry<UUID, LivingEntity> entry = it.next();
+      LivingEntity b = entry.getValue();
+      if (b == null
+          || !b.isValid()
+          || b.isDead()
+          || org.plugin.theMob.core.CosmeticEntities.isVisual(b)) {
+        UUID id = entry.getKey();
+        it.remove();
+        this.dirty.remove(id);
+        this.phaseTitle.remove(id);
+      }
     }
 
+    for (Player p : Bukkit.getOnlinePlayers()) {
+      this.updatePlayer(p);
+    }
+  }
+
+  private void updatePlayer(Player p) {
+    UUID pid = p.getUniqueId();
+    UUID current = this.playerBoss.get(pid);
+    LivingEntity activeBoss = null;
+
+    for (LivingEntity boss : this.bosses.values()) {
+      if (boss.getWorld() == p.getWorld() && this.isInsideArena(p, boss)) {
+        activeBoss = boss;
+        break;
+      }
+    }
+
+    if (activeBoss == null) {
+      if (current != null) {
+        PlayerBarCoordinator.Ctx ctx = this.playerBars.of(p);
+        BossBar bar = ctx.bossBar();
+        if (bar != null) {
+          bar.removePlayer(p);
+          ctx.setBossBar(null);
+        }
+
+        this.playerBoss.remove(pid);
+      }
+    } else {
+      UUID bid = activeBoss.getUniqueId();
+      if (current != null && current.equals(bid)) {
+        if (true) {
+          this.updateBar(p, activeBoss);
+        }
+      } else {
+        this.playerBoss.put(pid, bid);
+        this.showBar(p, activeBoss);
+      }
+    }
+  }
+
+  private boolean isInsideArena(Player p, LivingEntity boss) {
+    BossTemplate tpl = this.mobs.getBossTemplate(boss);
+    if (tpl == null) {
+      return false;
+    } else {
+      int chunks = Math.max(1, tpl.arenaRadiusChunks());
+      double radius = chunks * 16;
+      double radiusSq = radius * radius;
+      return p.getWorld() == boss.getWorld()
+          && p.getLocation().distanceSquared(boss.getLocation()) <= radiusSq + 4.0;
+    }
+  }
+
+  private void showBar(Player p, LivingEntity boss) {
+    PlayerBarCoordinator.Ctx ctx = this.playerBars.of(p);
+    BossBar bar = ctx.bossBar();
+    if (bar == null) {
+      bar = Bukkit.createBossBar("", BarColor.PURPLE, BarStyle.SOLID, new BarFlag[0]);
+      ctx.setBossBar(bar);
+    }
+
+    if (!bar.getPlayers().contains(p)) {
+      bar.addPlayer(p);
+    }
+
+    this.updateBar(p, boss);
+  }
+
+  private void updateBar(Player p, LivingEntity boss) {
+    PlayerBarCoordinator.Ctx ctx = this.playerBars.of(p);
+    BossBar bar = ctx.bossBar();
+    if (bar != null) {
+      double hp = hpProgress(boss);
+      bar.setProgress(hp);
+      bar.setColor(colorFor(hp));
+      bar.setTitle(Placeholder.resolve("{mob_name}", boss, null, p));
+      this.dirty.remove(boss.getUniqueId());
+    }
+  }
+
+  private void removeBoss(UUID id) {
+    this.bosses.remove(id);
+    this.dirty.remove(id);
+    this.phaseTitle.remove(id);
+  }
+
+  public double getBossProgress(LivingEntity boss) {
+    if (boss == null) {
+      return -1.0;
+    } else {
+      UUID id = boss.getUniqueId();
+      if (!this.bosses.containsKey(id)) {
+        return -1.0;
+      } else {
+        AttributeInstance attr = org.plugin.theMob.compat.BukkitTypes.instance(boss, "MAX_HEALTH");
+        return attr != null && !(attr.getValue() <= 0.0)
+            ? Math.max(0.0, Math.min(1.0, boss.getHealth() / attr.getValue()))
+            : -1.0;
+      }
+    }
+  }
+
+  private boolean isFollowPlayerMob(LivingEntity mob) {
+    if (this.mobs.getAutoSpawnManager() == null) {
+      return false;
+    } else {
+      String spawnId =
+          (String)
+              mob.getPersistentDataContainer()
+                  .get(this.mobs.keys().AUTO_SPAWN_ID, PersistentDataType.STRING);
+      if (spawnId == null) {
+        return false;
+      } else {
+        SpawnPoint sp = this.mobs.getAutoSpawnManager().get(spawnId);
+        return sp != null && sp.type() == SpawnType.FOLLOW_PLAYER;
+      }
+    }
+  }
+
+  private static double hpProgress(LivingEntity boss) {
+    AttributeInstance attr = org.plugin.theMob.compat.BukkitTypes.instance(boss, "MAX_HEALTH");
+    return attr != null && !(attr.getValue() <= 0.0)
+        ? Math.max(0.0, Math.min(1.0, boss.getHealth() / attr.getValue()))
+        : 0.0;
+  }
+
+  private static BarColor colorFor(double p) {
+    if (p > 0.75) {
+      return BarColor.PURPLE;
+    } else if (p > 0.5) {
+      return BarColor.GREEN;
+    } else {
+      return p > 0.25 ? BarColor.YELLOW : BarColor.RED;
+    }
+  }
+
+  public void removeBossCompletely(LivingEntity boss) {
+    if (boss != null) {
+      UUID bid = boss.getUniqueId();
+      this.removeBoss(bid);
+
+      for (Player p : Bukkit.getOnlinePlayers()) {
+        PlayerBarCoordinator.Ctx ctx = this.playerBars.of(p);
+        BossBar bar = ctx.bossBar();
+        if (bar != null) {
+          bar.removePlayer(p);
+          ctx.setBossBar(null);
+        }
+      }
+
+      this.playerBoss.values().removeIf(id -> id.equals(bid));
+    }
+  }
 }

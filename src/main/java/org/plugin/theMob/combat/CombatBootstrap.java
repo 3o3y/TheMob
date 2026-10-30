@@ -2,6 +2,7 @@ package org.plugin.theMob.combat;
 
 import org.bukkit.Bukkit;
 import org.bukkit.command.PluginCommand;
+import org.bukkit.event.HandlerList;
 import org.bukkit.plugin.PluginManager;
 import org.plugin.theMob.TheMob;
 import org.plugin.theMob.item.CustomEnchantSystem;
@@ -10,84 +11,65 @@ import org.plugin.theMob.progression.PlayerProgressionManager;
 import org.plugin.theMob.progression.ProgressionCombatApplier;
 
 public final class CombatBootstrap {
+  private final TheMob plugin;
+  private CombatDebugService debug;
+  private DamageCalculator calculator;
+  private MobMultiplierService multipliers;
+  private CombatListener listener;
+  private boolean enabled;
 
-    private final TheMob plugin;
+  public CombatBootstrap(TheMob plugin) {
+    this.plugin = plugin;
+  }
 
-    private CombatDebugService debug;
-    private DamageCalculator calculator;
-    private MobMultiplierService multipliers;
-    private CombatListener listener;
+  public void enable(PlayerStatCache cache, CustomEnchantSystem enchants) {
+    this.enable(cache, enchants, null, null);
+  }
 
-    private boolean enabled;
-
-    public CombatBootstrap(TheMob plugin) {
-        this.plugin = plugin;
+  public synchronized void enable(
+      PlayerStatCache cache,
+      CustomEnchantSystem enchants,
+      PlayerProgressionManager progression,
+      ProgressionCombatApplier progressionCombat) {
+    if (!this.enabled) {
+      this.enabled = true;
+      this.debug = new CombatDebugService();
+      this.multipliers = new MobMultiplierService(this.plugin);
+      this.calculator = new DamageCalculator(this.multipliers, cache);
+      this.listener =
+          new CombatListener(
+              this.plugin,
+              cache,
+              this.calculator,
+              this.debug,
+              enchants,
+              progression,
+              progressionCombat);
+      PluginManager pm = Bukkit.getPluginManager();
+      pm.registerEvents(this.listener, this.plugin);
+      PluginCommand cmd = this.plugin.getCommand("combatdebug");
+      if (cmd != null) {
+        cmd.setExecutor(new CombatDebugCommand(this.debug));
+      }
     }
+  }
 
-    // =====================================================
-    // LEGACY ENABLE (v1.5 – v1.8)
-    // =====================================================
+  public synchronized void disable() {
+    if (this.enabled) {
+      this.enabled = false;
+      if (this.listener != null) {
+        HandlerList.unregisterAll(this.listener);
+        this.listener = null;
+      }
 
-    public void enable(PlayerStatCache cache, CustomEnchantSystem enchants) {
-        enable(cache, enchants, null, null);
+      PluginCommand cmd = this.plugin.getCommand("combatdebug");
+      if (cmd != null) {
+        cmd.setExecutor(null);
+      }
+
+      this.calculator = null;
+      this.multipliers = null;
+      this.debug = null;
     }
-
-    // =====================================================
-    // v1.9 ENABLE (PROGRESSION AWARE)
-    // =====================================================
-
-    public synchronized void enable(
-            PlayerStatCache cache,
-            CustomEnchantSystem enchants,
-            PlayerProgressionManager progression,
-            ProgressionCombatApplier progressionCombat
-    ) {
-        if (enabled) return;
-        enabled = true;
-
-        this.debug = new CombatDebugService();
-        this.multipliers = new MobMultiplierService(plugin);
-        this.calculator = new DamageCalculator(multipliers);
-
-        this.listener = new CombatListener(
-                plugin,
-                cache,
-                calculator,
-                debug,
-                enchants,
-                progression,
-                progressionCombat
-        );
-
-        PluginManager pm = Bukkit.getPluginManager();
-        pm.registerEvents(listener, plugin);
-
-        PluginCommand cmd = plugin.getCommand("combatdebug");
-        if (cmd != null) {
-            cmd.setExecutor(new CombatDebugCommand(debug));
-        }
-    }
-
-    // =====================================================
-    // DISABLE / RELOAD CLEANUP
-    // =====================================================
-
-    public synchronized void disable() {
-        if (!enabled) return;
-        enabled = false;
-
-        if (listener != null) {
-            org.bukkit.event.HandlerList.unregisterAll(listener);
-            listener = null;
-        }
-
-        PluginCommand cmd = plugin.getCommand("combatdebug");
-        if (cmd != null) {
-            cmd.setExecutor(null);
-        }
-
-        calculator = null;
-        multipliers = null;
-        debug = null;
-    }
+  }
 }

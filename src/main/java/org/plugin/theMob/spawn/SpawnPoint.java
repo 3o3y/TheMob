@@ -1,195 +1,240 @@
 package org.plugin.theMob.spawn;
 
+import java.util.Locale;
+import java.util.Objects;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.plugin.theMob.spawn.type.SpawnMode;
 import org.plugin.theMob.spawn.type.SpawnType;
 
-import java.util.Locale;
-import java.util.Objects;
-
 public final class SpawnPoint {
+  private static final int DEFAULT_ARENA_RADIUS_CHUNKS = 2;
+  private final SpawnType type;
+  private final String mobId;
+  private final int intervalSeconds;
+  private final int maxSpawns;
+  private final boolean enabled;
+  private final String worldName;
+  private final int x;
+  private final int y;
+  private final int z;
+  private final int arenaRadiusChunks;
+  private final int minRadius;
+  private final int maxRadius;
+  private final String playerName;
+  private final SpawnMode mode;
+  private final int minDistance;
+  private final int maxDistance;
+  private final String message;
+  private final int messageTimerSeconds;
+  private final Integer lastX;
+  private final Integer lastY;
+  private final Integer lastZ;
 
-    private static final int DEFAULT_ARENA_RADIUS_CHUNKS = 2;
+  public SpawnPoint(
+      SpawnType type,
+      String mobId,
+      String worldName,
+      int x,
+      int y,
+      int z,
+      int intervalSeconds,
+      int maxSpawns,
+      boolean enabled,
+      Integer arenaRadiusChunks,
+      Integer minRadius,
+      Integer maxRadius,
+      String playerName,
+      SpawnMode mode,
+      Integer minDistance,
+      Integer maxDistance,
+      String message,
+      Integer messageTimerSeconds,
+      Integer lastX,
+      Integer lastY,
+      Integer lastZ) {
+    this.type = Objects.requireNonNull(type, "type");
+    this.mobId = Objects.requireNonNull(mobId, "mobId").toLowerCase(Locale.ROOT);
+    this.worldName = worldName;
+    this.x = x;
+    this.y = y;
+    this.z = z;
+    this.intervalSeconds = Math.max(1, intervalSeconds);
+    this.maxSpawns = Math.max(1, maxSpawns);
+    this.enabled = enabled;
+    this.arenaRadiusChunks = Math.max(0, arenaRadiusChunks == null ? 2 : arenaRadiusChunks);
+    this.minRadius = Math.max(0, minRadius == null ? 0 : minRadius);
+    this.maxRadius = Math.max(0, maxRadius == null ? 0 : maxRadius);
+    this.playerName = playerName;
+    this.mode = mode == null ? SpawnMode.ENDLESS : mode;
+    this.minDistance = Math.max(0, minDistance == null ? 6 : minDistance);
+    this.maxDistance = Math.max(this.minDistance, maxDistance == null ? 18 : maxDistance);
+    this.message = message == null ? "" : message;
+    this.messageTimerSeconds = Math.max(1, messageTimerSeconds == null ? 60 : messageTimerSeconds);
+    this.lastX = lastX;
+    this.lastY = lastY;
+    this.lastZ = lastZ;
+  }
 
-    private final SpawnType type;
+  public String spawnId() {
+    return switch (this.type) {
+      case FOLLOW_PLAYER -> "follow@" + this.safe(this.playerName) + ":" + this.mobId;
+      case RANDOM_WORLD -> "randomworld@" + this.safe(this.worldName) + ":" + this.mobId;
+      case RANDOM_RADIUS ->
+          this.mobId
+              + "@radius@"
+              + this.safe(this.worldName)
+              + ":"
+              + this.x
+              + ","
+              + this.y
+              + ","
+              + this.z;
+      case FIXED_POINT ->
+          this.mobId
+              + "@fixed@"
+              + this.safe(this.worldName)
+              + ":"
+              + this.x
+              + ","
+              + this.y
+              + ","
+              + this.z;
+    };
+  }
 
-    private final String mobId;
-    private final int intervalSeconds;
-    private final int maxSpawns;
-    private final boolean enabled;
+  private String safe(String s) {
+    return s == null ? "null" : s;
+  }
 
-    private final String worldName;
-    private final int x, y, z;
+  public SpawnType type() {
+    return this.type;
+  }
 
-    private final int arenaRadiusChunks;
+  public String mobId() {
+    return this.mobId;
+  }
 
-    private final int minRadius;
-    private final int maxRadius;
+  public int intervalSeconds() {
+    return this.intervalSeconds;
+  }
 
-    private final String playerName;
-    private final SpawnMode mode;
-    private final int minDistance;
-    private final int maxDistance;
-    private final String message;
+  public int maxSpawns() {
+    return this.maxSpawns;
+  }
 
-    private final int messageTimerSeconds;
+  public boolean enabled() {
+    return this.enabled;
+  }
 
-    private final Integer lastX, lastY, lastZ;
+  public String worldName() {
+    return this.worldName;
+  }
 
-    // =========================================================
-    // CTOR
-    // =========================================================
-    public SpawnPoint(
-            SpawnType type,
-            String mobId,
+  public int x() {
+    return this.x;
+  }
 
-            String worldName,
-            int x, int y, int z,
+  public int y() {
+    return this.y;
+  }
 
-            int intervalSeconds,
-            int maxSpawns,
-            boolean enabled,
+  public int z() {
+    return this.z;
+  }
 
-            Integer arenaRadiusChunks,
+  public int arenaRadiusChunks() {
+    return this.arenaRadiusChunks;
+  }
 
-            Integer minRadius,
-            Integer maxRadius,
+  public int minRadius() {
+    return this.minRadius;
+  }
 
-            String playerName,
-            SpawnMode mode,
-            Integer minDistance,
-            Integer maxDistance,
-            String message,
+  public int maxRadius() {
+    return this.maxRadius;
+  }
 
-            Integer messageTimerSeconds,
+  public String playerName() {
+    return this.playerName;
+  }
 
-            Integer lastX, Integer lastY, Integer lastZ
-    ) {
-        this.type = Objects.requireNonNull(type, "type");
-        this.mobId = Objects.requireNonNull(mobId, "mobId").toLowerCase(Locale.ROOT);
+  public SpawnMode mode() {
+    return this.mode;
+  }
 
-        this.worldName = worldName;
-        this.x = x;
-        this.y = y;
-        this.z = z;
+  public int minDistance() {
+    return this.minDistance;
+  }
 
-        this.intervalSeconds = Math.max(1, intervalSeconds);
-        this.maxSpawns = Math.max(1, maxSpawns);
-        this.enabled = enabled;
+  public int maxDistance() {
+    return this.maxDistance;
+  }
 
-        this.arenaRadiusChunks = Math.max(0,
-                arenaRadiusChunks == null ? DEFAULT_ARENA_RADIUS_CHUNKS : arenaRadiusChunks
-        );
+  public String message() {
+    return this.message;
+  }
 
-        this.minRadius = Math.max(0, minRadius == null ? 0 : minRadius);
-        this.maxRadius = Math.max(0, maxRadius == null ? 0 : maxRadius);
+  public int messageTimerSeconds() {
+    return this.messageTimerSeconds;
+  }
 
-        this.playerName = playerName;
-        this.mode = mode == null ? SpawnMode.ENDLESS : mode;
+  public Integer lastX() {
+    return this.lastX;
+  }
 
-        this.minDistance = Math.max(0, minDistance == null ? 6 : minDistance);
-        this.maxDistance = Math.max(this.minDistance, maxDistance == null ? 18 : maxDistance);
+  public Integer lastY() {
+    return this.lastY;
+  }
 
-        this.message = message == null ? "" : message;
-        this.messageTimerSeconds = Math.max(1, messageTimerSeconds == null ? 60 : messageTimerSeconds);
+  public Integer lastZ() {
+    return this.lastZ;
+  }
 
-        this.lastX = lastX;
-        this.lastY = lastY;
-        this.lastZ = lastZ;
+  public Location baseLocation() {
+    if (this.type == SpawnType.RANDOM_WORLD) {
+      return null;
+    } else if (this.worldName == null) {
+      return null;
+    } else {
+      World w = Bukkit.getWorld(this.worldName);
+      return w == null ? null : new Location(w, this.x + 0.5, this.y, this.z + 0.5);
     }
+  }
 
-    // =========================================================
-    // IDS
-    // =========================================================
-    public String spawnId() {
-        return switch (type) {
-            case FOLLOW_PLAYER -> "follow@" + safe(playerName) + ":" + mobId;
-            case RANDOM_WORLD -> "randomworld@" + safe(worldName) + ":" + mobId;
-            case RANDOM_RADIUS -> mobId + "@radius@" + safe(worldName) + ":" + x + "," + y + "," + z;
-            case FIXED_POINT -> mobId + "@fixed@" + safe(worldName) + ":" + x + "," + y + "," + z;
-        };
+  public Location lastLocationFallbackBase() {
+    if (this.type != SpawnType.RANDOM_WORLD) {
+      return this.baseLocation();
+    } else if (this.worldName == null) {
+      return null;
+    } else {
+      World w = Bukkit.getWorld(this.worldName);
+      if (w == null) {
+        return null;
+      } else {
+        return this.lastX != null && this.lastY != null && this.lastZ != null
+            ? new Location(
+                w, this.lastX.intValue() + 0.5, this.lastY.intValue(), this.lastZ.intValue() + 0.5)
+            : w.getSpawnLocation();
+      }
     }
+  }
 
-    private String safe(String s) {
-        return s == null ? "null" : s;
+  public boolean isInsideArena(Location loc) {
+    if (loc == null || loc.getWorld() == null) {
+      return false;
+    } else if (this.worldName == null) {
+      return false;
+    } else if (!loc.getWorld().getName().equals(this.worldName)) {
+      return false;
+    } else {
+      int cx = loc.getBlockX() >> 4;
+      int cz = loc.getBlockZ() >> 4;
+      int baseCx = this.x >> 4;
+      int baseCz = this.z >> 4;
+      return Math.abs(cx - baseCx) <= this.arenaRadiusChunks
+          && Math.abs(cz - baseCz) <= this.arenaRadiusChunks;
     }
-
-    // =========================================================
-    // GETTERS
-    // =========================================================
-    public SpawnType type() { return type; }
-
-    public String mobId() { return mobId; }
-    public int intervalSeconds() { return intervalSeconds; }
-    public int maxSpawns() { return maxSpawns; }
-    public boolean enabled() { return enabled; }
-
-    public String worldName() { return worldName; }
-    public int x() { return x; }
-    public int y() { return y; }
-    public int z() { return z; }
-
-    public int arenaRadiusChunks() { return arenaRadiusChunks; }
-
-    public int minRadius() { return minRadius; }
-    public int maxRadius() { return maxRadius; }
-
-    public String playerName() { return playerName; }
-    public SpawnMode mode() { return mode; }
-    public int minDistance() { return minDistance; }
-    public int maxDistance() { return maxDistance; }
-    public String message() { return message; }
-
-    public int messageTimerSeconds() { return messageTimerSeconds; }
-
-    public Integer lastX() { return lastX; }
-    public Integer lastY() { return lastY; }
-    public Integer lastZ() { return lastZ; }
-
-    // =========================================================
-    // LOC HELPERS
-    // =========================================================
-    public Location baseLocation() {
-        if (type == SpawnType.RANDOM_WORLD) {
-            return null;
-        }
-        if (worldName == null) return null;
-        World w = Bukkit.getWorld(worldName);
-        return w == null ? null : new Location(w, x + 0.5, y, z + 0.5);
-    }
-
-
-    public Location lastLocationFallbackBase() {
-        if (type != SpawnType.RANDOM_WORLD) {
-            return baseLocation();
-        }
-
-        if (worldName == null) return null;
-        World w = Bukkit.getWorld(worldName);
-        if (w == null) return null;
-
-        if (lastX != null && lastY != null && lastZ != null) {
-            return new Location(w, lastX + 0.5, lastY, lastZ + 0.5);
-        }
-
-        return w.getSpawnLocation();
-    }
-
-
-    public boolean isInsideArena(Location loc) {
-        if (loc == null || loc.getWorld() == null) return false;
-        if (worldName == null) return false;
-        if (!loc.getWorld().getName().equals(worldName)) return false;
-
-        int cx = loc.getBlockX() >> 4;
-        int cz = loc.getBlockZ() >> 4;
-
-        int baseCx = x >> 4;
-        int baseCz = z >> 4;
-
-        return Math.abs(cx - baseCx) <= arenaRadiusChunks
-                && Math.abs(cz - baseCz) <= arenaRadiusChunks;
-    }
+  }
 }

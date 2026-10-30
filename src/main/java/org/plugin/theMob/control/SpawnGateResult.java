@@ -5,51 +5,51 @@ import java.util.EnumSet;
 import java.util.Set;
 
 public final class SpawnGateResult {
+  private final boolean allowed;
+  private final Set<SpawnGateResult.Reason> reasons;
+  private final double tps;
+  private final double multiplier;
 
-    private final boolean allowed;
-    private final Set<Reason> reasons;
-    private final double tps;
-    private final double multiplier;
+  private SpawnGateResult(
+      boolean allowed, Set<SpawnGateResult.Reason> reasons, double tps, double multiplier) {
+    this.allowed = allowed;
+    this.reasons = reasons == null ? Collections.emptySet() : Collections.unmodifiableSet(reasons);
+    this.tps = tps;
+    this.multiplier = multiplier;
+  }
 
-    public enum Reason {
-        GLOBAL_BUDGET_TOTAL,
-        GLOBAL_BUDGET_BOSSES,
-        GLOBAL_BUDGET_MINIONS,
-        WORLD_BUDGET_TOTAL,
+  public static SpawnGateResult allow(double tps, double multiplier) {
+    return new SpawnGateResult(true, EnumSet.noneOf(SpawnGateResult.Reason.class), tps, multiplier);
+  }
 
-        THROTTLE_HARD_STOP,
-        THROTTLE_WARNING,
-        THROTTLE_CRITICAL
-    }
+  public static SpawnGateResult deny(
+      Set<SpawnGateResult.Reason> reasons, double tps, double multiplier) {
+    return new SpawnGateResult(false, reasons, tps, multiplier);
+  }
 
-    private SpawnGateResult(boolean allowed, Set<Reason> reasons, double tps, double multiplier) {
-        this.allowed = allowed;
-        this.reasons = reasons == null ? Collections.emptySet() : Collections.unmodifiableSet(reasons);
-        this.tps = tps;
-        this.multiplier = multiplier;
-    }
+  public boolean allowed() {
+    return this.allowed;
+  }
 
-    public static SpawnGateResult allow(double tps, double multiplier) {
-        return new SpawnGateResult(true, EnumSet.noneOf(Reason.class), tps, multiplier);
-    }
+  public Set<SpawnGateResult.Reason> reasons() {
+    return this.reasons;
+  }
 
-    public static SpawnGateResult deny(Set<Reason> reasons, double tps, double multiplier) {
-        return new SpawnGateResult(false, reasons, tps, multiplier);
-    }
+  public double tps() {
+    return this.tps;
+  }
 
-    public boolean allowed() {
-        return allowed;
-    }
+  public double multiplier() {
+    return this.multiplier;
+  }
 
-    public Set<Reason> reasons() {
-        return reasons;
-    }
-
-    public double tps() {
-        return tps;
-    }
-
-    public double multiplier() {
-        return multiplier;
-    }
+  public static enum Reason {
+    GLOBAL_BUDGET_TOTAL,
+    GLOBAL_BUDGET_BOSSES,
+    GLOBAL_BUDGET_MINIONS,
+    WORLD_BUDGET_TOTAL,
+    THROTTLE_HARD_STOP,
+    THROTTLE_WARNING,
+    THROTTLE_CRITICAL;
+  }
 }

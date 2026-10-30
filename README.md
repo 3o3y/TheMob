@@ -1,262 +1,41 @@
-🧟 TheMob – Advanced Custom Mobs & Boss System
+# TheMob 1.19.0 · Minecraft 1.18–26.3
 
-TheMob is a high-performance, YAML-driven custom mob system for modern Paper / Spigot servers.
+Eigenständig baubares IntelliJ-/Gradle-Projekt des aktuellen TheMob-Plugins. **Eine Plugin-JAR für Spigot und Paper von 1.18 bis 26.3**, Java-17-Bytecode. Die Pluginversion 1.19.0 ist unabhängig von der Minecraft-Version. [Kompatibilität und Prüfgrenzen](KOMPATIBILITAET.md).
 
-It focuses on performance, predictability, and server-owner control.
+**`/mob` öffnet das vollständige Adminmenü ohne Ressourcenpaket. Alle bisherigen Befehle bleiben erhalten.** Mobdefinitionen, Bossphasen, Drops, Spawns, Dungeons, Skills, Integrationen und Einstellungen sind im Menü erreichbar; Namen und Zahlen werden bei Bedarf im Chat eingegeben. [Menüanleitung](ADMIN-MENUE.md).
 
-Designed for:
+Enthalten sind der bisherige Kampf-/Phasenablauf, Hot-/Cold-Verwaltung, Spawnlimits, Eier und Spawner, sechs zufällige Dungeonbauarten mit mindestens 500 Blöcken Wegenetz, Ausgangsaltäre, Rare-/Epic-Ausrüstung mit 1–5 Sternen, Pet-Kampfunterstützung und die öffentliche **API 1.3.1**. Der Katalog erzeugt Level 1–5 für die auf der jeweiligen Minecraft-Version vorhandenen Mobarten. Auf 26.3 sind das 450 reguläre Levelvarianten, 20 Archetypbosse und 160 Ausrüstungsteile zusätzlich zu den acht Originalvorlagen. Natürliche Spawns werden nicht ersetzt.
 
+**20 ausgewählte optionale RPG-/Server-Anbindungen:** Jobs Reborn, Citizens, PikaMug Quests, AdvancedPlugins BattlePass, PlaceholderAPI, Vault, WorldGuard, LuckPerms, EssentialsX, Multiverse-Core, MythicMobs, MMOItems, AuraSkills, mcMMO, GriefPrevention, Towny, Lands, AdvancedCrates, EconomyShopGUI und DecentHolograms. Funktionen und jeweilige Grenzen: [Integrationen](INTEGRATIONEN-20.md). PKPlugin, CoinOverlay und SkilltreePlugin bleiben zusätzliche projektspezifische Verbindungen.
 
-RPG servers
+## Projekt öffnen und bauen
 
-Survival with depth
+1. Diesen Ordner in IntelliJ als Gradle-Projekt öffnen.
+2. Project SDK und Gradle JVM auf **JDK 25** stellen. Server- und Build-Java sind getrennt: der erzeugte Pluginkern verwendet Java 17.
+3. Unter Windows `gradlew.bat build`, unter Linux/macOS `sh gradlew build` ausführen. Alternativ sucht `build.ps1` ein vorhandenes JDK 25. Der erste Build benötigt Internetzugriff auf Gradle/Maven.
 
+Wichtige Ausgaben:
 
-Arenas & events
+- `build/libs/TheMob-1.19.0-MC1.18-26.3.jar`
+- `build/distributions/TheMob-1.19.0-MC1.18-26.3-Quellprojekt.zip`
+- `build/distributions/TheMob-1.19.0-MC1.18-26.3-Update.zip`
+- `build/distributions/TheMob-Developer-SDK-1.19.0.zip`
+- `build/distributions/TheMob-GitBook-1.19.0.zip`
 
+Das Quellprojekt enthält normale Java-Quellen unter `src/main/java`, Gradle Wrapper, Bibliotheken, Tests, Beispiele und Dokumentation. Es benötigt kein IntelliJ-Spezialformat und kein anderes lokales Projekt. [Git-Vorbereitung](GIT-START.md), [Installation](UPDATE.md), [Prüfstand](VALIDATION.md).
 
-Boss encounters without lag
+## Variante ohne SQLite
 
-⚠️ Core philosophy: Performance > Features
+`gradlew.bat jarWithoutSqlite noSqliteTest noSqliteLegacy118Test` erzeugt und prüft `build/libs/TheMob-1.19.0-MC1.18-26.3-NoSQLite.jar`. Diese separate Variante enthält keinen SQLite-Treiber und lädt ihn nicht herunter. Boss-Respawnzeiten werden in `boss-cooldowns.yml` gespeichert. Auch bei einer alten Einstellung `boss-cooldowns.storage: sqlite` wird mit Warnung die Dateispeicherung verwendet. Eine vorhandene `boss-cooldowns.db` wird weder verändert noch automatisch importiert. Wer SQLite tatsächlich verwendet hat, muss seine benötigten Wartezeiten vor dem Wechsel in die Dateispeicherung übernehmen. Nur eine TheMob-JAR installieren und vollständig neu starten.
 
-✨ Core Features
+## Dokumentation und Entwickler
 
-🧬 Custom Mobs
+[GitBook](https://3o3y.gitbook.io/the-mob) · [Dokuquellen](docs/README.md) · [API](API.md) · [Developer Guide](DEVELOPER-GUIDE.md) · [BattlePass](BATTLEPASS.md) · [Skills](SKILLS.md) · [Dungeons](DUNGEONS.md) · [Spielerwerte](SPIELERWERTE.md) · [Performance](PERFORMANCE.md).
 
+Die API wird über Bukkit ServicesManager bezogen; sie wird im Add-on nur als `compileOnly`/`provided` eingebunden. SDK, Beispiel, JavaDoc und lokales Maven-Repository sind enthalten. Es wurde kein öffentliches Maven- oder Git-Repository angelegt. Die MIT-Lizenz in `API-LICENSE.txt` gilt für API und SDK, nicht automatisch für das gesamte Plugin oder fremde Bibliotheken.
 
-Fully YAML-based mob definitions
+## Herkunft und bestehende Daten
 
-No recompiling required
+Der ursprüngliche Quellstand war nicht auffindbar; Grundlage war die vom Nutzer bereitgestellte TheMob-1.8.4-JAR, SHA-256 `538aa5f0105ab2abaa7b9c0d22155eb4e9791655574df2b8008aeafed0f80dc9`. Die acht Original-Mobdateien und die 14 ursprünglich umbenannten bStats-Klassen bleiben bytegleich. Pluginname, Datenordner `plugins/TheMob`, bestehende Befehle, Mob-IDs und Item-PDC bleiben bestehen. Der bisherige 26.3-Projektstand wurde vor der Anpassung separat gesichert.
 
-Attribute scaling, equipment, effects
-
-Clean separation between data & logic
-
-
-👑 Boss System
-
-
-Multi-phase boss mobs
-
-Phase logic based on HP percentage
-
-Phase enter / leave effects
-
-BossBars, titles, particles & sounds
-
-Visual elements (crowns, floating heads, scale)
-
-
-⚡ Auto-Spawn System
-
-
-Interval-based spawning
-
-Hard caps per spawn point
-
-Chunk-aware hot / cold logic
-
-AFK-farm prevention
-
-Safe cleanup when arenas become inactive
-
-
-🧭 Navigation HUD (Optional)
-
-
-Direction HUD via BossBar
-
-Integrated mob radar
-
-Fully configurable
-
-Can be disabled entirely (zero overhead)
-
-
-🎁 Drops & Items
-
-
-Advanced drop tables
-
-Legendary / OP drops (optional)
-
-YAML-driven item stats
-
-Designed for RPG progression
-
-🛠️ Performance Design
-
-
-TheMob is built for long-running servers:
-
-
-No per-tick heavy logic
-
-Smart throttling
-
-Cached attributes
-
-Chunk-aware behavior
-
-Clean reload handling
-
-
-➡️ Suitable for production servers, not just test worlds.
-
-
-📦 Installation
-
-
-Download TheMob.jar
-
-Place it in your /plugins folder
-
-Start the server once
-
-Edit configs & YAML mobs
-
-
-📘 Commands
-
-
-/mob spawn <mob-id>
-
-/mob autospawn <mob-id> <interval-seconds> <max-spawns>
-
-/mob list autospawn
-
-/mob del autospawn <mob-id>
-
-/mob reload
-
-/mob killall
-
-/mob reload
-
-
-🔐 Permissions
-
-
-themob.use
-
-themob.spawn
-
-themob.spawn.set
-
-themob.killall
-
-themob.reload
-
-themob.stats
-
-
-🧩 Addons & Extensions
-
-
-TheMob is designed to be extended.
-
-
-✔ Addons supported
-
-✔ Separate API (org.plugin.theMob.api)
-
-✔ Safe to update core without breaking addons
-
-
-You can create:
-
-
-Paid addons
-
-Custom boss logic
-
-Extra systems (pets, companions, mechanics)
-
-
-📄 License
-
-
-Core Plugin
-
-TheMob core is free to use on any server.
-
-
-Commercial use is allowed for:
-
-
-Addons
-
-Configuration packs (YAML)
-
-Services (setup, balancing, support)
-
-❌ Redistribution or resale of the core plugin JAR is not permitted.
-
-
-See: LICENSE.md
-
-
-
-🧠 Design Philosophy
-
-
-Performance > Features
-
-Predictability > Magic
-
-
-Server owners first
-
-Players second
-
-Developers respected
-
-
-No feature bloat.
-
-No forced dependencies.
-
-No client mods.
-
-
-🧭 Roadmap (Short Overview)
-
-
-✅v1.1 – Stability & Performance✅
-
-✅v1.2 – Performance Optimization✅
-
-✅v1.2.1 – Stability & Configuration Hotfix✅
-
-✅v1.3 – Boss Phase Depth ✅
-
-v1.4 – Player Feedback & HUD
-
-v1.5 – Combat Extensions
-
-v1.6 – Minions & Summons
-
-v1.7 – World Interaction
-
-v1.8 – AI & Behavior Enhancements
-
-v1.9 – Automation & Scaling
-
-v1.10 – Monitoring & Debugging
-
-v1.11 – Advanced Items & Progression (Optional)
-
-v1.12 – Polishing & Long-Term Support
-
-
-Core stays lightweight.
-
-Advanced features stay optional.
-
-
-❤️ Credits
-
-
-Created by 3o3y
-
-Built with ❤️ for serious server owners.
+Das gemeinsame grafische Ressourcenpaket wird von CoinOverlay geliefert. Es muss zur Clientversion passen; das Adminmenü und der Textkompass funktionieren ohne dieses Paket. Ein 26.3-Clientpaket ist kein universelles Paket für ältere Minecraft-Versionen.

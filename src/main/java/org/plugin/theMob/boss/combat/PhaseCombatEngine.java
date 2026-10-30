@@ -1,88 +1,50 @@
 package org.plugin.theMob.boss.combat;
 
+import java.util.*;
+import org.bukkit.NamespacedKey;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.persistence.PersistentDataType;
 import org.plugin.theMob.core.KeyRegistry;
 
-import java.util.Locale;
-
 public final class PhaseCombatEngine {
+  private final KeyRegistry keys;
+  private final Map<UUID, Map<NamespacedKey, Double>> previous = new HashMap<>();
 
-    private final KeyRegistry keys;
+  public PhaseCombatEngine(KeyRegistry keys) {
+    this.keys = keys;
+  }
 
-    public PhaseCombatEngine(KeyRegistry keys) {
-        this.keys = keys;
+  public void apply(LivingEntity mob, ConfigurationSection phase) {
+    if (mob == null || phase == null) return;
+    var combat = phase.getConfigurationSection("combat");
+    if (combat == null) return;
+    rollback(mob);
+    var before = new HashMap<NamespacedKey, Double>();
+    var pdc = mob.getPersistentDataContainer();
+    for (String raw : combat.getKeys(false)) {
+      var key = keys.mobStat(raw);
+      if (key == null) continue;
+      try {
+        double value = Double.parseDouble(String.valueOf(combat.get(raw)).replace("+", ""));
+        if (!Double.isFinite(value)) continue;
+        before.put(key, pdc.get(key, PersistentDataType.DOUBLE));
+        pdc.set(key, PersistentDataType.DOUBLE, value);
+      } catch (NumberFormatException ignored) {
+      }
     }
+    previous.put(mob.getUniqueId(), before);
+  }
 
-    // =====================================================
-    // APPLY COMBAT MODIFIERS (PHASE ENTER)
-    // =====================================================
-    public void apply(LivingEntity mob, ConfigurationSection phaseCfg) {
-        if (mob == null || phaseCfg == null) return;
-
-        ConfigurationSection combat = phaseCfg.getConfigurationSection("combat");
-        if (combat == null) return;
-
-        combat.getKeys(false).forEach(rawKey -> {
-
-            Object rawValue = combat.get(rawKey);
-            double value = parse(rawValue);
-            if (value == 0.0) return;
-
-            String norm = normalize(rawKey);
-
-            var namespacedKey = keys.mobStat(norm);
-
-            // 🔒 ABSOLUT KRITISCHER GUARD
-            if (namespacedKey == null) {
-                // Optional Debug:
-                // Bukkit.getLogger().warning("[TheMob] Unknown combat stat ignored: " + norm);
-                return;
-            }
-
-            mob.getPersistentDataContainer().set(
-                    namespacedKey,
-                    PersistentDataType.DOUBLE,
-                    value
-            );
+  public void rollback(LivingEntity mob) {
+    if (mob == null) return;
+    var before = previous.remove(mob.getUniqueId());
+    if (before == null) return;
+    var pdc = mob.getPersistentDataContainer();
+    before.forEach(
+        (key, value) -> {
+          if (value == null) pdc.remove(key);
+          else pdc.set(key, PersistentDataType.DOUBLE, value);
         });
-    }
-
-    // =====================================================
-    // ROLLBACK (PHASE LEAVE)
-    // =====================================================
-    public void rollback(LivingEntity mob) {
-        if (mob == null) return;
-
-        for (var e : keys.ALL_STATS.entrySet()) {
-            String stat = e.getKey();
-
-            if (stat.startsWith("crit")
-                    || stat.startsWith("lifesteal")
-                    || stat.startsWith("deal_knockback")
-                    || stat.startsWith("receive_damage_multiplier")) {
-
-                mob.getPersistentDataContainer().remove(e.getValue());
-            }
-        }
-    }
-
-    // =====================================================
-    // HELPERS
-    // =====================================================
-    private double parse(Object o) {
-        if (o == null) return 0.0;
-        try {
-            return Double.parseDouble(o.toString().replace("+", ""));
-        } catch (Exception e) {
-            return 0.0;
-        }
-    }
-
-    private String normalize(String s) {
-        return s == null
-                ? ""
-                : s.toLowerCase(Locale.ROOT).replace("-", "_");
-    }
+  }
 }

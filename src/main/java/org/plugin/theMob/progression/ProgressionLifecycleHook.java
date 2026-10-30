@@ -5,15 +5,14 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerQuitEvent;
 
 public final class ProgressionLifecycleHook implements Listener {
+  private final PlayerProgressionManager manager;
 
-    private final PlayerProgressionManager manager;
+  public ProgressionLifecycleHook(PlayerProgressionManager manager) {
+    this.manager = manager;
+  }
 
-    public ProgressionLifecycleHook(PlayerProgressionManager manager) {
-        this.manager = manager;
-    }
-
-    @EventHandler
-    public void onQuit(PlayerQuitEvent event) {
-        manager.remove(event.getPlayer().getUniqueId());
-    }
+  @EventHandler
+  public void onQuit(PlayerQuitEvent event) {
+    this.manager.remove(event.getPlayer().getUniqueId());
+  }
 }

@@ -3,27 +3,22 @@ package org.plugin.theMob.control;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * Tracks whether an arena is still "hot"
- * after boss death (cleanup, waves, grace time).
- */
 public final class ArenaHeatService {
+  private final Map<String, Long> hotUntil = new ConcurrentHashMap<>();
 
-    private final Map<String, Long> hotUntil = new ConcurrentHashMap<>();
+  public void markHot(String arenaId, long seconds) {
+    this.hotUntil.put(arenaId, System.currentTimeMillis() + seconds * 1000L);
+  }
 
-    /** Mark arena as hot for N seconds */
-    public void markHot(String arenaId, long seconds) {
-        hotUntil.put(arenaId, System.currentTimeMillis() + seconds * 1000);
+  public boolean isHot(String arenaId) {
+    Long until = this.hotUntil.get(arenaId);
+    if (until == null) {
+      return false;
+    } else if (System.currentTimeMillis() >= until) {
+      this.hotUntil.remove(arenaId);
+      return false;
+    } else {
+      return true;
     }
-
-    /** True if arena is still hot */
-    public boolean isHot(String arenaId) {
-        Long until = hotUntil.get(arenaId);
-        if (until == null) return false;
-        if (System.currentTimeMillis() >= until) {
-            hotUntil.remove(arenaId);
-            return false;
-        }
-        return true;
-    }
+  }
 }

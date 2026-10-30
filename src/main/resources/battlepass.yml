@@ -1,0 +1,24 @@
+# BattlePass-Aufgabenprofile fuer type: themob_objective und variable: <Profil-ID>.
+# Nach Aenderungen /mob reload. Fortschritt und Belohnungen verwaltet BattlePass.
+# Alle Filter werden UND-verknuepft. Listen enthalten erlaubte Alternativen.
+# Welten/Phasen/Spawnarten: [] = kein Filter. mobs: ['*'] = alle TheMob-Definitionen.
+# kind: any | mob (ohne Bosse/Minions) | boss | minion.
+# Minions erfordern zusaetzlich integrations.track-minion-kills: true in config.yml.
+# Ungueltige Profile werden deaktiviert und unter /mob battlepass angezeigt.
+objectives:
+  mobjaeger:
+    mobs: ['*']
+    kind: any
+  bossjaeger:
+    mobs: ['*']
+    kind: boss
+  untotenjagd:
+    mobs: [zombie_mob_template, skeleton_normal]
+    kind: mob
+    worlds: []
+    spawn-reasons: []
+    phases: []
+  wilde_jagd:
+    mobs: ['*']
+    kind: any
+    spawn-reasons: [AUTO_SPAWN]

@@ -1,0 +1,8 @@
+# Ergänzung für eine bestehende eigene Mob-YAML; kein vollständiger Mob.
+integrations:
+  jobs:
+    money-multiplier: 1.0
+    points-multiplier: 1.0
+    experience-multiplier: 1.0
+  vault:
+    money: 0.0
