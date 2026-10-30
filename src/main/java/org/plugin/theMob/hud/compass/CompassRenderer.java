@@ -1,49 +1,59 @@
 package org.plugin.theMob.hud.compass;
 
 public final class CompassRenderer {
+  private static final int STEPS = 32;
+  private static final int WIDTH = 59;
+  private static final String[] RING = new String[32];
 
-    private static final int STEPS = 32;
-    private static final int WIDTH = 59; // must be odd
-    private static final String[] RING = new String[STEPS];
-
-    static {
-        for (int i = 0; i < STEPS; i++) RING[i] = "·";
-        RING[0]  = "N";
-        RING[8]  = "E";
-        RING[16] = "S";
-        RING[24] = "W";
+  public String render(float yaw) {
+    float deg = (yaw + 180.0F) % 360.0F;
+    if (deg < 0.0F) {
+      deg += 360.0F;
     }
 
-    public String render(float yaw) {
-        float deg = (yaw + 180f) % 360f;
-        if (deg < 0f) deg += 360f;
+    int center = (int) Math.floor(deg / 360.0F * 32.0F) % 32;
+    int half = 29;
+    StringBuilder sb = new StringBuilder(128);
+    sb.append("§1⟮ ");
 
-        int center = (int) Math.floor((deg / 360f) * STEPS) % STEPS;
-        int half = WIDTH / 2;
-
-        StringBuilder sb = new StringBuilder(128);
-        sb.append("§1⟮ ");
-
-        for (int offset = -half; offset <= half; offset++) {
-            if (offset == 0) {
-                sb.append("§f§l▲");
-                continue;
-            }
-            int idx = (center + offset) % STEPS;
-            if (idx < 0) idx += STEPS;
-            sb.append(color(offset)).append(RING[idx]);
+    for (int offset = -half; offset <= half; offset++) {
+      if (offset == 0) {
+        sb.append("§f§l▲");
+      } else {
+        int idx = (center + offset) % 32;
+        if (idx < 0) {
+          idx += 32;
         }
 
-        sb.append(" §1⟯");
-        return sb.toString();
+        sb.append(this.color(offset)).append(RING[idx]);
+      }
     }
 
-    private String color(int offset) {
-        int d = Math.abs(offset);
-        if (d <= 1) return "§f";
-        if (d <= 3) return "§b";
-        if (d <= 6) return "§9";
-        if (d <= 10) return "§1";
-        return "§0";
+    sb.append(" §1⟯");
+    return sb.toString();
+  }
+
+  private String color(int offset) {
+    int d = Math.abs(offset);
+    if (d <= 1) {
+      return "§f";
+    } else if (d <= 3) {
+      return "§b";
+    } else if (d <= 6) {
+      return "§9";
+    } else {
+      return d <= 10 ? "§1" : "§0";
     }
+  }
+
+  static {
+    for (int i = 0; i < 32; i++) {
+      RING[i] = "·";
+    }
+
+    RING[0] = "N";
+    RING[8] = "E";
+    RING[16] = "S";
+    RING[24] = "W";
+  }
 }

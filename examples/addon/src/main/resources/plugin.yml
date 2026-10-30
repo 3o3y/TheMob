@@ -1,0 +1,17 @@
+name: TheMobAddonExample
+version: 1.0.0
+main: example.MobAddon
+api-version: '1.18'
+depend: [TheMob]
+
+description: Safe example for TheMob kill and dungeon objective adapters; no money or quest rewards.
+
+commands:
+  themobexample:
+    description: Connection check and explicitly requested test spawn
+    permission: themobexample.admin
+
+permissions:
+  themobexample.admin:
+    description: Use the SDK example status and manual test spawn
+    default: op

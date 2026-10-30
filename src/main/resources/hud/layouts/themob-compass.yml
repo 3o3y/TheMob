@@ -1,0 +1,7 @@
+themob_compass_marker_layout:
+  images:
+    1:
+      name: themob_compass_arrow
+      x: -4
+      y: 0
+      scale: 1

@@ -4,15 +4,17 @@ import org.bukkit.entity.LivingEntity;
 import org.plugin.theMob.boss.BossPhase;
 
 public interface BossBehavior {
+  String id();
 
-    String id();
+  default void onEnter(LivingEntity boss, BossPhase phase) {}
 
-    default void onEnter(LivingEntity boss, BossPhase phase) {}
-    default void onExit(LivingEntity boss, BossPhase phase) {}
-    default void tick(LivingEntity boss, BossPhase phase) {}
+  default void onExit(LivingEntity boss, BossPhase phase) {}
 
-    // 🔁 OPTIONAL: Wunsch nach Behavior-Wechsel
-    default String requestNextBehavior(LivingEntity boss, BossPhase phase) {
-        return null;
-    }
+  default void tick(LivingEntity boss, BossPhase phase) {}
+
+  default void onSuspend(LivingEntity boss, BossPhase phase) {}
+
+  default String requestNextBehavior(LivingEntity boss, BossPhase phase) {
+    return null;
+  }
 }

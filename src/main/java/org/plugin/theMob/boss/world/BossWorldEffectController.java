@@ -1,160 +1,93 @@
 package org.plugin.theMob.boss.world;
 
-import org.bukkit.Bukkit;
-import org.bukkit.WeatherType;
-import org.bukkit.entity.LivingEntity;
-import org.bukkit.entity.Player;
-import org.bukkit.event.EventHandler;
-import org.bukkit.event.Listener;
-import org.bukkit.event.player.PlayerChangedWorldEvent;
-import org.bukkit.event.player.PlayerQuitEvent;
+import java.util.*;
+import org.bukkit.*;
+import org.bukkit.entity.*;
+import org.bukkit.event.*;
+import org.bukkit.event.player.*;
 import org.bukkit.plugin.Plugin;
 
-import java.util.HashSet;
-import java.util.Set;
-import java.util.UUID;
-
 public final class BossWorldEffectController implements Listener {
+  private record Effect(LivingEntity boss, double radiusSquared, String weather, String time) {}
 
-    private final Plugin plugin;
+  private final Map<UUID, Effect> effects = new HashMap<>();
+  private final Set<UUID> affected = new HashSet<>();
 
-    // MAIN THREAD ONLY
-    private LivingEntity activeBoss;
-    private double radiusSq;
+  public BossWorldEffectController(Plugin plugin) {
+    Bukkit.getPluginManager().registerEvents(this, plugin);
+    Bukkit.getScheduler().runTaskTimer(plugin, this::tick, 1, 10);
+  }
 
-    private String weather;
-    private String time;
-
-    private final Set<UUID> affectedPlayers = new HashSet<>();
-
-    public BossWorldEffectController(Plugin plugin) {
-        this.plugin = plugin;
-        Bukkit.getPluginManager().registerEvents(this, plugin);
+  public void apply(LivingEntity boss, double radius, String weather, String time) {
+    if (boss == null) return;
+    if (!boss.isValid() || boss.isDead()) {
+      reset(boss);
+      return;
     }
+    effects.put(boss.getUniqueId(), new Effect(boss, Math.max(0, radius * radius), weather, time));
+    tick();
+  }
 
-    // =====================================================
-    // APPLY (PHASE ENTER)
-    // =====================================================
+  public void reset(LivingEntity boss) {
+    if (boss != null) effects.remove(boss.getUniqueId());
+    tick();
+  }
 
-    public void apply(
-            LivingEntity boss,
-            double radius,
-            String weather,
-            String time
-    ) {
-        reset(boss); // reset previous boss safely
-
-        if (boss == null || !boss.isValid() || boss.isDead()) return;
-
-        this.activeBoss = boss;
-        this.radiusSq = Math.max(0.0, radius * radius);
-        this.weather = weather;
-        this.time = time;
-
-        for (Player p : boss.getWorld().getPlayers()) {
-            if (isInside(p)) applyToPlayer(p);
+  public void tick() {
+    effects.values().removeIf(effect -> !effect.boss().isValid() || effect.boss().isDead());
+    for (Player player : Bukkit.getOnlinePlayers()) {
+      Effect selected = null;
+      double nearest = Double.MAX_VALUE;
+      for (Effect effect : effects.values())
+        if (player.getWorld().equals(effect.boss().getWorld())) {
+          double distance = player.getLocation().distanceSquared(effect.boss().getLocation());
+          if (distance <= effect.radiusSquared() && distance < nearest) {
+            nearest = distance;
+            selected = effect;
+          }
         }
+      if (selected == null) {
+        if (affected.remove(player.getUniqueId())) resetPlayer(player);
+        continue;
+      }
+      affected.add(player.getUniqueId());
+      String weather = String.valueOf(selected.weather()).toUpperCase(Locale.ROOT);
+      if (weather.equals("RAIN") || weather.equals("THUNDER"))
+        player.setPlayerWeather(WeatherType.DOWNFALL);
+      else if (weather.equals("CLEAR")) player.setPlayerWeather(WeatherType.CLEAR);
+      else player.resetPlayerWeather();
+      switch (String.valueOf(selected.time()).toUpperCase(Locale.ROOT)) {
+        case "DAY" -> player.setPlayerTime(1000, false);
+        case "NOON" -> player.setPlayerTime(6000, false);
+        case "SUNSET" -> player.setPlayerTime(12000, false);
+        case "NIGHT" -> player.setPlayerTime(13000, false);
+        case "MIDNIGHT" -> player.setPlayerTime(18000, false);
+        default -> player.resetPlayerTime();
+      }
     }
+  }
 
-    // =====================================================
-    // TICK (OPTIONAL, SAFE TO CALL EACH TICK)
-    // =====================================================
+  private void resetPlayer(Player player) {
+    player.resetPlayerWeather();
+    player.resetPlayerTime();
+  }
 
-    public void tick() {
-        if (activeBoss == null || !activeBoss.isValid() || activeBoss.isDead()) {
-            reset(activeBoss);
-            return;
-        }
+  @EventHandler
+  public void onQuit(PlayerQuitEvent e) {
+    if (affected.remove(e.getPlayer().getUniqueId())) resetPlayer(e.getPlayer());
+  }
 
-        for (Player p : activeBoss.getWorld().getPlayers()) {
-            boolean inside = isInside(p);
-            boolean affected = affectedPlayers.contains(p.getUniqueId());
+  @EventHandler
+  public void onWorldChange(PlayerChangedWorldEvent e) {
+    if (affected.remove(e.getPlayer().getUniqueId())) resetPlayer(e.getPlayer());
+  }
 
-            if (inside && !affected) {
-                applyToPlayer(p);
-            } else if (!inside && affected) {
-                resetPlayer(p);
-            }
-        }
+  public void shutdown() {
+    effects.clear();
+    for (UUID id : affected) {
+      Player p = Bukkit.getPlayer(id);
+      if (p != null) resetPlayer(p);
     }
-
-    // =====================================================
-    // RESET API (PUBLIC, BOSS-SCOPED)
-    // =====================================================
-
-    public void reset(LivingEntity boss) {
-        if (boss == null) return;
-        if (activeBoss == null) return;
-        if (!boss.getUniqueId().equals(activeBoss.getUniqueId())) return;
-
-        for (UUID id : new HashSet<>(affectedPlayers)) {
-            Player p = Bukkit.getPlayer(id);
-            if (p != null) resetPlayer(p);
-        }
-
-        affectedPlayers.clear();
-        activeBoss = null;
-        radiusSq = 0.0;
-        weather = null;
-        time = null;
-    }
-
-    // =====================================================
-    // PLAYER RESET (PRIVATE)
-    // =====================================================
-
-    private void resetPlayer(Player p) {
-        p.resetPlayerWeather();
-        p.resetPlayerTime();
-        affectedPlayers.remove(p.getUniqueId());
-    }
-
-    // =====================================================
-    // EVENTS (PLAYER SAFETY)
-    // =====================================================
-
-    @EventHandler
-    public void onQuit(PlayerQuitEvent e) {
-        resetPlayer(e.getPlayer());
-    }
-
-    @EventHandler
-    public void onWorldChange(PlayerChangedWorldEvent e) {
-        resetPlayer(e.getPlayer());
-    }
-
-    // =====================================================
-    // INTERNAL
-    // =====================================================
-
-    private boolean isInside(Player p) {
-        if (p == null || activeBoss == null) return false;
-        if (!p.getWorld().equals(activeBoss.getWorld())) return false;
-
-        return p.getLocation()
-                .distanceSquared(activeBoss.getLocation()) <= radiusSq;
-    }
-
-    private void applyToPlayer(Player p) {
-        if (weather != null) {
-            switch (weather.toUpperCase()) {
-                case "CLEAR" -> p.setPlayerWeather(WeatherType.CLEAR);
-                case "RAIN", "THUNDER" -> p.setPlayerWeather(WeatherType.DOWNFALL);
-                case "NONE" -> p.resetPlayerWeather();
-            }
-        }
-
-        if (time != null) {
-            switch (time.toUpperCase()) {
-                case "DAY" -> p.setPlayerTime(1000, false);
-                case "NOON" -> p.setPlayerTime(6000, false);
-                case "SUNSET" -> p.setPlayerTime(12000, false);
-                case "NIGHT" -> p.setPlayerTime(13000, false);
-                case "MIDNIGHT" -> p.setPlayerTime(18000, false);
-                case "NONE" -> p.resetPlayerTime();
-            }
-        }
-
-        affectedPlayers.add(p.getUniqueId());
-    }
+    affected.clear();
+  }
 }

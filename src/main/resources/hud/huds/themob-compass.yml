@@ -1,0 +1,13 @@
+themob_compass_marker:
+  # Kopfbereich oberhalb der nativen Bossbars: Kompass y=8, Pfeil y=18.
+  default: false
+  tick: 1
+  layouts:
+    1:
+      name: themob_compass_marker_layout
+      gui:
+        x: 50
+        y: 0
+      pixel:
+        x: 0
+        y: 18

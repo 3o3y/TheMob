@@ -1,5 +1,12 @@
 package org.plugin.theMob.boss.minion;
 
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.event.EventHandler;
@@ -8,196 +15,146 @@ import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.persistence.PersistentDataType;
 import org.plugin.theMob.TheMob;
 
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-
-/**
- * v1.6 – Spigot-safe Minion tracking & cleanup
- */
 public final class BossMinionController implements Listener {
+  private final TheMob plugin;
+  private final Map<UUID, Set<UUID>> bossToMinions = new ConcurrentHashMap<>();
+  private final Map<UUID, UUID> minionToBoss = new ConcurrentHashMap<>();
+  private final Map<UUID, Map<String, Set<UUID>>> bossPhaseToMinions = new ConcurrentHashMap<>();
 
-    private final TheMob plugin;
+  public BossMinionController(TheMob plugin) {
+    this.plugin = plugin;
+    Bukkit.getPluginManager().registerEvents(this, plugin);
+  }
 
-    // bossId -> minion UUIDs
-    private final Map<UUID, Set<UUID>> bossToMinions = new ConcurrentHashMap<>();
+  public int countBossMinions(UUID bossId) {
+    Set<UUID> set = this.bossToMinions.get(bossId);
+    return set == null ? 0 : set.size();
+  }
 
-    // minionId -> bossId
-    private final Map<UUID, UUID> minionToBoss = new ConcurrentHashMap<>();
-
-    // bossId -> (phaseId -> minion UUIDs)
-    private final Map<UUID, Map<String, Set<UUID>>> bossPhaseToMinions = new ConcurrentHashMap<>();
-
-    public BossMinionController(TheMob plugin) {
-        this.plugin = plugin;
-        Bukkit.getPluginManager().registerEvents(this, plugin);
+  public int countBossPhaseMinions(UUID bossId, String phaseId) {
+    Map<String, Set<UUID>> phaseMap = this.bossPhaseToMinions.get(bossId);
+    if (phaseMap == null) {
+      return 0;
+    } else {
+      Set<UUID> set = phaseMap.get(phaseId);
+      return set == null ? 0 : set.size();
     }
+  }
 
-    // =====================================================
-    // COUNTS
-    // =====================================================
-
-    public int countBossMinions(UUID bossId) {
-        Set<UUID> set = bossToMinions.get(bossId);
-        return set == null ? 0 : set.size();
+  public void register(UUID bossId, String phaseId, LivingEntity minion) {
+    if (bossId != null && phaseId != null && minion != null) {
+      UUID minionId = minion.getUniqueId();
+      this.bossToMinions.computeIfAbsent(bossId, k -> ConcurrentHashMap.newKeySet()).add(minionId);
+      this.minionToBoss.put(minionId, bossId);
+      this.bossPhaseToMinions
+          .computeIfAbsent(bossId, k -> new ConcurrentHashMap<>())
+          .computeIfAbsent(phaseId, k -> ConcurrentHashMap.newKeySet())
+          .add(minionId);
+      // Respect the no-drops setting applied by the spawner.
     }
+  }
 
-    public int countBossPhaseMinions(UUID bossId, String phaseId) {
-        Map<String, Set<UUID>> phaseMap = bossPhaseToMinions.get(bossId);
-        if (phaseMap == null) return 0;
-        Set<UUID> set = phaseMap.get(phaseId);
-        return set == null ? 0 : set.size();
-    }
-
-    // =====================================================
-    // REGISTER / UNREGISTER
-    // =====================================================
-
-    public void register(UUID bossId, String phaseId, LivingEntity minion) {
-        if (bossId == null || phaseId == null || minion == null) return;
-
-        UUID minionId = minion.getUniqueId();
-
-        bossToMinions
-                .computeIfAbsent(bossId, k -> ConcurrentHashMap.newKeySet())
-                .add(minionId);
-
-        minionToBoss.put(minionId, bossId);
-
-        bossPhaseToMinions
-                .computeIfAbsent(bossId, k -> new ConcurrentHashMap<>())
-                .computeIfAbsent(phaseId, k -> ConcurrentHashMap.newKeySet())
-                .add(minionId);
-
-        // Minions never drop items
-        minion.getPersistentDataContainer().set(
-                plugin.keys().NO_DROPS,
-                PersistentDataType.INTEGER,
-                1
-        );
-    }
-
-    public void unregister(UUID minionId) {
-        if (minionId == null) return;
-
-        UUID bossId = minionToBoss.remove(minionId);
-        if (bossId == null) return;
-
-        Set<UUID> bossSet = bossToMinions.get(bossId);
+  public void unregister(UUID minionId) {
+    if (minionId != null) {
+      UUID bossId = this.minionToBoss.remove(minionId);
+      if (bossId != null) {
+        Set<UUID> bossSet = this.bossToMinions.get(bossId);
         if (bossSet != null) {
-            bossSet.remove(minionId);
-            if (bossSet.isEmpty()) bossToMinions.remove(bossId);
+          bossSet.remove(minionId);
+          if (bossSet.isEmpty()) {
+            this.bossToMinions.remove(bossId);
+          }
         }
 
-        Map<String, Set<UUID>> phaseMap = bossPhaseToMinions.get(bossId);
+        Map<String, Set<UUID>> phaseMap = this.bossPhaseToMinions.get(bossId);
         if (phaseMap != null) {
-            for (Iterator<Map.Entry<String, Set<UUID>>> it = phaseMap.entrySet().iterator(); it.hasNext();) {
-                Map.Entry<String, Set<UUID>> e = it.next();
-                e.getValue().remove(minionId);
-                if (e.getValue().isEmpty()) it.remove();
+          Iterator<Entry<String, Set<UUID>>> it = phaseMap.entrySet().iterator();
+
+          while (it.hasNext()) {
+            Entry<String, Set<UUID>> e = it.next();
+            e.getValue().remove(minionId);
+            if (e.getValue().isEmpty()) {
+              it.remove();
             }
-            if (phaseMap.isEmpty()) bossPhaseToMinions.remove(bossId);
+          }
+
+          if (phaseMap.isEmpty()) {
+            this.bossPhaseToMinions.remove(bossId);
+          }
         }
+      }
+    }
+  }
+
+  public void tick() {
+    Iterator<UUID> it = this.bossToMinions.keySet().iterator();
+
+    while (it.hasNext()) {
+      UUID bossId = it.next();
+      LivingEntity boss = this.findLiving(bossId);
+      if (boss == null || boss.isDead() || !boss.isValid()) {
+        this.cleanupBoss(bossId);
+        it.remove();
+      }
     }
 
-    // =====================================================
-    // TICK (DEFENSIVE CLEANUP)
-    // =====================================================
+    Iterator<Entry<UUID, UUID>> entries = this.minionToBoss.entrySet().iterator();
 
-    /**
-     * Called periodically from BossActionEngine
-     * Ensures no orphaned minions exist
-     */
-    public void tick() {
-
-        // validate bosses
-        for (Iterator<UUID> it = bossToMinions.keySet().iterator(); it.hasNext();) {
-            UUID bossId = it.next();
-
-            LivingEntity boss = findLiving(bossId);
-            if (boss == null || boss.isDead() || !boss.isValid()) {
-                cleanupBoss(bossId);
-                it.remove();
-            }
-        }
-
-        // validate minions
-        for (Iterator<Map.Entry<UUID, UUID>> it = minionToBoss.entrySet().iterator(); it.hasNext();) {
-            Map.Entry<UUID, UUID> e = it.next();
-            UUID minionId = e.getKey();
-
-            LivingEntity minion = findLiving(minionId);
-            if (minion == null || minion.isDead() || !minion.isValid()) {
-                unregister(minionId);
-                it.remove();
-            }
-        }
+    while (entries.hasNext()) {
+      Entry<UUID, UUID> e = (Entry<UUID, UUID>) entries.next();
+      UUID minionId = e.getKey();
+      LivingEntity minion = this.findLiving(minionId);
+      if (minion == null || minion.isDead() || !minion.isValid()) {
+        this.unregister(minionId);
+        entries.remove();
+      }
     }
+  }
 
-    // =====================================================
-    // HARD CLEANUP
-    // =====================================================
-
-    public void cleanupBoss(UUID bossId) {
-        if (bossId == null) return;
-
-        Set<UUID> minions = bossToMinions.remove(bossId);
-        bossPhaseToMinions.remove(bossId);
-
-        if (minions == null || minions.isEmpty()) return;
-
+  public void cleanupBoss(UUID bossId) {
+    if (bossId != null) {
+      Set<UUID> minions = this.bossToMinions.remove(bossId);
+      this.bossPhaseToMinions.remove(bossId);
+      if (minions != null && !minions.isEmpty()) {
         for (UUID mid : new HashSet<>(minions)) {
-            minionToBoss.remove(mid);
-
-            LivingEntity le = findLiving(mid);
-            if (le != null) le.remove();
+          this.minionToBoss.remove(mid);
+          LivingEntity le = this.findLiving(mid);
+          if (le != null) {
+            le.remove();
+          }
         }
+      }
     }
+  }
 
-    // =====================================================
-    // EVENTS
-    // =====================================================
-
-    @EventHandler
-    public void onMinionDeath(EntityDeathEvent e) {
-        LivingEntity entity = e.getEntity();
-        if (entity == null) return;
-        unregister(entity.getUniqueId());
+  @EventHandler
+  public void onMinionDeath(EntityDeathEvent e) {
+    LivingEntity entity = e.getEntity();
+    if (entity != null) {
+      if (this.minionToBoss.containsKey(entity.getUniqueId())
+          && entity
+                  .getPersistentDataContainer()
+                  .getOrDefault(this.plugin.keys().NO_DROPS, PersistentDataType.INTEGER, 0)
+              == 1) {
+        e.getDrops().clear();
+        e.setDroppedExp(0);
+      }
+      this.unregister(entity.getUniqueId());
     }
+  }
 
-    // =====================================================
-    // SHUTDOWN
-    // =====================================================
+  public void shutdown() {
+    for (UUID bossId : new HashSet<>(this.bossToMinions.keySet())) this.cleanupBoss(bossId);
+    this.bossToMinions.clear();
+    this.bossPhaseToMinions.clear();
+    this.minionToBoss.clear();
+  }
 
-    public void shutdown() {
-        bossToMinions.clear();
-        bossPhaseToMinions.clear();
-        minionToBoss.clear();
-    }
+  public void clearAll() {
+    this.shutdown();
+  }
 
-    // =====================================================
-// GLOBAL CLEANUP (API ALIAS)
-// =====================================================
-
-    /**
-     * Clears ALL tracked minions and internal state.
-     * Safe to call on plugin shutdown or reload.
-     */
-    public void clearAll() {
-        shutdown();
-    }
-
-
-    // =====================================================
-    // UTIL
-    // =====================================================
-
-    private LivingEntity findLiving(UUID id) {
-        for (org.bukkit.World w : Bukkit.getWorlds()) {
-            var e = w.getEntity(id);
-            if (e instanceof LivingEntity le && le.isValid()) {
-                return le;
-            }
-        }
-        return null;
-    }
+  private LivingEntity findLiving(UUID id) {
+    return Bukkit.getEntity(id) instanceof LivingEntity le && le.isValid() ? le : null;
+  }
 }

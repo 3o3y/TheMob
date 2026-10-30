@@ -1,6 +1,8 @@
 package org.plugin.theMob;
 
-
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.NamespacedKey;
@@ -10,25 +12,33 @@ import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.HandlerList;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.plugin.theMob.boss.*;
+import org.plugin.theMob.boss.BossActionEngine;
+import org.plugin.theMob.boss.BossCombatListener;
+import org.plugin.theMob.boss.BossImmunityListener;
+import org.plugin.theMob.boss.BossLockService;
+import org.plugin.theMob.boss.Placeholder;
 import org.plugin.theMob.boss.bar.BossBarService;
+import org.plugin.theMob.boss.behavior.BossBehaviorController;
 import org.plugin.theMob.boss.phase.BossPhaseController;
 import org.plugin.theMob.boss.phase.BossPhaseResolver;
 import org.plugin.theMob.boss.world.BossWorldEffectController;
 import org.plugin.theMob.combat.CombatBootstrap;
-import org.plugin.theMob.command.*;
+import org.plugin.theMob.command.MobCommand;
+import org.plugin.theMob.command.MobEggCommand;
+import org.plugin.theMob.command.MobTabCompleter;
+import org.plugin.theMob.command.StatsCommand;
 import org.plugin.theMob.control.AutomationScalingSystem;
-import org.plugin.theMob.item.CustomEnchantSystem;
-import org.plugin.theMob.item.ItemBuilderFromConfig;
-import org.plugin.theMob.item.ItemLoreRenderer;
-import org.plugin.theMob.item.ItemStatReader;
+import org.plugin.theMob.control.feedback.SpawnBlockFeedbackService;
 import org.plugin.theMob.core.ConfigService;
 import org.plugin.theMob.core.KeyRegistry;
 import org.plugin.theMob.core.TickScheduler;
 import org.plugin.theMob.core.context.PlayerBarCoordinator;
 import org.plugin.theMob.hud.NaviHudListener;
 import org.plugin.theMob.hud.NaviHudService;
-import org.plugin.theMob.metrics.MetricsService;
+import org.plugin.theMob.item.CustomEnchantSystem;
+import org.plugin.theMob.item.ItemBuilderFromConfig;
+import org.plugin.theMob.item.ItemLoreRenderer;
+import org.plugin.theMob.item.ItemStatReader;
 import org.plugin.theMob.mob.MobDropEngine;
 import org.plugin.theMob.mob.MobListener;
 import org.plugin.theMob.mob.MobManager;
@@ -40,552 +50,579 @@ import org.plugin.theMob.player.stats.PlayerEquipListener;
 import org.plugin.theMob.player.stats.PlayerStatCache;
 import org.plugin.theMob.player.stats.menu.StatsMenuListener;
 import org.plugin.theMob.player.stats.menu.StatsMenuService;
+import org.plugin.theMob.progression.ProgressionBootstrap;
+import org.plugin.theMob.progression.ProgressionV19Bootstrap;
 import org.plugin.theMob.spawn.SpawnController;
 import org.plugin.theMob.spawn.egg.SpawnEggItemFactory;
+import org.plugin.theMob.spawn.egg.SpawnEggListener;
+import org.plugin.theMob.spawn.egg.SpawnEggService;
 import org.plugin.theMob.spawn.spawner.SpawnerFactory;
 import org.plugin.theMob.spawn.spawner.SpawnerListener;
 import org.plugin.theMob.spawn.spawner.SpawnerService;
 import org.plugin.theMob.spawn.spawner.SpawnerTickService;
 import org.plugin.theMob.ui.MobHealthDisplay;
 
-import org.plugin.theMob.spawn.egg.SpawnEggService;
-import org.plugin.theMob.progression.ProgressionBootstrap;
-import org.plugin.theMob.progression.ProgressionV19Bootstrap;
+public class TheMob extends JavaPlugin {
+  public TheMob() {
+    super();
+  }
 
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
+  /** Supported Bukkit constructor also used by isolated older server test environments. */
+  protected TheMob(
+      org.bukkit.plugin.java.JavaPluginLoader loader,
+      org.bukkit.plugin.PluginDescriptionFile description,
+      java.io.File dataFolder,
+      java.io.File file) {
+    super(loader, description, dataFolder, file);
+  }
 
-import static org.plugin.theMob.boss.bar.BossBarService.BOSSBAR_KEY;
-import static org.plugin.theMob.hud.NaviHudService.HUD_KEY;
+  private org.plugin.theMob.admin.AdminMenus adminMenus;
 
-public final class TheMob extends JavaPlugin {
+  public org.plugin.theMob.admin.AdminMenus adminMenus() {
+    return adminMenus;
+  }
 
-    // Core
-    private ConfigService configService;
-    private KeyRegistry keys;
-    private TickScheduler ticks;
-    private StuckDefensePath stuckDefense;
+  private org.plugin.theMob.dungeon.DungeonService dungeons;
+  private org.plugin.theMob.dungeon.DungeonApiService dungeonApi;
 
-    // Mobs
-    private MobManager mobManager;
-    private MobHealthDisplay healthDisplay;
-    private MobDropEngine dropEngine;
+  public org.plugin.theMob.dungeon.DungeonService dungeons() {
+    return dungeons;
+  }
 
-    // Spawn
-    private AutoSpawnManager autoSpawnManager;
-    private SpawnController spawnController;
-    // Spawn Egg Tools
-    private SpawnEggService spawnEggService;
-    private SpawnerFactory spawnerFactory;
-    private SpawnerService spawnerService;
+  private org.plugin.theMob.control.MobActivityService activity;
 
-    // Boss
-    private PlayerBarCoordinator playerBars;
-    private BossBarService bossBars;
-    private BossPhaseController phaseController;
-    private BossActionEngine bossActionEngine;
-    private BossLockService bossLocks;
-    private org.plugin.theMob.boss.behavior.BossBehaviorController behaviorController;
-    // Commands
-    private MobEggCommand eggCommand;
+  public org.plugin.theMob.control.MobActivityService activity() {
+    return activity;
+  }
 
-    // HUD
-    private NaviHudService hud;
+  private org.plugin.theMob.content.EquipmentCatalog gear;
 
-    // Items / Stats
-    private ItemBuilderFromConfig itemBuilder;
-    private ItemLoreRenderer loreRenderer;
-    private ItemStatReader itemStatReader;
+  public org.plugin.theMob.content.EquipmentCatalog gear() {
+    return gear;
+  }
 
-    // Player Stats / Combat
-    private PlayerStatCache playerStatCache;
-    private StatsMenuService statsMenu;
-    private CombatBootstrap combat;
-    private CustomEnchantSystem customEnchants;
+  private org.plugin.theMob.api.internal.TheMobApiService api;
+  private org.plugin.theMob.integration.IntegrationManager integrations;
+  private org.plugin.theMob.integration.ObjectiveEventService objectives;
 
-    // v1.7 Automation & Scaling
-    private AutomationScalingSystem automationScaling;
+  public org.plugin.theMob.integration.ObjectiveEventService objectives() {
+    return objectives;
+  }
 
-    // v1.9 Progression (ADD ONLY)
-    private ProgressionBootstrap progressionBootstrap;
-    private ProgressionV19Bootstrap progressionV19;
+  public org.plugin.theMob.api.internal.TheMobApiService api() {
+    return api;
+  }
 
-    @Override
-    public void onEnable() {
+  public org.plugin.theMob.integration.IntegrationManager integrations() {
+    return integrations;
+  }
 
-        // =====================
-        // Config bootstrap
-        // =====================
-        saveDefaultConfig(); // config.yml ONLY
+  private ConfigService configService;
+  private org.plugin.theMob.core.TheMobSkills skills;
 
-        this.configService = new ConfigService(this);
-        configService.ensureFoldersAndDefaults();
-        configService.reloadAll();
+  public org.plugin.theMob.core.TheMobSkills skills() {
+    return skills;
+  }
 
-        cleanupStaleHudBars();
-        boot(true);
+  private String runtimeSession;
 
-        getLogger().info("[TheMob] Enabled.");
+  public String runtimeSession() {
+    return this.runtimeSession;
+  }
+
+  private KeyRegistry keys;
+  private TickScheduler ticks;
+  private StuckDefensePath stuckDefense;
+  private MobManager mobManager;
+  private MobHealthDisplay healthDisplay;
+  private MobDropEngine dropEngine;
+  private AutoSpawnManager autoSpawnManager;
+  private SpawnController spawnController;
+  private SpawnEggService spawnEggService;
+  private SpawnerFactory spawnerFactory;
+  private SpawnerService spawnerService;
+  private PlayerBarCoordinator playerBars;
+  private BossBarService bossBars;
+  private BossPhaseController phaseController;
+  private BossActionEngine bossActionEngine;
+  private BossLockService bossLocks;
+  private BossBehaviorController behaviorController;
+  private MobEggCommand eggCommand;
+  private NaviHudService hud;
+  private ItemBuilderFromConfig itemBuilder;
+  private ItemLoreRenderer loreRenderer;
+  private ItemStatReader itemStatReader;
+  private PlayerStatCache playerStatCache;
+  private StatsMenuService statsMenu;
+  private CombatBootstrap combat;
+  private CustomEnchantSystem customEnchants;
+  private PlayerEquipListener equipmentListener;
+  private BossWorldEffectController worldEffects;
+  private AutomationScalingSystem automationScaling;
+  private ProgressionBootstrap progressionBootstrap;
+  private ProgressionV19Bootstrap progressionV19;
+
+  public void onLoad() {
+    var renderer = Bukkit.getPluginManager().getPlugin("BetterHud");
+    var coinPlugin = Bukkit.getPluginManager().getPlugin("CoinOverlay");
+    boolean delegatedCompass =
+        coinPlugin != null && coinPlugin.getDescription().getCommands().containsKey("kompass");
+    if (renderer != null
+        && !delegatedCompass
+        && isNavigationHudEnabled()
+        && !"legacy"
+            .equalsIgnoreCase(
+                getConfig().getString("navigation-hud.compass-style", "coinoverlay"))) {
+      try {
+        org.plugin.theMob.hud.compass.CompassHeaderLayout.reserve(
+            renderer.getDataFolder().toPath(), renderer::getResource);
+      } catch (java.io.IOException failure) {
+        getLogger()
+            .log(
+                java.util.logging.Level.SEVERE,
+                "Kompass-Kopfbereich konnte beim Laden nicht vorbereitet werden.",
+                failure);
+      }
+    }
+    integrations = new org.plugin.theMob.integration.IntegrationManager(this);
+    integrations.prepareQuests();
+  }
+
+  public void onEnable() {
+    this.saveDefaultConfig();
+    this.configService = new ConfigService(this);
+    this.configService.ensureFoldersAndDefaults();
+    this.configService.reloadAll();
+    this.cleanupStaleHudBars();
+    this.boot(true);
+    this.getLogger().info("[TheMob] Enabled.");
+  }
+
+  public void onDisable() {
+    if (this.autoSpawnManager != null) {
+      this.autoSpawnManager.stop();
     }
 
-    @Override
-    public void onDisable() {
+    this.cleanupStaleHudBars();
+    this.hardShutdown();
+    if (integrations != null) integrations.close();
+    Bukkit.getServicesManager().unregisterAll(this);
+    this.getLogger().info("[TheMob] Disabled cleanly.");
+  }
 
-        // 1) Stop AutoSpawn & release chunk tickets
-        if (autoSpawnManager != null) {
-            autoSpawnManager.stop();
-        }
-
-        // 2) Cleanup HUD / BossBars (reload-sicher)
-        cleanupStaleHudBars();
-
-        // 3) Hard shutdown aller Systeme
-        hardShutdown();
-
-        getLogger().info("[TheMob] Disabled cleanly.");
+  public void reloadPlugin() {
+    this.getLogger().info("[TheMob] Reloading (hard reset) ...");
+    this.cleanupStaleHudBars();
+    this.hardShutdown();
+    this.reloadConfig();
+    if (this.configService != null) {
+      this.configService.reloadAll();
     }
 
-    // =====================================================
-    // RELOAD
-    // =====================================================
-    public void reloadPlugin() {
-        getLogger().info("[TheMob] Reloading (hard reset) ...");
+    this.boot(false);
+    this.getLogger().info("[TheMob] Reload complete (full restart behavior).");
+  }
 
-        cleanupStaleHudBars();
-        hardShutdown();
-
-        reloadConfig();
-        if (configService != null) {
-            configService.reloadAll();
-        }
-
-        boot(false);
-
-        getLogger().info("[TheMob] Reload complete (full restart behavior).");
+  private void boot(boolean firstEnable) {
+    if (skills == null) skills = new org.plugin.theMob.core.TheMobSkills(this);
+    if (api == null) {
+      api = new org.plugin.theMob.api.internal.TheMobApiService(this);
+      Bukkit.getServicesManager()
+          .register(
+              org.plugin.theMob.api.TheMobApi.class,
+              api,
+              this,
+              org.bukkit.plugin.ServicePriority.Normal);
+    }
+    this.runtimeSession = java.util.UUID.randomUUID().toString();
+    if (this.configService == null) {
+      this.configService = new ConfigService(this);
+      this.configService.ensureFoldersAndDefaults();
     }
 
-    // =====================================================
-    // BOOTSTRAP
-    // =====================================================
-    private void boot(boolean firstEnable) {
+    this.configService.reloadAll();
+    if (this.keys == null) {
+      this.keys = new KeyRegistry(this);
+      Placeholder.init(this.keys);
+    }
 
-        // ---------- Config / Keys / Ticks ----------
-        if (configService == null) {
-            configService = new ConfigService(this);
-            configService.ensureFoldersAndDefaults();
-        }
-        configService.reloadAll();
+    this.automationScaling = new AutomationScalingSystem(this);
+    this.automationScaling.reload(this.getConfig());
+    this.automationScaling.register();
+    this.spawnerFactory = new SpawnerFactory(this.keys);
+    if (this.ticks != null) {
+      try {
+        this.ticks.shutdown();
+      } catch (Throwable var7) {
+      }
 
-        if (keys == null) {
-            keys = new KeyRegistry(this);
-            Placeholder.init(keys);
-        }
-        // ---------- Spawner ----------
-        spawnerFactory = new SpawnerFactory(keys);
-        // SpawnerService must be created AFTER mobManager is initialized (see below).
-        // Keeping these lines without removing them:
-        this.spawnerService = this.spawnerService; // no-op placeholder to preserve line count/structure
-        // (moved real initialization below)
+      this.ticks = null;
+    }
 
-        if (ticks != null) {
-            try { ticks.shutdown(); } catch (Throwable ignored) {}
-            ticks = null;
-        }
-        ticks = new TickScheduler(this);
-
-        // ---------- Mob Manager ----------
-        mobManager = new MobManager(this, configService, keys);
-        mobManager.reloadFromConfigs();
-        stuckDefense = new StuckDefensePath();
-
-// ---------- Spawner Service (MUSS ZUERST) ----------
-        this.spawnerService = new SpawnerService(
-                this,
-                mobManager,
-                keys,
-                configService
-        );
-
-// ---------- Spawner Tick (DANACH) ----------
-        new SpawnerTickService(
-                this,
-                spawnerService,
-                keys
-        ).start();
-
-
-        ticks.registerRepeatingTask(20, () -> {
-            if (mobManager == null) return;
-            for (LivingEntity mob : mobManager.getAllLivingMobs()) {
-                stuckDefense.tick(mob);
+    this.ticks = new TickScheduler(this);
+    this.mobManager = new MobManager(this, this.configService, this.keys);
+    this.mobManager.reloadFromConfigs();
+    this.activity = new org.plugin.theMob.control.MobActivityService(this);
+    this.objectives = new org.plugin.theMob.integration.ObjectiveEventService(this);
+    Bukkit.getPluginManager()
+        .registerEvents(new org.plugin.theMob.content.CatalogCombatListener(this), this);
+    Bukkit.getPluginManager()
+        .registerEvents(new org.plugin.theMob.mob.MobEntityLifecycle(this, this.mobManager), this);
+    this.stuckDefense = new StuckDefensePath();
+    this.spawnerService = new SpawnerService(this, this.mobManager, this.keys, this.configService);
+    new SpawnerTickService(this, this.spawnerService, this.keys).start();
+    this.ticks.registerRepeatingTask(
+        20L,
+        () -> {
+          if (this.mobManager != null) {
+            for (LivingEntity mob : this.mobManager.getAllLivingMobs()) {
+              if (this.activity.active(mob)) this.stuckDefense.tick(mob);
             }
+          }
         });
-        eggCommand = new MobEggCommand(
-                new SpawnEggItemFactory(keys),
-                configService
-        );
-
-        // ---------- Items ----------
-        itemBuilder = new ItemBuilderFromConfig(this);
-        loreRenderer = new ItemLoreRenderer();
-        itemStatReader = new ItemStatReader(this);
-
-        // ---------- Drops ----------
-        this.dropEngine = new MobDropEngine(this);
-        this.dropEngine.bind(mobManager);
-        mobManager.setDropEngine(this.dropEngine);
-
-        // ---------- Boss: Bars + Phases ----------
-        playerBars = new PlayerBarCoordinator();
-
-        bossActionEngine = new BossActionEngine(this);
-        BossPhaseResolver resolver = new BossPhaseResolver();
-
-        bossBars = new BossBarService(this, mobManager, playerBars);
-        bossBars.start();
-        bossBars.restore();
-        Bukkit.getPluginManager().registerEvents(bossBars, this);
-
-        BossWorldEffectController worldEffects = new BossWorldEffectController(this);
-
-        phaseController = new BossPhaseController(
-                resolver,
-                bossActionEngine,
-                bossBars,
-                keys,
-                worldEffects
-        );
-
-// =====================
-// BOSS BEHAVIOR SYSTEM
-// =====================
-        behaviorController = new org.plugin.theMob.boss.behavior.BossBehaviorController(
-                this,
-                mobManager,
-                phaseController
-        );
-
-// 🔥 Phase → Behavior binden
-        phaseController.bindBehaviorController(behaviorController);
-
-
-        // ---------- Health Display (needs bossBars) ----------
-        healthDisplay = new MobHealthDisplay(
-                this,
-                mobManager,
-                bossBars
-        );
-        mobManager.setHealthDisplay(healthDisplay);
-
-        // ---------- Boss Adapter (needs phaseController + healthDisplay) ----------
-        Bukkit.getPluginManager().registerEvents(
-                new BossBarListenerAdapter(
-                        mobManager,
-                        phaseController,
-                        healthDisplay
-                ),
-                this
-        );
-        // ---------- Spawn Service ----------
-        MobSpawnService spawnService = new MobSpawnService(
-                this,
-                mobManager,
-                keys,
-                healthDisplay,
-                bossBars,
-                phaseController
-        );
-        mobManager.setSpawnService(spawnService);
-
-        // ---------- Auto Spawn ----------
-        bossLocks = new BossLockService();
-
-        autoSpawnManager = new AutoSpawnManager(
-                this,
-                mobManager,
-                keys,
-                bossLocks
-        );
-
-        spawnController = new SpawnController(this, mobManager, autoSpawnManager);
-        spawnController.start();
-
-        mobManager.setAutoSpawnManager(autoSpawnManager);
-
-        // ---------- Spawn Egg Tools ----------
-        spawnEggService = new org.plugin.theMob.spawn.egg.SpawnEggService(
-                mobManager,
-                keys,
-                configService
-        );
-
-        // ---------- HUD ----------
-        boolean hudEnabled = isNavigationHudEnabled();
-        if (hudEnabled) {
-            hud = new NaviHudService(this, mobManager);
-            hud.start();
-            Bukkit.getPluginManager().registerEvents(new NaviHudListener(hud), this);
-        } else {
-            cleanupStaleHudBars();
-        }
-
-        // ---------- v1.7 Automation & Scaling ----------
-        automationScaling = new AutomationScalingSystem(this);
-        automationScaling.reload(getConfig());
-        automationScaling.register();
-
-        // ---------- Player Stats / Combat ----------
-        playerStatCache = new PlayerStatCache(this);
-        statsMenu = new StatsMenuService(this, playerStatCache);
-
-        customEnchants = new CustomEnchantSystem(this);
-        combat = new CombatBootstrap(this);
-        combat.enable(playerStatCache, customEnchants);
-
-        // ---------- v1.9 Progression (ADD ONLY) ----------
-        progressionBootstrap = new ProgressionBootstrap(this);
-        progressionV19 = new ProgressionV19Bootstrap(this);
-
-        // ---------- Spawn feedback (v1.8 UX fix) ----------
-        new org.plugin.theMob.control.feedback.SpawnBlockFeedbackService(
-                this,
-                automationScaling
-        ).start();
-
-        // ---------- Listeners + Commands ----------
-        registerAllListeners();
-        registerCommands();
-
-        PluginCommand stats = getCommand("stats");
-        if (stats != null) {
-            stats.setExecutor(new StatsCommand(statsMenu, playerStatCache));
-        }
-
-        Bukkit.getPluginManager().registerEvents(
-                new BossImmunityListener(mobManager, phaseController),
-                this
-        );
-        Bukkit.getPluginManager().registerEvents(
-                new BossCombatListener(this, mobManager, phaseController),
-                this
-        );
+    this.eggCommand = new MobEggCommand(new SpawnEggItemFactory(this.keys), this.configService);
+    this.itemBuilder = new ItemBuilderFromConfig(this);
+    this.gear = new org.plugin.theMob.content.EquipmentCatalog(this);
+    this.loreRenderer = new ItemLoreRenderer();
+    this.itemStatReader = new ItemStatReader(this);
+    this.dropEngine = new MobDropEngine(this);
+    this.dropEngine.bind(this.mobManager);
+    this.mobManager.setDropEngine(this.dropEngine);
+    this.playerBars = new PlayerBarCoordinator();
+    this.bossActionEngine = new BossActionEngine(this);
+    BossPhaseResolver resolver = new BossPhaseResolver();
+    this.bossBars = new BossBarService(this, this.mobManager, this.playerBars);
+    this.bossBars.start();
+    this.bossBars.restore();
+    Bukkit.getPluginManager().registerEvents(this.bossBars, this);
+    this.worldEffects = new BossWorldEffectController(this);
+    this.phaseController =
+        new BossPhaseController(
+            this, resolver, this.bossActionEngine, this.bossBars, this.keys, worldEffects);
+    this.behaviorController =
+        new BossBehaviorController(this, this.mobManager, this.phaseController);
+    this.phaseController.bindBehaviorController(this.behaviorController);
+    this.healthDisplay = new MobHealthDisplay(this, this.mobManager, this.bossBars);
+    this.mobManager.setHealthDisplay(this.healthDisplay);
+    Bukkit.getPluginManager()
+        .registerEvents(
+            new BossBarListenerAdapter(
+                this, this.mobManager, this.phaseController, this.healthDisplay),
+            this);
+    MobSpawnService spawnService =
+        new MobSpawnService(
+            this,
+            this.mobManager,
+            this.keys,
+            this.healthDisplay,
+            this.bossBars,
+            this.phaseController);
+    this.mobManager.setSpawnService(spawnService);
+    this.bossLocks = new BossLockService();
+    this.autoSpawnManager = new AutoSpawnManager(this, this.mobManager, this.keys, this.bossLocks);
+    this.spawnController = new SpawnController(this, this.mobManager, this.autoSpawnManager);
+    this.spawnController.start();
+    this.mobManager.setAutoSpawnManager(this.autoSpawnManager);
+    this.spawnEggService = new SpawnEggService(this.mobManager, this.keys, this.configService);
+    boolean hudEnabled = this.isNavigationHudEnabled();
+    if (hudEnabled) {
+      this.hud = new NaviHudService(this, this.mobManager);
+      this.hud.start();
+      Bukkit.getPluginManager().registerEvents(new NaviHudListener(this.hud), this);
+    } else {
+      this.cleanupStaleHudBars();
     }
 
-    private boolean isNavigationHudEnabled() {
-        if (getConfig().isSet("navigation-hud.enabled")) {
-            return getConfig().getBoolean("navigation-hud.enabled", true);
-        }
-        return getConfig().getBoolean("plugin.navigation-hud.enabled", true);
+    this.playerStatCache = new PlayerStatCache(this);
+    this.statsMenu = new StatsMenuService(this, this.playerStatCache);
+    this.customEnchants = new CustomEnchantSystem(this);
+    this.combat = new CombatBootstrap(this);
+    this.progressionV19 = new ProgressionV19Bootstrap(this);
+    this.progressionBootstrap = new ProgressionBootstrap(this, this.progressionV19.players());
+    this.dropEngine.setTieredLoot(this.progressionV19.loot());
+    this.combat.enable(
+        this.playerStatCache,
+        this.customEnchants,
+        this.progressionV19.players(),
+        this.progressionV19.combat());
+    new SpawnBlockFeedbackService(this, this.automationScaling).start();
+    this.registerAllListeners();
+    this.dungeons = new org.plugin.theMob.dungeon.DungeonService(this);
+    if (dungeonApi == null) {
+      dungeonApi = new org.plugin.theMob.dungeon.DungeonApiService(this);
+      Bukkit.getServicesManager()
+          .register(
+              org.plugin.theMob.api.dungeon.TheMobDungeonApi.class,
+              dungeonApi,
+              this,
+              org.bukkit.plugin.ServicePriority.Normal);
+    }
+    this.registerCommands();
+    if (integrations == null)
+      integrations = new org.plugin.theMob.integration.IntegrationManager(this);
+    integrations.register();
+    PluginCommand stats = this.getCommand("stats");
+    if (stats != null) {
+      stats.setExecutor(new StatsCommand(this.statsMenu, this.playerStatCache));
     }
 
-    // =====================================================
-    // SHUTDOWN
-    // =====================================================
-    private void hardShutdown() {
+    Bukkit.getPluginManager()
+        .registerEvents(new BossImmunityListener(this.mobManager, this.phaseController), this);
+    Bukkit.getPluginManager()
+        .registerEvents(new BossCombatListener(this, this.mobManager, this.phaseController), this);
+    this.adminMenus = new org.plugin.theMob.admin.AdminMenus(this);
+  }
+
+  private boolean isNavigationHudEnabled() {
+    return this.getConfig().isSet("navigation-hud.enabled")
+        ? this.getConfig().getBoolean("navigation-hud.enabled", true)
+        : this.getConfig().getBoolean("plugin.navigation-hud.enabled", true);
+  }
+
+  private void hardShutdown() {
+    if (integrations != null) integrations.suspendExtended();
+    if (adminMenus != null) {
+      adminMenus.close();
+      adminMenus = null;
+    }
+    if (dungeons != null) {
+      dungeons.close();
+      dungeons = null;
+    }
+    Bukkit.getScheduler().cancelTasks(this);
+    if (objectives != null) {
+      objectives.close();
+      objectives = null;
+    }
+    if (activity != null && mobManager != null) {
+      activity.close();
+      activity = null;
+    }
+    for (var world : Bukkit.getWorlds())
+      for (var entity : world.getEntities())
+        if (entity
+            .getPersistentDataContainer()
+            .has(
+                new NamespacedKey(this, "temporary_visual"),
+                org.bukkit.persistence.PersistentDataType.BYTE)) entity.remove();
+    if (this.worldEffects != null) {
+      this.worldEffects.shutdown();
+      this.worldEffects = null;
+    }
+    for (Player player : Bukkit.getOnlinePlayers())
+      if (org.plugin.theMob.compat.Views.top(player.getOpenInventory()) != null
+          && org.plugin.theMob.compat.Views.top(player.getOpenInventory()).getHolder()
+              instanceof org.plugin.theMob.player.stats.menu.StatsMenuHolder)
+        player.closeInventory();
+    if (this.equipmentListener != null) {
+      this.equipmentListener.shutdown();
+      this.equipmentListener = null;
+    }
+    try {
+      this.progressionV19 = null;
+      this.progressionBootstrap = null;
+      if (this.automationScaling != null) {
+        this.automationScaling.shutdown();
+        this.automationScaling = null;
+      }
+
+      if (this.spawnController != null) {
+        this.spawnController.stop();
+        this.spawnController = null;
+      }
+
+      if (this.behaviorController != null) {
+        this.behaviorController.shutdown();
+        this.behaviorController = null;
+      }
+
+      if (this.phaseController != null) {
         try {
-            progressionV19 = null;
-            progressionBootstrap = null;
-
-            if (automationScaling != null) {
-                automationScaling.shutdown();
-                automationScaling = null;
+          for (LivingEntity b : this.phaseController.activeBosses()) {
+            if (b != null && b.isValid() && !b.isDead()) {
+              this.phaseController.onBossDeath(b);
             }
-
-            if (spawnController != null) {
-                spawnController.stop();
-                spawnController = null;
-            }
-            if (behaviorController != null) {
-                behaviorController.shutdown();
-                behaviorController = null;
-            }
-
-            // Clear boss phase runtime behavior/state cleanly (if possible)
-            if (phaseController != null) {
-                try {
-                    for (LivingEntity b : phaseController.activeBosses()) {
-                        if (b != null && b.isValid() && !b.isDead()) {
-                            phaseController.onBossDeath(b);
-                        }
-                    }
-                } catch (Throwable ignored) {}
-                phaseController = null;
-            }
-
-            if (mobManager != null) {
-                mobManager.hardReset();
-                mobManager = null;
-            }
-
-            if (autoSpawnManager != null) {
-                autoSpawnManager.stop();
-                autoSpawnManager = null;
-            }
-
-            if (hud != null) {
-                hud.shutdown();
-                hud = null;
-            }
-
-            if (bossBars != null) {
-                bossBars.shutdown();
-                bossBars = null;
-            }
-
-            if (bossActionEngine != null) {
-                bossActionEngine.shutdown();
-                bossActionEngine = null;
-            }
-
-            if (bossLocks != null) {
-                bossLocks.clearAll();
-                bossLocks = null;
-            }
-
-            if (playerBars != null) {
-                playerBars.clearAll();
-                playerBars = null;
-            }
-
-            if (ticks != null) {
-                ticks.shutdown();
-                ticks = null;
-            }
-
-            if (stuckDefense != null) {
-                stuckDefense.clear();
-                stuckDefense = null;
-            }
-
-            // These are lightweight; keep nulling for GC clarity
-            healthDisplay = null;
-            dropEngine = null;
-            itemBuilder = null;
-            loreRenderer = null;
-            itemStatReader = null;
-            playerStatCache = null;
-            statsMenu = null;
-            combat = null;
-            customEnchants = null;
-            spawnEggService = null;
-            spawnerService = null;
-            spawnerFactory = null;
-
-        } catch (Throwable t) {
-            getLogger().severe("[TheMob] HARD SHUTDOWN FAILED");
-            t.printStackTrace();
-        } finally {
-            HandlerList.unregisterAll(this);
+          }
+        } catch (Throwable var7) {
         }
+
+        this.phaseController = null;
+      }
+
+      if (this.mobManager != null) {
+        this.mobManager.hardReset();
+        this.mobManager = null;
+      }
+
+      if (this.autoSpawnManager != null) {
+        this.autoSpawnManager.stop();
+        this.autoSpawnManager = null;
+      }
+
+      if (this.hud != null) {
+        this.hud.shutdown();
+        this.hud = null;
+      }
+
+      if (this.bossBars != null) {
+        this.bossBars.shutdown();
+        this.bossBars = null;
+      }
+
+      if (this.bossActionEngine != null) {
+        this.bossActionEngine.shutdown();
+        this.bossActionEngine = null;
+      }
+
+      if (this.bossLocks != null) {
+        this.bossLocks.clearAll();
+        this.bossLocks = null;
+      }
+
+      if (this.playerBars != null) {
+        this.playerBars.clearAll();
+        this.playerBars = null;
+      }
+
+      if (this.ticks != null) {
+        this.ticks.shutdown();
+        this.ticks = null;
+      }
+
+      if (this.stuckDefense != null) {
+        this.stuckDefense.clear();
+        this.stuckDefense = null;
+      }
+
+      this.healthDisplay = null;
+      this.dropEngine = null;
+      this.itemBuilder = null;
+      this.loreRenderer = null;
+      this.itemStatReader = null;
+      this.playerStatCache = null;
+      this.statsMenu = null;
+      this.combat = null;
+      this.customEnchants = null;
+      this.spawnEggService = null;
+      this.spawnerService = null;
+      this.spawnerFactory = null;
+    } catch (Throwable var8) {
+      this.getLogger().severe("[TheMob] HARD SHUTDOWN FAILED");
+      var8.printStackTrace();
+    } finally {
+      HandlerList.unregisterAll(this);
+    }
+  }
+
+  private void registerAllListeners() {
+    Bukkit.getPluginManager()
+        .registerEvents(
+            new MobListener(
+                this,
+                this.mobManager,
+                this.healthDisplay,
+                this.bossBars,
+                this.bossActionEngine,
+                this.behaviorController,
+                this.keys,
+                this.autoSpawnManager),
+            this);
+    Bukkit.getPluginManager().registerEvents(new PlayerDeathListener(this, this.mobManager), this);
+    this.equipmentListener = new PlayerEquipListener(this, this.playerStatCache);
+    Bukkit.getPluginManager().registerEvents(this.equipmentListener, this);
+    Bukkit.getPluginManager().registerEvents(new StatsMenuListener(this), this);
+    if (this.spawnController != null) {
+      Bukkit.getPluginManager().registerEvents(this.spawnController, this);
     }
 
-    // =====================================================
-    // LISTENERS / COMMANDS
-    // =====================================================
-    private void registerAllListeners() {
+    Bukkit.getPluginManager().registerEvents(new SpawnEggListener(this.spawnEggService), this);
+    Bukkit.getPluginManager()
+        .registerEvents(new SpawnerListener(this.spawnerService, this.spawnEggService), this);
+    Bukkit.getPluginManager()
+        .registerEvents(new org.plugin.theMob.spawn.spawner.SpawnerSpawnListener(this.keys), this);
+  }
 
-        Bukkit.getPluginManager().registerEvents(
-                new MobListener(
-                        this,
-                        mobManager,
-                        healthDisplay,
-                        bossBars,
-                        bossActionEngine,
-                        behaviorController,
-                        keys,
-                        autoSpawnManager
-                ),
-                this
-        );
+  private void registerCommands() {
+    if (hud == null && getCommand("mobkompass") != null)
+      getCommand("mobkompass")
+          .setExecutor(
+              (sender, command, label, args) -> {
+                sender.sendMessage("§e[TheMob] navigation-hud.enabled ist deaktiviert.");
+                return true;
+              });
+    PluginCommand mob = this.getCommand("mob");
+    if (mob != null) {
+      mob.setExecutor(new MobCommand(this, this.mobManager, this.spawnController));
+      mob.setTabCompleter(new MobTabCompleter(this.mobManager, this.configService));
+    }
+  }
 
-        Bukkit.getPluginManager().registerEvents(
-                new PlayerDeathListener(this, mobManager),
-                this
-        );
+  public MobManager mobs() {
+    return this.mobManager;
+  }
 
-        Bukkit.getPluginManager().registerEvents(
-                new PlayerEquipListener(this, playerStatCache),
-                this
-        );
+  public SpawnController spawns() {
+    return this.spawnController;
+  }
 
-        Bukkit.getPluginManager().registerEvents(
-                new StatsMenuListener(),
-                this
-        );
+  public ConfigService configs() {
+    return this.configService;
+  }
 
-        if (spawnController != null) {
-            Bukkit.getPluginManager().registerEvents(spawnController, this);
+  public KeyRegistry keys() {
+    return this.keys;
+  }
+
+  public ItemStatReader itemStats() {
+    return this.itemStatReader;
+  }
+
+  public BossPhaseController bossPhases() {
+    return this.phaseController;
+  }
+
+  public AutomationScalingSystem automation() {
+    return this.automationScaling;
+  }
+
+  public StuckDefensePath getStuckDefense() {
+    return this.stuckDefense;
+  }
+
+  private Player findNearestPlayer(Location loc, double radius) {
+    if (loc != null && loc.getWorld() != null) {
+      double best = radius * radius;
+      Player nearest = null;
+
+      for (Player p : loc.getWorld().getPlayers()) {
+        double d = p.getLocation().distanceSquared(loc);
+        if (d < best) {
+          best = d;
+          nearest = p;
         }
-        Bukkit.getPluginManager().registerEvents(
-                new org.plugin.theMob.spawn.egg.SpawnEggListener(spawnEggService),
-                this
-        );
-        Bukkit.getPluginManager().registerEvents(
-                new SpawnerListener(
-                        spawnerService,
-                        spawnEggService
-                ),
-                this
-        );
+      }
 
+      return nearest;
+    } else {
+      return null;
+    }
+  }
+
+  private void cleanupStaleHudBars() {
+    List<NamespacedKey> toRemove = new ArrayList<>();
+    Iterator<KeyedBossBar> it = Bukkit.getBossBars();
+
+    while (it.hasNext()) {
+      KeyedBossBar bar = it.next();
+      if (BossBarService.BOSSBAR_KEY.equals(bar.getKey())
+          || NaviHudService.HUD_KEY.equals(bar.getKey())) {
+        bar.removeAll();
+        toRemove.add(bar.getKey());
+      }
     }
 
-    private void registerCommands() {
-        PluginCommand mob = getCommand("mob");
-        if (mob != null) {
-            mob.setExecutor(new MobCommand(this, mobManager, spawnController));
-            mob.setTabCompleter(new MobTabCompleter(mobManager, configService));
-
-        }
+    for (NamespacedKey key : toRemove) {
+      Bukkit.removeBossBar(key);
     }
-
-    // =====================================================
-    // API
-    // =====================================================
-    public MobManager mobs() { return mobManager; }
-    public ConfigService configs() { return configService; }
-    public KeyRegistry keys() { return keys; }
-    public ItemStatReader itemStats() { return itemStatReader; }
-    public BossPhaseController bossPhases() { return phaseController; }
-    public AutomationScalingSystem automation() { return automationScaling; }
-    public StuckDefensePath getStuckDefense() { return stuckDefense; }
-
-    // =====================================================
-    // HELPERS
-    // =====================================================
-    @SuppressWarnings("unused")
-    private Player findNearestPlayer(Location loc, double radius) {
-        if (loc == null || loc.getWorld() == null) return null;
-
-        double best = radius * radius;
-        Player nearest = null;
-
-        for (Player p : loc.getWorld().getPlayers()) {
-            double d = p.getLocation().distanceSquared(loc);
-            if (d < best) {
-                best = d;
-                nearest = p;
-            }
-        }
-        return nearest;
-    }
-
-    private void cleanupStaleHudBars() {
-        List<NamespacedKey> toRemove = new ArrayList<>();
-
-        Iterator<KeyedBossBar> it = Bukkit.getBossBars();
-        while (it.hasNext()) {
-            KeyedBossBar bar = it.next();
-
-            if (BOSSBAR_KEY.equals(bar.getKey()) || HUD_KEY.equals(bar.getKey())) {
-                bar.removeAll();
-                toRemove.add(bar.getKey());
-            }
-        }
-
-        for (NamespacedKey key : toRemove) {
-            Bukkit.removeBossBar(key);
-        }
-    }
+  }
 }

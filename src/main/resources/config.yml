@@ -1,15 +1,15 @@
 # =========================================================
-#  TheMob – Global Configuration
+#  TheMob â€“ Global Configuration
 # =========================================================
 #
 #  High-performance RPG mob & boss framework
 #  for survival worlds, arenas and large networks.
 #
 #  Focus:
-#   • Automation & scaling
-#   • Zero exploit potential
-#   • Predictable performance
-#   • Admin transparency
+#   â€¢ Automation & scaling
+#   â€¢ Zero exploit potential
+#   â€¢ Predictable performance
+#   â€¢ Admin transparency
 #
 # ---------------------------------------------------------
 #  Version
@@ -27,10 +27,10 @@ plugin:
   # -------------------------------------------------------
   debug: false
   # Enables detailed logging for:
-  #  • Spawn decisions
-  #  • Budget blocks
-  #  • Throttle state changes
-  #  • Boss cooldown checks
+  #  â€¢ Spawn decisions
+  #  â€¢ Budget blocks
+  #  â€¢ Throttle state changes
+  #  â€¢ Boss cooldown checks
 
 use_spawn_egg: true
 
@@ -38,7 +38,7 @@ use_spawn_egg: true
 #  GLOBAL SPAWN BUDGETS
 # =========================================================
 # Hard limits that protect server performance.
-# Budgets never force-despawn mobs – they only block spawns.
+# Budgets never force-despawn mobs â€“ they only block spawns.
 # =========================================================
 
 spawn:
@@ -113,6 +113,7 @@ scaling:
 # =========================================================
 boss-cooldowns:
   enabled: true
+  default-seconds: 0 # 0 preserves existing unlimited timing; override per mob with boss-cooldown-seconds
   storage: file
   # file | sqlite
   data:
@@ -133,11 +134,24 @@ diagnostics:
 # =========================================================
 navigation-hud:
   enabled: true
+  # coinoverlay = identischer BetterHud-Regenbogenkompass; legacy = bisherige Textleiste.
+  compass-style: coinoverlay
   update-interval-ticks: 5
   hide-in-combat: false
   hide-when-idle: false
   hide-in-creative: false
   hide-in-spectator: true
+  resource-pack:
+    # Mit aktivem CoinOverlay wird dessen gemeinsames HUD-Paket verwendet.
+    # Diese Optionen gelten nur beim Betrieb ohne CoinOverlay-Ressourcen-HUD.
+    offer-on-join: true
+    join-delay-ticks: 30
+    # Leer = vorhandenes Paket aus server.properties verwenden.
+    url: ""
+    sha1: ""
+    # Plugin-Angebote bleiben optional. Auch server.properties: require-resource-pack=false.
+    required: false
+    prompt: "Server-Ressourcenpaket fuer den Kompass laden?"
 mob-radar:
   scan-radius: 20
   scan-chunks:
@@ -169,5 +183,69 @@ combat:
       - op
       - admin
 # Max Critical multiplier for damage
-    crit:
+  crit:
     max-multiplier: 10.0
+
+# Optionale Anbieter; ohne deren JAR bleibt TheMob eigenständig nutzbar.
+integrations:
+  track-minion-kills: false
+  jobs:
+    enabled: true
+  citizens:
+    enabled: true
+    click-cooldown-seconds: 10
+    spawn-on-click: {}
+  quests:
+    enabled: true
+  battlepass:
+    enabled: true
+  placeholderapi:
+    enabled: true
+  vault:
+    enabled: true
+  worldguard:
+    enabled: true
+    protect-dungeons: true
+  luckperms:
+    enabled: true
+  essentialsx:
+    enabled: true
+  multiverse:
+    enabled: true
+  mythicmobs:
+    enabled: true
+  mmoitems:
+    enabled: true
+  auraskills:
+    enabled: true
+  mcmmo:
+    enabled: true
+  griefprevention:
+    enabled: true
+    protect-dungeons: true
+  towny:
+    enabled: true
+    protect-dungeons: true
+  lands:
+    enabled: true
+    protect-dungeons: true
+  advancedcrates:
+    enabled: true
+  economyshopgui:
+    enabled: true
+    protect-custom-items: true
+  decentholograms:
+    enabled: true
+    boss-holograms: false
+
+# Hot/Cold betrifft ausschliesslich TheMob-Mobs. Keine Chunk-Erzeugung fuer Arenen.
+performance:
+  arena-ticket-radius-chunks: 2
+  nameplates-per-cycle: 128
+  activity:
+    enabled: true
+    hot-radius: 64
+    cold-radius: 96
+    cold-grace-seconds: 10
+    combat-keepalive-seconds: 20
+    entities-per-cycle: 64

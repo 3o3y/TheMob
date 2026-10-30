@@ -1,131 +1,154 @@
 package org.plugin.theMob.control.cooldown;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.time.Instant;
+import java.util.Collections;
+import java.util.Properties;
+import java.util.Set;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.plugin.Plugin;
 
-import java.time.Instant;
-import java.util.Collections;
-import java.util.Set;
-
-/**
- * Central boss cooldown controller.
- * Responsible for reading, writing and exposing boss spawn cooldowns.
- */
 public final class BossCooldownService {
+  private final Plugin plugin;
+  private BossCooldownStore store;
+  private boolean enabled = true;
 
-    private final Plugin plugin;
-    private BossCooldownStore store;
+  public BossCooldownService(Plugin plugin) {
+    this.plugin = plugin;
+  }
 
-    private boolean enabled = true;
-
-    public BossCooldownService(Plugin plugin) {
-        this.plugin = plugin;
+  public void reload(FileConfiguration cfg) {
+    this.enabled = cfg.getBoolean("boss-cooldowns.enabled", true);
+    String storage = cfg.getString("boss-cooldowns.storage", "file");
+    storage = storage == null ? "file" : storage.trim().toLowerCase();
+    if (storage.equals("sqlite") && !sqliteEnabledInBuild()) {
+      this.plugin
+          .getLogger()
+          .warning(
+              "This NoSQLite build uses boss-cooldowns.yml instead of SQLite. "
+                  + "An existing boss-cooldowns.db is left unchanged and is not imported.");
+      storage = "file";
     }
-
-    // =========================
-    // RELOAD / INIT
-    // =========================
-    public void reload(FileConfiguration cfg) {
-        enabled = cfg.getBoolean("boss-cooldowns.enabled", true);
-
-        String storage = cfg.getString("boss-cooldowns.storage", "file");
-        storage = storage == null ? "file" : storage.trim().toLowerCase();
-
-        BossCooldownStore next = switch (storage) {
-            case "sqlite" -> new SqliteBossCooldownStore(plugin);
-            default -> new FileBossCooldownStore(plugin);
-        };
-
-        if (store != null) {
-            try { store.close(); } catch (Exception ignored) {}
+    byte bossId = -1;
+    switch (storage.hashCode()) {
+      case -894935028:
+        if (storage.equals("sqlite")) {
+          bossId = 0;
+        }
+      default:
+        BossCooldownStore next =
+            (BossCooldownStore)
+                (switch (bossId) {
+                  case 0 -> new SqliteBossCooldownStore(this.plugin);
+                  default -> new FileBossCooldownStore(this.plugin);
+                });
+        if (this.store != null) {
+          try {
+            this.store.close();
+          } catch (Exception var8) {
+          }
         }
 
-        store = next;
-        store.load();
-
+        this.store = next;
+        try {
+          this.store.load();
+        } catch (RuntimeException failure) {
+          this.plugin
+              .getLogger()
+              .severe(
+                  "Cooldown storage failed: "
+                      + failure.getMessage()
+                      + "; falling back to file storage.");
+          this.store.close();
+          this.store = new FileBossCooldownStore(this.plugin);
+          this.store.load();
+        }
         if (cfg.isConfigurationSection("boss-cooldowns.data")) {
-            for (String bossId : cfg.getConfigurationSection("boss-cooldowns.data").getKeys(false)) {
-                long nextSpawn = cfg.getLong(
-                        "boss-cooldowns.data." + bossId + ".next-spawn",
-                        0L
-                );
-
-                if (nextSpawn > 0 && store.getNextSpawnEpochSeconds(bossId) <= 0) {
-                    store.setNextSpawnEpochSeconds(bossId, nextSpawn);
-                }
+          for (String bossIdx : cfg.getConfigurationSection("boss-cooldowns.data").getKeys(false)) {
+            long nextSpawn = cfg.getLong("boss-cooldowns.data." + bossIdx + ".next-spawn", 0L);
+            if (nextSpawn > 0L && this.store.getNextSpawnEpochSeconds(bossIdx) <= 0L) {
+              this.store.setNextSpawnEpochSeconds(bossIdx, nextSpawn);
             }
+          }
         }
 
-        store.save();
+        this.store.save();
     }
+  }
 
-    // =========================
-    // BASIC STATE
-    // =========================
-    public boolean enabled() {
-        return enabled;
+  private boolean sqliteEnabledInBuild() {
+    try (InputStream input = this.plugin.getResource("themob-build.properties")) {
+      if (input == null) return true;
+      Properties properties = new Properties();
+      properties.load(input);
+      return !"false".equalsIgnoreCase(properties.getProperty("sqlite.enabled"));
+    } catch (IOException failure) {
+      this.plugin.getLogger().warning("Cannot read build profile; using file cooldown storage.");
+      return false;
     }
+  }
 
-    // =========================
-    // SPAWN CHECK
-    // =========================
-    public boolean canSpawnNow(String bossId) {
-        if (!enabled) return true;
-        if (store == null) return true;
-        if (bossId == null || bossId.isBlank()) return true;
+  public boolean enabled() {
+    return this.enabled;
+  }
 
-        long now = Instant.now().getEpochSecond();
-        long next = store.getNextSpawnEpochSeconds(bossId);
-
-        return next <= 0 || now >= next;
+  public boolean canSpawnNow(String bossId) {
+    if (!this.enabled) {
+      return true;
+    } else if (this.store == null) {
+      return true;
+    } else if (bossId != null && !bossId.isBlank()) {
+      long now = Instant.now().getEpochSecond();
+      long next = this.store.getNextSpawnEpochSeconds(bossId);
+      return next <= 0L || now >= next;
+    } else {
+      return true;
     }
+  }
 
-    // =========================
-    // TIME LEFT
-    // =========================
-    public long secondsRemaining(String bossId) {
-        if (!enabled) return 0;
-        if (store == null) return 0;
-        if (bossId == null || bossId.isBlank()) return 0;
-
-        long now = Instant.now().getEpochSecond();
-        long next = store.getNextSpawnEpochSeconds(bossId);
-
-        return Math.max(0, next - now);
+  public long secondsRemaining(String bossId) {
+    if (!this.enabled) {
+      return 0L;
+    } else if (this.store == null) {
+      return 0L;
+    } else if (bossId != null && !bossId.isBlank()) {
+      long now = Instant.now().getEpochSecond();
+      long next = this.store.getNextSpawnEpochSeconds(bossId);
+      return Math.max(0L, next - now);
+    } else {
+      return 0L;
     }
+  }
 
-    // =========================
-    // SET COOLDOWN
-    // =========================
-    public void setCooldownSeconds(String bossId, long cooldownSeconds) {
-        if (!enabled) return;
-        if (store == null) return;
-        if (bossId == null || bossId.isBlank()) return;
-
-        long now = Instant.now().getEpochSecond();
-        store.setNextSpawnEpochSeconds(
-                bossId,
-                now + Math.max(0, cooldownSeconds)
-        );
-        store.save();
-    }
-
-    // =========================
-    // DIAGNOSTICS SUPPORT
-    // =========================
-    public Set<String> allBossIds() {
-        if (!enabled) return Collections.emptySet();
-        if (store == null) return Collections.emptySet();
-        return store.getAllBossIds();
-    }
-
-    // =========================
-    // SHUTDOWN
-    // =========================
-    public void shutdown() {
-        if (store != null) {
-            try { store.close(); } catch (Exception ignored) {}
+  public void setCooldownSeconds(String bossId, long cooldownSeconds) {
+    if (this.enabled) {
+      if (this.store != null) {
+        if (bossId != null && !bossId.isBlank()) {
+          long now = Instant.now().getEpochSecond();
+          this.store.setNextSpawnEpochSeconds(bossId, now + Math.max(0L, cooldownSeconds));
+          this.store.save();
         }
-        store = null;
+      }
     }
+  }
+
+  public Set<String> allBossIds() {
+    if (!this.enabled) {
+      return Collections.emptySet();
+    } else {
+      return this.store == null ? Collections.emptySet() : this.store.getAllBossIds();
+    }
+  }
+
+  public void shutdown() {
+    if (this.store != null) {
+      try {
+        this.store.close();
+      } catch (Exception var2) {
+      }
+    }
+
+    this.store = null;
+  }
 }

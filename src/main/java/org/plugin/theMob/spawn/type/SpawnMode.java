@@ -1,11 +1,14 @@
 package org.plugin.theMob.spawn.type;
 
 public enum SpawnMode {
-    ONETIME,
-    ENDLESS;
+  ONETIME,
+  ENDLESS;
 
-    public static SpawnMode fromString(String s) {
-        if (s == null) return ENDLESS;
-        return s.equalsIgnoreCase("onetime") ? ONETIME : ENDLESS;
+  public static SpawnMode fromString(String s) {
+    if (s == null) {
+      return ENDLESS;
+    } else {
+      return s.equalsIgnoreCase("onetime") ? ONETIME : ENDLESS;
     }
+  }
 }

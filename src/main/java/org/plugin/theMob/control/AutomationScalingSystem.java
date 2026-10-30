@@ -5,60 +5,90 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.plugin.theMob.control.cooldown.BossCooldownService;
 
 public final class AutomationScalingSystem {
+  private final JavaPlugin plugin;
+  private final SpawnBudgetManager budgets;
+  private final ThrottleManager throttling;
+  private final ScalingManager scaling;
+  private final SpawnGate gate;
+  private final BossCooldownService bossCooldowns;
+  private final TpsTracker tps;
+  private final BossArenaStateService bossArenaState;
 
-    private final JavaPlugin plugin;
+  public AutomationScalingSystem(JavaPlugin plugin) {
+    this.plugin = plugin;
+    this.budgets = new SpawnBudgetManager(plugin);
+    this.throttling = new ThrottleManager();
+    this.scaling = new ScalingManager();
+    this.tps = new TpsTracker();
+    this.gate = new SpawnGate(this.budgets, this.throttling, this.scaling, this.tps);
+    this.bossCooldowns = new BossCooldownService(plugin);
+    this.bossArenaState = new BossArenaStateService(this);
+  }
 
-    private final SpawnBudgetManager budgets;
-    private final ThrottleManager throttling;
-    private final ScalingManager scaling;
-    private final SpawnGate gate;
-    private final BossCooldownService bossCooldowns;
-    private final TpsTracker tps;
-    private final BossArenaStateService bossArenaState;
+  public void reload(FileConfiguration cfg) {
+    this.budgets.reload(cfg);
+    this.throttling.reload(cfg);
+    this.scaling.reload(cfg);
+    this.bossCooldowns.reload(cfg);
+  }
 
-    public AutomationScalingSystem(JavaPlugin plugin) {
-        this.plugin = plugin;
+  public void register() {
+    this.plugin.getServer().getPluginManager().registerEvents(this.budgets, this.plugin);
+    this.tps.start(this.plugin);
+    this.budgets.rebuild();
+  }
 
-        this.budgets = new SpawnBudgetManager(plugin);
-        this.throttling = new ThrottleManager();
-        this.scaling = new ScalingManager();
+  public void shutdown() {
+    this.bossCooldowns.shutdown();
+    this.tps.stop();
+  }
 
-        this.tps = new TpsTracker();
-        this.gate = new SpawnGate(budgets, throttling, scaling, tps);
-
-        this.bossCooldowns = new BossCooldownService(plugin);
-        this.bossArenaState = new BossArenaStateService(this);
+  public String resolveArenaForBoss(String bossId) {
+    var idKey = new org.bukkit.NamespacedKey(this.plugin, "mob_id");
+    var arenaKey = new org.bukkit.NamespacedKey(this.plugin, "auto_spawn_id");
+    for (var uuid : this.budgets.aliveBossUuids()) {
+      var entity = org.bukkit.Bukkit.getEntity(uuid);
+      if (entity != null
+          && bossId.equalsIgnoreCase(
+              entity
+                  .getPersistentDataContainer()
+                  .get(idKey, org.bukkit.persistence.PersistentDataType.STRING)))
+        return entity
+            .getPersistentDataContainer()
+            .get(arenaKey, org.bukkit.persistence.PersistentDataType.STRING);
     }
+    return null;
+  }
 
-    public void reload(FileConfiguration cfg) {
-        budgets.reload(cfg);
-        throttling.reload(cfg);
-        scaling.reload(cfg);
-        bossCooldowns.reload(cfg);
-    }
+  public JavaPlugin plugin() {
+    return this.plugin;
+  }
 
-    public void register() {
-        plugin.getServer().getPluginManager().registerEvents(budgets, plugin);
-        tps.start(plugin);
-    }
+  public SpawnBudgetManager budgets() {
+    return this.budgets;
+  }
 
-    public void shutdown() {
-        bossCooldowns.shutdown();
-        tps.stop();
-    }
+  public ThrottleManager throttling() {
+    return this.throttling;
+  }
 
-    /** v1.7: arena resolution not implemented */
-    public String resolveArenaForBoss(String bossId) {
-        return null;
-    }
+  public ScalingManager scaling() {
+    return this.scaling;
+  }
 
-    public JavaPlugin plugin() { return plugin; }
+  public SpawnGate gate() {
+    return this.gate;
+  }
 
-    public SpawnBudgetManager budgets() { return budgets; }
-    public ThrottleManager throttling() { return throttling; }
-    public ScalingManager scaling() { return scaling; }
-    public SpawnGate gate() { return gate; }
-    public BossCooldownService bossCooldowns() { return bossCooldowns; }
-    public TpsTracker tps() { return tps; }
-    public BossArenaStateService bossArenaState() { return bossArenaState; }
+  public BossCooldownService bossCooldowns() {
+    return this.bossCooldowns;
+  }
+
+  public TpsTracker tps() {
+    return this.tps;
+  }
+
+  public BossArenaStateService bossArenaState() {
+    return this.bossArenaState;
+  }
 }

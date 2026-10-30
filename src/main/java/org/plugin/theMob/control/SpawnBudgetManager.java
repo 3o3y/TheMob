@@ -1,7 +1,13 @@
 package org.plugin.theMob.control;
 
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
+import org.bukkit.NamespacedKey;
 import org.bukkit.World;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Entity;
@@ -9,181 +15,256 @@ import org.bukkit.entity.LivingEntity;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
-import org.bukkit.event.entity.EntityRemoveEvent;
 import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.world.WorldUnloadEvent;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
-import org.bukkit.NamespacedKey;
 
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-
-/**
- * Tracks alive TheMob entities by role/world using PDC tags.
- */
 public final class SpawnBudgetManager implements Listener {
+  private final Plugin plugin;
+  private final NamespacedKey keyMobTag;
+  private final NamespacedKey keyRole;
+  private final BudgetConfig config = new BudgetConfig();
+  private final Set<UUID> aliveAll = ConcurrentHashMap.newKeySet();
+  private final Set<UUID> aliveBosses = ConcurrentHashMap.newKeySet();
+  private final Set<UUID> aliveMinions = ConcurrentHashMap.newKeySet();
+  private final Map<String, Set<UUID>> aliveByWorld = new ConcurrentHashMap<>();
 
-    private final Plugin plugin;
+  public SpawnBudgetManager(Plugin plugin) {
+    this.plugin = plugin;
+    this.keyMobTag = new NamespacedKey(plugin, "themob");
+    this.keyRole = new NamespacedKey(plugin, "themob_role");
+    boolean hasRemoval =
+        org.plugin.theMob.compat.OptionalEvents.bind(
+            plugin,
+            this,
+            "org.bukkit.event.entity.EntityRemoveEvent",
+            EventPriority.MONITOR,
+            true,
+            event -> onRemove((org.bukkit.event.entity.EntityEvent) event));
+    if (!hasRemoval && Bukkit.getServer() != null && plugin.isEnabled())
+      Bukkit.getScheduler().runTaskTimer(plugin, this::pruneLegacy, 20, 20);
+  }
 
-    private final NamespacedKey keyMobTag;
-    private final NamespacedKey keyRole;
+  public void reload(FileConfiguration cfg) {
+    this.config.reload(cfg);
+  }
 
-    private final BudgetConfig config = new BudgetConfig();
+  public BudgetConfig config() {
+    return this.config;
+  }
 
-    private final Set<UUID> aliveAll = ConcurrentHashMap.newKeySet();
-    private final Set<UUID> aliveBosses = ConcurrentHashMap.newKeySet();
-    private final Set<UUID> aliveMinions = ConcurrentHashMap.newKeySet();
-
-    private final Map<String, Set<UUID>> aliveByWorld = new ConcurrentHashMap<>();
-
-    public SpawnBudgetManager(Plugin plugin) {
-        this.plugin = plugin;
-        this.keyMobTag = new NamespacedKey(plugin, "themob");
-        this.keyRole = new NamespacedKey(plugin, "themob_role");
+  public void tagSpawnedEntity(LivingEntity entity, SpawnRole role) {
+    if (entity != null) {
+      PersistentDataContainer pdc = entity.getPersistentDataContainer();
+      pdc.set(this.keyMobTag, PersistentDataType.BYTE, (byte) 1);
+      pdc.set(this.keyRole, PersistentDataType.STRING, role.name());
+      this.addAlive(entity.getUniqueId(), entity.getWorld(), role);
     }
+  }
 
-    public void reload(FileConfiguration cfg) {
-        config.reload(cfg);
+  public void rebuild() {
+    this.aliveAll.clear();
+    this.aliveBosses.clear();
+    this.aliveMinions.clear();
+    this.aliveByWorld.clear();
+    for (World world : Bukkit.getWorlds())
+      for (LivingEntity entity : world.getLivingEntities()) restore(entity);
+  }
+
+  private void restore(LivingEntity entity) {
+    var pdc = entity.getPersistentDataContainer();
+    if (!entity.isValid() || entity.isDead()) return;
+    if (isTheMobEntity(entity)
+        || pdc.has(new NamespacedKey(this.plugin, "mob_id"), PersistentDataType.STRING)
+        || pdc.has(new NamespacedKey(this.plugin, "minion"), PersistentDataType.BYTE)) {
+      SpawnRole role = roleOf(entity);
+      if (role == null)
+        role =
+            pdc.getOrDefault(
+                        new NamespacedKey(this.plugin, "is_boss"), PersistentDataType.INTEGER, 0)
+                    == 1
+                ? SpawnRole.BOSS
+                : SpawnRole.MOB;
+      tagSpawnedEntity(entity, role);
     }
+  }
 
-    public BudgetConfig config() {
-        return config;
+  @EventHandler
+  public void onLoad(org.bukkit.event.world.EntitiesLoadEvent event) {
+    for (Entity entity : event.getEntities())
+      if (entity instanceof LivingEntity living) restore(living);
+  }
+
+  public boolean isTheMobEntity(Entity e) {
+    if (e == null) {
+      return false;
+    } else {
+      Byte tag = (Byte) e.getPersistentDataContainer().get(this.keyMobTag, PersistentDataType.BYTE);
+      return tag != null && tag == 1;
     }
+  }
 
-    public void tagSpawnedEntity(LivingEntity entity, SpawnRole role) {
-        if (entity == null) return;
-
-        PersistentDataContainer pdc = entity.getPersistentDataContainer();
-        pdc.set(keyMobTag, PersistentDataType.BYTE, (byte) 1);
-        pdc.set(keyRole, PersistentDataType.STRING, role.name());
-
-        addAlive(entity.getUniqueId(), entity.getWorld(), role);
-    }
-
-    public boolean isTheMobEntity(Entity e) {
-        if (e == null) return false;
-        Byte tag = e.getPersistentDataContainer().get(keyMobTag, PersistentDataType.BYTE);
-        return tag != null && tag == (byte) 1;
-    }
-
-    public SpawnRole roleOf(Entity e) {
-        if (e == null) return null;
-        String r = e.getPersistentDataContainer().get(keyRole, PersistentDataType.STRING);
-        if (r == null) return null;
+  public SpawnRole roleOf(Entity e) {
+    if (e == null) {
+      return null;
+    } else {
+      String r =
+          (String) e.getPersistentDataContainer().get(this.keyRole, PersistentDataType.STRING);
+      if (r == null) {
+        return null;
+      } else {
         try {
-            return SpawnRole.valueOf(r);
-        } catch (Exception ignored) {
-            return null;
+          return SpawnRole.valueOf(r);
+        } catch (Exception var4) {
+          return null;
         }
+      }
+    }
+  }
+
+  public int aliveTotal() {
+    return this.aliveAll.size();
+  }
+
+  public int aliveBosses() {
+    return this.aliveBosses.size();
+  }
+
+  public int aliveMinions() {
+    return this.aliveMinions.size();
+  }
+
+  public int aliveInWorld(String worldName) {
+    Set<UUID> set = this.aliveByWorld.get(worldName);
+    return set == null ? 0 : set.size();
+  }
+
+  public Map<String, Integer> aliveWorldSnapshot() {
+    Map<String, Integer> out = new LinkedHashMap<>();
+
+    for (World w : Bukkit.getWorlds()) {
+      out.put(w.getName(), this.aliveInWorld(w.getName()));
     }
 
-    public int aliveTotal() {
-        return aliveAll.size();
-    }
+    return out;
+  }
 
-    public int aliveBosses() {
-        return aliveBosses.size();
-    }
+  private void addAlive(UUID id, World world, SpawnRole role) {
+    if (id != null && world != null) {
+      this.aliveAll.add(id);
+      this.aliveByWorld
+          .computeIfAbsent(world.getName(), k -> ConcurrentHashMap.newKeySet())
+          .add(id);
+      if (role == SpawnRole.BOSS) {
+        this.aliveBosses.add(id);
+      }
 
-    public int aliveMinions() {
-        return aliveMinions.size();
+      if (role == SpawnRole.MINION) {
+        this.aliveMinions.add(id);
+      }
     }
+  }
 
-    public int aliveInWorld(String worldName) {
-        Set<UUID> set = aliveByWorld.get(worldName);
-        return set == null ? 0 : set.size();
-    }
-
-    public Map<String, Integer> aliveWorldSnapshot() {
-        Map<String, Integer> out = new LinkedHashMap<>();
-        for (World w : Bukkit.getWorlds()) {
-            out.put(w.getName(), aliveInWorld(w.getName()));
+  private void removeAlive(UUID id, World world, SpawnRole role) {
+    if (id != null) {
+      this.aliveAll.remove(id);
+      if (world != null) {
+        Set<UUID> set = this.aliveByWorld.get(world.getName());
+        if (set != null) {
+          set.remove(id);
         }
-        return out;
+      }
+
+      if (role == SpawnRole.BOSS) {
+        this.aliveBosses.remove(id);
+      }
+
+      if (role == SpawnRole.MINION) {
+        this.aliveMinions.remove(id);
+      }
     }
+  }
 
-    private void addAlive(UUID id, World world, SpawnRole role) {
-        if (id == null || world == null) return;
-
-        aliveAll.add(id);
-        aliveByWorld.computeIfAbsent(world.getName(), k -> ConcurrentHashMap.newKeySet()).add(id);
-
-        if (role == SpawnRole.BOSS) aliveBosses.add(id);
-        if (role == SpawnRole.MINION) aliveMinions.add(id);
+  @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+  public void onDeath(EntityDeathEvent e) {
+    LivingEntity ent = e.getEntity();
+    if (this.isTheMobEntity(ent)) {
+      SpawnRole role = this.roleOf(ent);
+      this.removeAlive(ent.getUniqueId(), ent.getWorld(), role);
     }
+  }
 
-    private void removeAlive(UUID id, World world, SpawnRole role) {
-        if (id == null) return;
+  public void onRemove(org.bukkit.event.entity.EntityEvent e) {
+    if (e.getEntity() instanceof LivingEntity le) {
+      if (this.isTheMobEntity(le)) {
+        SpawnRole role = this.roleOf(le);
+        this.removeAlive(le.getUniqueId(), le.getWorld(), role);
+      }
+    }
+  }
 
+  @EventHandler(priority = EventPriority.MONITOR)
+  public void unloaded(org.bukkit.event.world.EntitiesUnloadEvent event) {
+    for (Entity entity : event.getEntities())
+      if (isTheMobEntity(entity))
+        removeAlive(entity.getUniqueId(), event.getWorld(), roleOf(entity));
+  }
+
+  private int legacyCursor;
+
+  private void pruneLegacy() {
+    var ids = new java.util.ArrayList<>(aliveAll);
+    if (ids.isEmpty()) {
+      legacyCursor = 0;
+      return;
+    }
+    int count = Math.min(100, ids.size());
+    for (int n = 0; n < count; n++) {
+      UUID id = ids.get((legacyCursor + n) % ids.size());
+      Entity entity = Bukkit.getEntity(id);
+      if (entity == null || !entity.isValid() || entity.isDead()) {
         aliveAll.remove(id);
+        aliveBosses.remove(id);
+        aliveMinions.remove(id);
+        aliveByWorld.values().forEach(set -> set.remove(id));
+      }
+    }
+    legacyCursor = (legacyCursor + count) % ids.size();
+  }
 
-        if (world != null) {
-            Set<UUID> set = aliveByWorld.get(world.getName());
-            if (set != null) set.remove(id);
+  @EventHandler(priority = EventPriority.MONITOR)
+  public void onWorldUnload(WorldUnloadEvent e) {
+    String name = e.getWorld().getName();
+    Set<UUID> set = this.aliveByWorld.remove(name);
+    if (set != null) {
+      for (UUID id : set) {
+        this.aliveAll.remove(id);
+        this.aliveBosses.remove(id);
+        this.aliveMinions.remove(id);
+      }
+    }
+  }
+
+  public Set<String> aliveBossIds() {
+    Set<String> out = new HashSet<>();
+    NamespacedKey mobIdKey = new NamespacedKey(this.plugin, "mob_id");
+
+    for (UUID id : this.aliveBosses) {
+      if (Bukkit.getEntity(id) instanceof LivingEntity le) {
+        String mobId =
+            (String) le.getPersistentDataContainer().get(mobIdKey, PersistentDataType.STRING);
+        if (mobId != null && !mobId.isBlank()) {
+          out.add(mobId);
         }
-
-        if (role == SpawnRole.BOSS) aliveBosses.remove(id);
-        if (role == SpawnRole.MINION) aliveMinions.remove(id);
+      }
     }
 
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
-    public void onDeath(EntityDeathEvent e) {
-        LivingEntity ent = e.getEntity();
-        if (!isTheMobEntity(ent)) return;
+    return out;
+  }
 
-        SpawnRole role = roleOf(ent);
-        removeAlive(ent.getUniqueId(), ent.getWorld(), role);
-    }
-
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
-    public void onRemove(EntityRemoveEvent e) {
-        Entity ent = e.getEntity();
-        if (!(ent instanceof LivingEntity le)) return;
-        if (!isTheMobEntity(le)) return;
-
-        SpawnRole role = roleOf(le);
-        removeAlive(le.getUniqueId(), le.getWorld(), role);
-    }
-
-    @EventHandler(priority = EventPriority.MONITOR)
-    public void onWorldUnload(WorldUnloadEvent e) {
-        String name = e.getWorld().getName();
-        Set<UUID> set = aliveByWorld.remove(name);
-        if (set == null) return;
-
-        for (UUID id : set) {
-            aliveAll.remove(id);
-            aliveBosses.remove(id);
-            aliveMinions.remove(id);
-        }
-    }
-    // =========================
-// READ-ONLY ACCESSORS
-// =========================
-    public Set<String> aliveBossIds() {
-        Set<String> out = new HashSet<>();
-        NamespacedKey mobIdKey = new NamespacedKey(plugin, "mob_id");
-
-        for (UUID id : aliveBosses) {
-            Entity e = Bukkit.getEntity(id);
-            if (!(e instanceof LivingEntity le)) continue;
-
-            String mobId = le.getPersistentDataContainer()
-                    .get(mobIdKey, PersistentDataType.STRING);
-
-            if (mobId != null && !mobId.isBlank()) {
-                out.add(mobId);
-            }
-        }
-        return out;
-    }
-
-    public Set<UUID> aliveBossUuids() {
-        return Set.copyOf(aliveBosses);
-    }
-
-
-
+  public Set<UUID> aliveBossUuids() {
+    return Set.copyOf(this.aliveBosses);
+  }
 }

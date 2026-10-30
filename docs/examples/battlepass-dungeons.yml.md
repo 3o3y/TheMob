@@ -1,0 +1,34 @@
+# battlepass-dungeons.yml — configuration example
+
+This is a reference file from TheMob 1.19.0. Keep your tuned production configuration when upgrading. Use materials and entity types supported by your Minecraft version.
+
+```yaml
+# Dungeon-Beispiele fuer AdvancedPlugins BattlePass 5.0.12.
+# Unter quests: in eine aktive BattlePass-Woche uebernehmen. IDs vorher pruefen.
+# Beispiel d00001 bei Bedarf durch eure Dungeon-ID ersetzen.
+quests:
+  9107:
+    name: 'Dungeon bezwingen'
+    type: themob_dungeon_complete
+    variable: d00001
+    required-progress: 1
+    points: 30
+    exclusive: free
+    item:
+      material: netherite_sword
+      name: '&6Dungeon bezwingen'
+      lore: ['&7Besiege den festgelegten Endboss.', '&e%total_progress%&7/&e%required_progress%']
+  9108:
+    name: 'Gottesturm bezwingen'
+    type: themob_dungeon_complete
+    variable:
+      root: none
+      style: gottesturm
+    required-progress: 3
+    points: 50
+    exclusive: free
+    item:
+      material: beacon
+      name: '&6Gottesturm bezwingen'
+      lore: ['&7Bezwinge 3 Gottesturm-Endbosse.', '&e%total_progress%&7/&e%required_progress%']
+```

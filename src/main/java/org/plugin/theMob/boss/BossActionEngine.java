@@ -1,297 +1,238 @@
 package org.plugin.theMob.boss;
 
+import java.util.Locale;
+import java.util.Random;
+import java.util.UUID;
 import net.md_5.bungee.api.ChatMessageType;
 import net.md_5.bungee.api.chat.TextComponent;
-import org.bukkit.*;
+import org.bukkit.ChatColor;
+import org.bukkit.Location;
+import org.bukkit.Particle;
+import org.bukkit.Sound;
 import org.bukkit.configuration.ConfigurationSection;
-import org.bukkit.configuration.file.FileConfiguration;
-import org.bukkit.entity.ExperienceOrb;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Mob;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Listener;
 import org.bukkit.potion.PotionEffect;
-import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.plugin.theMob.TheMob;
 import org.plugin.theMob.boss.minion.BossMinionController;
 import org.plugin.theMob.boss.minion.BossMinionSpawner;
 
-import java.util.Locale;
-import java.util.Random;
-import java.util.UUID;
-
 public final class BossActionEngine implements Listener {
+  private final TheMob plugin;
+  private final Random rnd = new Random();
+  private final BossMinionController minionController;
+  private final BossMinionSpawner minionSpawner;
+  private BukkitRunnable tickTask;
 
-    private final TheMob plugin;
-    private final Random rnd = new Random();
-
-    private final BossMinionController minionController;
-    private final BossMinionSpawner minionSpawner;
-
-    private BukkitRunnable tickTask;
-
-    public BossActionEngine(TheMob plugin) {
-        this.plugin = plugin;
-
-        this.minionController = new BossMinionController(plugin);
-        this.minionSpawner = new BossMinionSpawner(plugin, minionController);
-
-        tickTask = new BukkitRunnable() {
-            @Override
-            public void run() {
-                minionController.tick();
-            }
+  public BossActionEngine(TheMob plugin) {
+    this.plugin = plugin;
+    this.minionController = new BossMinionController(plugin);
+    this.minionSpawner = new BossMinionSpawner(plugin, this.minionController);
+    this.tickTask =
+        new BukkitRunnable() {
+          public void run() {
+            BossActionEngine.this.minionController.tick();
+          }
         };
-        tickTask.runTaskTimer(plugin, 20L, 20L);
-    }
+    this.tickTask.runTaskTimer(plugin, 20L, 20L);
+  }
 
-    // =====================================================
-    // PHASE HOOKS
-    // =====================================================
-
-    public void onPhaseEnter(LivingEntity boss, BossPhase phase) {
-        if (boss == null || phase == null || !boss.isValid() || boss.isDead()) return;
-
-        ConfigurationSection cfg = phase.cfg();
-        if (cfg == null) return;
-
-        applyAbilities(boss, cfg.getConfigurationSection("abilities"));
-        applyEffects(boss, cfg.getConfigurationSection("effects"));
-        applyPhysics(boss, cfg.getConfigurationSection("physics"));
-
-        // 🔥 NEW: behavior overrides (FLEE = BLINDNESS)
-        applyBehaviorOverrides(boss, cfg.getConfigurationSection("behavior"));
-
+  public void onPhaseEnter(LivingEntity boss, BossPhase phase) {
+    if (boss != null && phase != null && boss.isValid() && !boss.isDead()) {
+      ConfigurationSection cfg = phase.cfg();
+      if (cfg != null) {
+        if (plugin.skills().enabled("bosses.phase-abilities")) {
+          this.applyAbilities(boss, cfg.getConfigurationSection("abilities"));
+          this.applyEffects(boss, cfg.getConfigurationSection("effects"));
+          this.applyPhysics(boss, cfg.getConfigurationSection("physics"));
+        }
+        if (plugin
+            .skills()
+            .enabled(
+                "bosses." + cfg.getString("behavior.mode", "aggressive").toLowerCase(Locale.ROOT)))
+          this.applyBehaviorOverrides(boss, cfg.getConfigurationSection("behavior"));
         ConfigurationSection onEnter = cfg.getConfigurationSection("on-enter");
-        if (onEnter != null) runOnEnterEffects(boss, onEnter);
+        if (onEnter != null && plugin.skills().enabled("bosses.phase-effects")) {
+          this.runOnEnterEffects(boss, onEnter);
+        }
 
         ConfigurationSection actions = cfg.getConfigurationSection("actions");
         if (actions != null) {
-            ConfigurationSection summon = actions.getConfigurationSection("summon-minions");
-            if (summon != null) {
-                minionSpawner.onPhaseEnter(boss, phase, summon);
-            }
+          ConfigurationSection summon = actions.getConfigurationSection("summon-minions");
+          if (summon != null && plugin.skills().enabled("bosses.summon-minions")) {
+            this.minionSpawner.onPhaseEnter(boss, phase, summon);
+          }
         }
+      }
     }
+  }
 
-    public void onPhaseLeave(LivingEntity boss, BossPhase phase) {
-        if (boss == null || phase == null) return;
+  public void onPhaseLeave(LivingEntity boss, BossPhase phase) {
+    if (boss != null && phase != null) {
+      boss.removePotionEffect(org.plugin.theMob.compat.BukkitTypes.potion("BLINDNESS"));
+      boss.removePotionEffect(org.plugin.theMob.compat.BukkitTypes.potion("SLOWNESS"));
+      if (boss instanceof Mob mob) {
+        mob.setAware(true);
+      }
 
-        boss.removePotionEffect(PotionEffectType.BLINDNESS);
-        boss.removePotionEffect(PotionEffectType.SLOWNESS);
-
-        if (boss instanceof org.bukkit.entity.Mob mob) {
-            mob.setAware(true);
-        }
-
-        minionSpawner.onPhaseLeave(boss, phase);
+      this.minionSpawner.onPhaseLeave(boss, phase);
     }
+  }
 
+  public void cleanupBoss(LivingEntity boss) {
+    this.onBossDeath(boss);
+  }
 
-    public void onBossDeath(LivingEntity boss) {
-        if (boss == null) return;
+  public void onBossDeath(LivingEntity boss) {
+    if (boss != null) {
+      boss.removePotionEffect(org.plugin.theMob.compat.BukkitTypes.potion("BLINDNESS"));
+      boss.removePotionEffect(org.plugin.theMob.compat.BukkitTypes.potion("SLOWNESS"));
+      if (boss instanceof Mob mob) {
+        mob.setTarget(null);
+        mob.setAware(true);
+        mob.setAI(false);
+      }
 
-        boss.removePotionEffect(PotionEffectType.BLINDNESS);
-        boss.removePotionEffect(PotionEffectType.SLOWNESS);
-
-        if (boss instanceof Mob mob) {
-            mob.setTarget(null);
-            mob.setAware(true);
-            mob.setAI(false); // verhindert letzte Ticks
-        }
-
-        UUID id = boss.getUniqueId();
-
-        minionSpawner.stopAllForBoss(id);
-        minionController.cleanupBoss(id);
-
-        spawnBossXpExplosion(boss);
+      UUID id = boss.getUniqueId();
+      this.minionSpawner.stopAllForBoss(id);
+      this.minionController.cleanupBoss(id);
+      // XP is issued exactly once by MobDropEngine.
     }
+  }
 
-    // =====================================================
-    // BEHAVIOR OVERRIDES (🔥 CORE CHANGE)
-    // =====================================================
-
-    private void applyBehaviorOverrides(LivingEntity boss, ConfigurationSection cfg) {
-        if (cfg == null) return;
-
-        String mode = cfg.getString("mode", "aggressive").toLowerCase(Locale.ROOT);
-
-        if (!"flee".equals(mode)) return;
-
-        // =========================
-        // PANIC / BLINDNESS DESIGN
-        // =========================
-
-        // Blindness = Orientierungslos
-        boss.addPotionEffect(new PotionEffect(
-                PotionEffectType.BLINDNESS,
+  private void applyBehaviorOverrides(LivingEntity boss, ConfigurationSection cfg) {
+    if (cfg != null) {
+      String mode = cfg.getString("mode", "aggressive").toLowerCase(Locale.ROOT);
+      if ("flee".equals(mode)) {
+        boss.addPotionEffect(
+            new PotionEffect(
+                org.plugin.theMob.compat.BukkitTypes.potion("BLINDNESS"),
                 Integer.MAX_VALUE,
                 1,
                 false,
-                false
-        ));
-
-        // Optional: zusätzlich Slow für "taumeln"
-        boss.addPotionEffect(new PotionEffect(
-                PotionEffectType.SLOWNESS,
+                false));
+        boss.addPotionEffect(
+            new PotionEffect(
+                org.plugin.theMob.compat.BukkitTypes.potion("SLOWNESS"),
                 Integer.MAX_VALUE,
                 1,
                 false,
-                false
-        ));
-
-        // -------------------------
-        // Mob-spezifische Kontrolle
-        // -------------------------
+                false));
         if (boss instanceof Mob mob) {
-            mob.setTarget(null);
-            mob.setAware(true);
-            mob.setAI(true);
+          mob.setTarget(null);
+          mob.setAware(true);
+          mob.setAI(true);
         }
-
+      }
     }
+  }
 
-
-    // =====================================================
-    // ABILITIES / EFFECTS / PHYSICS
-    // =====================================================
-
-    private void applyAbilities(LivingEntity boss, ConfigurationSection cfg) {
-        if (cfg == null) return;
-
-        boss.setAI(!cfg.getBoolean("no-ai", false));
-        boss.setSilent(cfg.getBoolean("silent", false));
-        boss.setInvulnerable(cfg.getBoolean("invulnerable", false));
-        boss.setGlowing(cfg.getBoolean("glowing", false));
-        boss.setInvisible(cfg.getBoolean("invisibility", false));
-        boss.setGravity(cfg.getBoolean("gravity", true));
-        boss.setPersistent(true);
+  private void applyAbilities(LivingEntity boss, ConfigurationSection cfg) {
+    if (cfg != null) {
+      boss.setAI(!cfg.getBoolean("no-ai", false));
+      boss.setSilent(cfg.getBoolean("silent", false));
+      boss.setInvulnerable(cfg.getBoolean("invulnerable", false));
+      boss.setGlowing(cfg.getBoolean("glowing", false));
+      boss.setInvisible(cfg.getBoolean("invisibility", false));
+      boss.setGravity(cfg.getBoolean("gravity", true));
+      boss.setPersistent(true);
     }
+  }
 
-    private void applyEffects(LivingEntity boss, ConfigurationSection cfg) {
-        if (cfg == null) return;
+  private void applyEffects(LivingEntity boss, ConfigurationSection cfg) {
+    if (cfg != null) {
+      if (cfg.getBoolean("fire-resistance", false)) {
+        boss.addPotionEffect(
+            new PotionEffect(
+                org.plugin.theMob.compat.BukkitTypes.potion("FIRE_RESISTANCE"),
+                Integer.MAX_VALUE,
+                0,
+                false,
+                false));
+      }
+    }
+  }
 
-        if (cfg.getBoolean("fire-resistance", false)) {
-            boss.addPotionEffect(new PotionEffect(
-                    PotionEffectType.FIRE_RESISTANCE,
-                    Integer.MAX_VALUE,
-                    0,
-                    false,
-                    false
-            ));
+  private void applyPhysics(LivingEntity boss, ConfigurationSection cfg) {
+    if (cfg != null) {
+      boss.setGravity(cfg.getBoolean("gravity", true));
+    }
+  }
+
+  private void runOnEnterEffects(LivingEntity boss, ConfigurationSection onEnter) {
+    ConfigurationSection effects = onEnter.getConfigurationSection("effects");
+    if (effects != null) {
+      Location loc = boss.getLocation().add(0.0, 1.0, 0.0);
+      ConfigurationSection particles = effects.getConfigurationSection("particles");
+      if (particles != null) {
+        try {
+          Particle type =
+              Particle.valueOf(particles.getString("type", "FLAME").toUpperCase(Locale.ROOT));
+          boss.getWorld()
+              .spawnParticle(
+                  type,
+                  loc,
+                  particles.getInt("amount", 40),
+                  particles.getDouble("radius", 1.5),
+                  particles.getDouble("height", 1.5),
+                  particles.getDouble("radius", 1.5),
+                  particles.getDouble("speed", 0.03));
+        } catch (Exception var9) {
         }
-    }
+      }
 
-    private void applyPhysics(LivingEntity boss, ConfigurationSection cfg) {
-        if (cfg == null) return;
-        boss.setGravity(cfg.getBoolean("gravity", true));
-    }
-
-    // =====================================================
-    // ON-ENTER EFFECTS
-    // =====================================================
-
-    private void runOnEnterEffects(LivingEntity boss, ConfigurationSection onEnter) {
-        ConfigurationSection effects = onEnter.getConfigurationSection("effects");
-        if (effects == null) return;
-
-        Location loc = boss.getLocation().add(0, 1, 0);
-
-        ConfigurationSection particles = effects.getConfigurationSection("particles");
-        if (particles != null) {
-            try {
-                Particle type = Particle.valueOf(
-                        particles.getString("type", "FLAME").toUpperCase(Locale.ROOT)
-                );
-
-                boss.getWorld().spawnParticle(
-                        type,
-                        loc,
-                        particles.getInt("amount", 40),
-                        particles.getDouble("radius", 1.5),
-                        particles.getDouble("height", 1.5),
-                        particles.getDouble("radius", 1.5),
-                        particles.getDouble("speed", 0.03)
-                );
-            } catch (Exception ignored) {}
+      ConfigurationSection sound = effects.getConfigurationSection("sound");
+      if (sound != null) {
+        try {
+          Sound s =
+              org.plugin.theMob.compat.BukkitTypes.sound(
+                  sound.getString("type", "ENTITY_WITHER_SPAWN"));
+          if (s == null) return;
+          boss.getWorld()
+              .playSound(
+                  boss.getLocation(),
+                  s,
+                  (float) sound.getDouble("volume", 1.0),
+                  (float) sound.getDouble("pitch", 1.0));
+        } catch (Exception var8) {
         }
+      }
 
-        ConfigurationSection sound = effects.getConfigurationSection("sound");
-        if (sound != null) {
-            try {
-                Sound s = Sound.valueOf(
-                        sound.getString("type", "ENTITY_WITHER_SPAWN").toUpperCase(Locale.ROOT)
-                );
-                boss.getWorld().playSound(
-                        boss.getLocation(),
-                        s,
-                        (float) sound.getDouble("volume", 1.0),
-                        (float) sound.getDouble("pitch", 1.0)
-                );
-            } catch (Exception ignored) {}
+      ConfigurationSection msg = effects.getConfigurationSection("message");
+      if (msg != null) {
+        this.sendPhaseEnterMessage(boss, msg);
+      }
+    }
+  }
+
+  private void sendPhaseEnterMessage(LivingEntity boss, ConfigurationSection msg) {
+    String raw = msg.getString("text", "");
+    if (raw != null && !raw.isEmpty()) {
+      double r2 = Math.pow(msg.getDouble("radius", 32.0), 2.0);
+
+      for (Player p : boss.getWorld().getPlayers()) {
+        if (!(p.getLocation().distanceSquared(boss.getLocation()) > r2)) {
+          String resolved = Placeholder.resolve(raw, boss, null, p);
+          p.spigot()
+              .sendMessage(
+                  ChatMessageType.ACTION_BAR,
+                  TextComponent.fromLegacyText(
+                      ChatColor.translateAlternateColorCodes('&', resolved)));
         }
+      }
+    }
+  }
 
-        ConfigurationSection msg = effects.getConfigurationSection("message");
-        if (msg != null) sendPhaseEnterMessage(boss, msg);
+  public void shutdown() {
+    if (this.tickTask != null) {
+      this.tickTask.cancel();
+      this.tickTask = null;
     }
 
-    private void sendPhaseEnterMessage(LivingEntity boss, ConfigurationSection msg) {
-        String raw = msg.getString("text", "");
-        if (raw == null || raw.isEmpty()) return;
-
-        double r2 = Math.pow(msg.getDouble("radius", 32.0), 2);
-
-        for (Player p : boss.getWorld().getPlayers()) {
-            if (p.getLocation().distanceSquared(boss.getLocation()) > r2) continue;
-
-            String resolved = Placeholder.resolve(raw, boss, null, p);
-            p.spigot().sendMessage(
-                    ChatMessageType.ACTION_BAR,
-                    TextComponent.fromLegacyText(
-                            ChatColor.translateAlternateColorCodes('&', resolved)
-                    )
-            );
-        }
-    }
-
-    // =====================================================
-    // XP EXPLOSION
-    // =====================================================
-
-    private void spawnBossXpExplosion(LivingEntity boss) {
-        FileConfiguration cfg = plugin.mobs().mobConfigOf(boss);
-        if (cfg == null) return;
-
-        int totalXp = cfg.getInt("xp", 0);
-        if (totalXp <= 0) return;
-
-        World w = boss.getWorld();
-        Location c = boss.getLocation().add(0, 1, 0);
-
-        w.spawnParticle(Particle.EXPLOSION_EMITTER, c, 2);
-        w.spawnParticle(Particle.HAPPY_VILLAGER, c, 60, 1.8, 1.2, 1.8, 0.05);
-        w.playSound(c, Sound.ENTITY_PLAYER_LEVELUP, 1.4f, 0.6f);
-
-        int orbCount = 20;
-        int xpPerOrb = Math.max(1, totalXp / orbCount);
-
-        for (int i = 0; i < orbCount; i++) {
-            ExperienceOrb orb = w.spawn(c, ExperienceOrb.class);
-            orb.setExperience(xpPerOrb);
-        }
-    }
-
-    // =====================================================
-    // SHUTDOWN
-    // =====================================================
-
-    public void shutdown() {
-        if (tickTask != null) {
-            tickTask.cancel();
-            tickTask = null;
-        }
-        minionController.clearAll();
-    }
+    this.minionSpawner.shutdown();
+    this.minionController.clearAll();
+  }
 }

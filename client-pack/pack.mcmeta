@@ -1,0 +1,28 @@
+{
+  "pack": {
+    "description": "TheMob 1.10.0 - CoinOverlay-Kompass: Regenbogen und goldener Pfeil",
+    "min_format": [
+      97,
+      1
+    ],
+    "max_format": [
+      97,
+      1
+    ]
+  },
+  "overlays": {
+    "entries": [
+      {
+        "directory": "betterhud_26_3",
+        "min_format": [
+          97,
+          1
+        ],
+        "max_format": [
+          97,
+          1
+        ]
+      }
+    ]
+  }
+}

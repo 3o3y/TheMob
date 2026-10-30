@@ -1,0 +1,29 @@
+# catalog.yml — configuration example
+
+This is a reference file from TheMob 1.19.0. Keep your tuned production configuration when upgrading. Use materials and entity types supported by your Minecraft version.
+
+```yaml
+# 5 Varianten jeder spawnbaren Mob-Spezies der Server-API, plus vier Bossarchetypen.
+# Verfuegbar ueber /mob spawn, /mob egg, AutoSpawns, Blockspawner und API.
+# Natuerliche Spawns werden nicht ersetzt. Eigene mobs/*.yml gewinnen bei gleicher ID.
+enabled: true
+levels:
+  1: {health: 1.0, damage: 1.0}
+  2: {health: 1.3, damage: 1.15}
+  3: {health: 1.65, damage: 1.3}
+  4: {health: 2.1, damage: 1.5}
+  5: {health: 2.7, damage: 1.8}
+bosses:
+  enabled: true
+  health-multiplier: 1.0
+loot:
+  enabled: true
+  require-player-kill: true
+  equipment-chance: 0.04
+  equipment-chance-per-level: 0.02
+  boss-equipment-chance: 1.0
+  epic-chance: 0.08
+  epic-chance-per-level: 0.035
+  boss-epic-chance: 0.6
+  essence-chance: 0.5
+```

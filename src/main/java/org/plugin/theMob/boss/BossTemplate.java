@@ -1,99 +1,81 @@
 package org.plugin.theMob.boss;
 
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Objects;
 import org.bukkit.configuration.ConfigurationSection;
 
-import java.util.*;
-
 public final class BossTemplate {
+  private final String mobId;
+  private final int arenaRadiusChunks;
+  private final Map<String, BossPhase> phases = new LinkedHashMap<>();
+  private final Map<String, ConfigurationSection> phaseConfigs = new HashMap<>();
+  private BossPhase lastResolvedPhase;
 
-    private final String mobId;
+  public BossTemplate(String mobId, int arenaRadiusChunks) {
+    this.mobId = Objects.requireNonNull(mobId, "mobId");
+    this.arenaRadiusChunks = Math.max(1, arenaRadiusChunks);
+  }
 
-    // Arena definition (in chunks)
-    private final int arenaRadiusChunks;
+  public int arenaRadiusChunks() {
+    return this.arenaRadiusChunks;
+  }
 
-    // Reihenfolge behalten (YAML Ordnung!)
-    private final Map<String, BossPhase> phases = new LinkedHashMap<>();
-    private final Map<String, ConfigurationSection> phaseConfigs = new HashMap<>();
+  public void addPhase(BossPhase phase, ConfigurationSection cfg) {
+    if (phase != null && cfg != null) {
+      this.phases.put(phase.id(), phase);
+      this.phaseConfigs.put(phase.id(), cfg);
+    }
+  }
 
-    // 🔒 PHASE LOCK STATE
-    private BossPhase lastResolvedPhase;
+  public boolean hasPhases() {
+    return !this.phases.isEmpty();
+  }
 
-    public BossTemplate(String mobId, int arenaRadiusChunks) {
-        this.mobId = Objects.requireNonNull(mobId, "mobId");
-        this.arenaRadiusChunks = Math.max(1, arenaRadiusChunks);
+  public Collection<BossPhase> phases() {
+    return Collections.unmodifiableCollection(this.phases.values());
+  }
+
+  public BossPhase resolvePhase(double hpPercent0to100) {
+    BossPhase matched = null;
+
+    for (BossPhase p : this.phases.values()) {
+      if (p.matches(hpPercent0to100)) {
+        matched = p;
+        break;
+      }
     }
 
-    // =====================================================
-    // ARENA
-    // =====================================================
+    if (matched == null) {
+      return this.lastResolvedPhase;
+    } else {
+      if (this.lastResolvedPhase == null || matched.min() < this.lastResolvedPhase.min()) {
+        this.lastResolvedPhase = matched;
+      }
 
-    public int arenaRadiusChunks() {
-        return arenaRadiusChunks;
+      return this.lastResolvedPhase;
     }
+  }
 
-    // =====================================================
-    // PHASES
-    // =====================================================
+  public ConfigurationSection phaseConfig(String phaseId) {
+    return this.phaseConfigs.get(phaseId);
+  }
 
-    public void addPhase(BossPhase phase, ConfigurationSection cfg) {
-        if (phase == null || cfg == null) return;
-        phases.put(phase.id(), phase);
-        phaseConfigs.put(phase.id(), cfg);
-    }
+  public String mobId() {
+    return this.mobId;
+  }
 
-    public boolean hasPhases() {
-        return !phases.isEmpty();
-    }
+  public BossTemplate newInstance() {
+    BossTemplate copy = new BossTemplate(this.mobId, this.arenaRadiusChunks);
+    for (BossPhase phase : this.phases.values())
+      copy.addPhase(phase, this.phaseConfigs.get(phase.id()));
+    return copy;
+  }
 
-    public Collection<BossPhase> phases() {
-        return Collections.unmodifiableCollection(phases.values());
-    }
-
-    /**
-     * Phase resolution with monotonic lock.
-     * Phase can ONLY move forward (down in HP).
-     */
-    public BossPhase resolvePhase(double hpPercent0to100) {
-        BossPhase matched = null;
-
-        for (BossPhase p : phases.values()) {
-            if (p.matches(hpPercent0to100)) {
-                matched = p;
-                break;
-            }
-        }
-
-        if (matched == null) {
-            // Fallback: keep last phase (prevents flicker)
-            return lastResolvedPhase;
-        }
-
-        // 🔒 LOCK: never go backwards
-        if (lastResolvedPhase == null
-                || matched.min() < lastResolvedPhase.min()) {
-            lastResolvedPhase = matched;
-        }
-
-        return lastResolvedPhase;
-    }
-
-    public ConfigurationSection phaseConfig(String phaseId) {
-        return phaseConfigs.get(phaseId);
-    }
-
-    // =====================================================
-    // META
-    // =====================================================
-
-    public String mobId() {
-        return mobId;
-    }
-
-    // =====================================================
-    // RESET (on respawn)
-    // =====================================================
-
-    public void resetPhaseState() {
-        lastResolvedPhase = null;
-    }
+  public void resetPhaseState() {
+    this.lastResolvedPhase = null;
+  }
 }

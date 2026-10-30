@@ -11,79 +11,66 @@ import org.plugin.theMob.core.KeyRegistry;
 import org.plugin.theMob.mob.MobManager;
 
 public final class SpawnEggService {
+  private static final String SPAWN_SOURCE = "egg";
+  private final MobManager mobs;
+  private final KeyRegistry keys;
+  private final ConfigService configs;
 
-    private static final String SPAWN_SOURCE = "egg";
+  public SpawnEggService(MobManager mobs, KeyRegistry keys, ConfigService configs) {
+    this.mobs = mobs;
+    this.keys = keys;
+    this.configs = configs;
+  }
 
-    private final MobManager mobs;
-    private final KeyRegistry keys;
-    private final ConfigService configs;
-
-    public SpawnEggService(
-            MobManager mobs,
-            KeyRegistry keys,
-            ConfigService configs
-    ) {
-        this.mobs = mobs;
-        this.keys = keys;
-        this.configs = configs;
+  public boolean spawnFromThrownEgg(Player player, ItemStack egg, Location location) {
+    if (egg == null || location == null) {
+      return false;
+    } else if (!egg.hasItemMeta()) {
+      return false;
+    } else {
+      String mobId = this.resolveMobIdFromEgg(egg, player);
+      if (mobId == null) {
+        return false;
+      } else {
+        return this.mobs.spawnCustomMob(mobId, "egg", location) != null;
+      }
     }
+  }
 
-    // =====================================================
-    // THROWABLE EGG
-    // =====================================================
-    public boolean spawnFromThrownEgg(Player player, ItemStack egg, Location location) {
-        if (egg == null || location == null) return false;
-        if (!egg.hasItemMeta()) return false;
+  public boolean isTheMobEgg(ItemStack egg) {
+    return egg != null && egg.hasItemMeta()
+        ? egg.getItemMeta()
+            .getPersistentDataContainer()
+            .has(this.keys.SPAWN_EGG_MOB_ID, PersistentDataType.STRING)
+        : false;
+  }
 
-        String mobId = resolveMobIdFromEgg(egg, player);
-        if (mobId == null) return true;
-
-        mobs.spawnCustomMob(mobId, SPAWN_SOURCE, location);
-        return true;
-    }
-
-    // =====================================================
-    // VALIDATION
-    // =====================================================
-    public boolean isTheMobEgg(ItemStack egg) {
-        if (egg == null || !egg.hasItemMeta()) return false;
-
-        return egg.getItemMeta()
-                .getPersistentDataContainer()
-                .has(keys.SPAWN_EGG_MOB_ID, PersistentDataType.STRING);
-    }
-
-    // =====================================================
-    // INTERNAL RESOLVE
-    // =====================================================
-    public String resolveMobIdFromEgg(ItemStack egg, Player player) {
-        PersistentDataContainer pdc =
-                egg.getItemMeta().getPersistentDataContainer();
-
-        String eggKey =
-                pdc.get(keys.SPAWN_EGG_MOB_ID, PersistentDataType.STRING);
-
-        if (eggKey == null || eggKey.isBlank()) return null;
-
-        FileConfiguration cfg = configs.spawnEggs();
-        String path = "spawn-eggs." + eggKey.toLowerCase();
-
-        if (!cfg.isString(path)) {
-            if (player != null) {
-                player.sendMessage("§cNo spawn-egg mapping for §f" + eggKey);
-            }
-            return null;
+  public String resolveMobIdFromEgg(ItemStack egg, Player player) {
+    PersistentDataContainer pdc = egg.getItemMeta().getPersistentDataContainer();
+    String eggKey = (String) pdc.get(this.keys.SPAWN_EGG_MOB_ID, PersistentDataType.STRING);
+    if (eggKey != null && !eggKey.isBlank()) {
+      FileConfiguration cfg = this.configs.spawnEggs();
+      String path = "spawn-eggs." + eggKey.toLowerCase();
+      if (!cfg.isString(path)) {
+        if (player != null) {
+          player.sendMessage("§cNo spawn-egg mapping for §f" + eggKey);
         }
 
+        return null;
+      } else {
         String mobId = cfg.getString(path).toLowerCase();
+        if (!this.mobs.mobExists(mobId)) {
+          if (player != null) {
+            player.sendMessage("§cTheMob mob not loaded: §f" + mobId);
+          }
 
-        if (!mobs.mobExists(mobId)) {
-            if (player != null) {
-                player.sendMessage("§cTheMob mob not loaded: §f" + mobId);
-            }
-            return null;
+          return null;
+        } else {
+          return mobId;
         }
-
-        return mobId;
+      }
+    } else {
+      return null;
     }
+  }
 }
