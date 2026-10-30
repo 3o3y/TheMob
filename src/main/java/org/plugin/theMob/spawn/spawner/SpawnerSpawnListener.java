@@ -8,22 +8,19 @@ import org.bukkit.persistence.PersistentDataType;
 import org.plugin.theMob.core.KeyRegistry;
 
 public final class SpawnerSpawnListener implements Listener {
+  private final KeyRegistry keys;
 
-    private final KeyRegistry keys;
+  public SpawnerSpawnListener(KeyRegistry keys) {
+    this.keys = keys;
+  }
 
-    public SpawnerSpawnListener(KeyRegistry keys) {
-        this.keys = keys;
+  @EventHandler(ignoreCancelled = true)
+  public void onSpawnerSpawn(SpawnerSpawnEvent event) {
+    if (event.getSpawner().getBlock().getState() instanceof TileState tile) {
+      if (tile.getPersistentDataContainer()
+          .has(this.keys.THEMOB_SPAWNER, PersistentDataType.BYTE)) {
+        event.setCancelled(true);
+      }
     }
-
-    @EventHandler(ignoreCancelled = true)
-    public void onSpawnerSpawn(SpawnerSpawnEvent event) {
-        if (!(event.getSpawner().getBlock().getState() instanceof TileState tile)) return;
-
-        if (tile.getPersistentDataContainer().has(
-                keys.THEMOB_SPAWNER,
-                PersistentDataType.BYTE
-        )) {
-            event.setCancelled(true);
-        }
-    }
+  }
 }

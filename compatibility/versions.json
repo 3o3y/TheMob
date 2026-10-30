@@ -1,0 +1,194 @@
+[
+  {
+    "version": "1.18-R0.1-SNAPSHOT",
+    "snapshot": "1.18-R0.1-20211210.131639-28",
+    "sha256": "bff0ca07b12ca848fa52f910717642f148452514b2de8ee4f4b2269586373aa6",
+    "url": "https://hub.spigotmc.org/nexus/content/repositories/snapshots/org/spigotmc/spigot-api/1.18-R0.1-SNAPSHOT/spigot-api-1.18-R0.1-20211210.131639-28.jar"
+  },
+  {
+    "version": "1.18.1-R0.1-SNAPSHOT",
+    "snapshot": "1.18.1-R0.1-20220228.150432-81",
+    "sha256": "0c3e2bbeb39ac9379b1527b5c4c09d375b9adafe59eb1aba5abf61907c2574c2",
+    "url": "https://hub.spigotmc.org/nexus/content/repositories/snapshots/org/spigotmc/spigot-api/1.18.1-R0.1-SNAPSHOT/spigot-api-1.18.1-R0.1-20220228.150432-81.jar"
+  },
+  {
+    "version": "1.18.2-R0.1-SNAPSHOT",
+    "snapshot": "1.18.2-R0.1-20220607.160742-53",
+    "sha256": "70954df15dd56727e264441074ee66c169d30a569cf7d7372f1bd5215715386b",
+    "url": "https://hub.spigotmc.org/nexus/content/repositories/snapshots/org/spigotmc/spigot-api/1.18.2-R0.1-SNAPSHOT/spigot-api-1.18.2-R0.1-20220607.160742-53.jar"
+  },
+  {
+    "version": "1.19-R0.1-SNAPSHOT",
+    "snapshot": "1.19-R0.1-20220725.090125-47",
+    "sha256": "0c099d1e70af3096178bcb45722c6c04f3cb4c834cf20269134420ec55a3709d",
+    "url": "https://hub.spigotmc.org/nexus/content/repositories/snapshots/org/spigotmc/spigot-api/1.19-R0.1-SNAPSHOT/spigot-api-1.19-R0.1-20220725.090125-47.jar"
+  },
+  {
+    "version": "1.19.1-R0.1-SNAPSHOT",
+    "snapshot": "1.19.1-R0.1-20220804.104059-10",
+    "sha256": "76ba4683b2133c7c3155752b4ad89ff439b03a39ff5eb8fc859242d5c730142f",
+    "url": "https://hub.spigotmc.org/nexus/content/repositories/snapshots/org/spigotmc/spigot-api/1.19.1-R0.1-SNAPSHOT/spigot-api-1.19.1-R0.1-20220804.104059-10.jar"
+  },
+  {
+    "version": "1.19.2-R0.1-SNAPSHOT",
+    "snapshot": "1.19.2-R0.1-20221207.161214-43",
+    "sha256": "1af887e2d4d08929574dee99261c9e8654eb52f2e3faa1a6bf10458a2c550abd",
+    "url": "https://hub.spigotmc.org/nexus/content/repositories/snapshots/org/spigotmc/spigot-api/1.19.2-R0.1-SNAPSHOT/spigot-api-1.19.2-R0.1-20221207.161214-43.jar"
+  },
+  {
+    "version": "1.19.3-R0.1-SNAPSHOT",
+    "snapshot": "1.19.3-R0.1-20230314.163538-56",
+    "sha256": "512bf19d15225f11d12dfcfced7d1fd2ca9146861ffbca6adf80f59c981e890d",
+    "url": "https://hub.spigotmc.org/nexus/content/repositories/snapshots/org/spigotmc/spigot-api/1.19.3-R0.1-SNAPSHOT/spigot-api-1.19.3-R0.1-20230314.163538-56.jar"
+  },
+  {
+    "version": "1.19.4-R0.1-SNAPSHOT",
+    "snapshot": "1.19.4-R0.1-20230607.155743-88",
+    "sha256": "b5ee998f2ea460eda6e02c405601db5eeed2d1621e4babb717dae0560ffce800",
+    "url": "https://hub.spigotmc.org/nexus/content/repositories/snapshots/org/spigotmc/spigot-api/1.19.4-R0.1-SNAPSHOT/spigot-api-1.19.4-R0.1-20230607.155743-88.jar"
+  },
+  {
+    "version": "1.20-R0.1-SNAPSHOT",
+    "snapshot": "1.20-R0.1-20230612.113428-32",
+    "sha256": "be2711b11ff240e6939cf806ecff0488a9fc4d19b4e99bc338cc4ff1836b742a",
+    "url": "https://hub.spigotmc.org/nexus/content/repositories/snapshots/org/spigotmc/spigot-api/1.20-R0.1-SNAPSHOT/spigot-api-1.20-R0.1-20230612.113428-32.jar"
+  },
+  {
+    "version": "1.20.1-R0.1-SNAPSHOT",
+    "snapshot": "1.20.1-R0.1-20230921.163938-66",
+    "sha256": "d8aa356781e32896e7d78490813975cac7ca8d99126adc41c2836c56c68b9c3e",
+    "url": "https://hub.spigotmc.org/nexus/content/repositories/snapshots/org/spigotmc/spigot-api/1.20.1-R0.1-SNAPSHOT/spigot-api-1.20.1-R0.1-20230921.163938-66.jar"
+  },
+  {
+    "version": "1.20.2-R0.1-SNAPSHOT",
+    "snapshot": "1.20.2-R0.1-20231205.164257-71",
+    "sha256": "5fae276365312c6858da02028dd9fbb905eb4bd45546bce055d01e140da923f3",
+    "url": "https://hub.spigotmc.org/nexus/content/repositories/snapshots/org/spigotmc/spigot-api/1.20.2-R0.1-SNAPSHOT/spigot-api-1.20.2-R0.1-20231205.164257-71.jar"
+  },
+  {
+    "version": "1.20.3-R0.1-SNAPSHOT",
+    "snapshot": "1.20.3-R0.1-20231207.085553-9",
+    "sha256": "2035c4d29b3255193bf066c98fe84ee856ebaf1019642dfd3a172c81952a5f06",
+    "url": "https://hub.spigotmc.org/nexus/content/repositories/snapshots/org/spigotmc/spigot-api/1.20.3-R0.1-SNAPSHOT/spigot-api-1.20.3-R0.1-20231207.085553-9.jar"
+  },
+  {
+    "version": "1.20.4-R0.1-SNAPSHOT",
+    "snapshot": "1.20.4-R0.1-20240423.152506-123",
+    "sha256": "a6e6a32e882ec3861be5ef307c5289e3926c0a25489d66da880e98a83e139592",
+    "url": "https://hub.spigotmc.org/nexus/content/repositories/snapshots/org/spigotmc/spigot-api/1.20.4-R0.1-SNAPSHOT/spigot-api-1.20.4-R0.1-20240423.152506-123.jar"
+  },
+  {
+    "version": "1.20.5-R0.1-SNAPSHOT",
+    "snapshot": "1.20.5-R0.1-20240429.101539-37",
+    "sha256": "a46c3a04c69dcb6fbc2f30fa0963c4621f2540e1c63bc1d9c175c030b3452ffd",
+    "url": "https://hub.spigotmc.org/nexus/content/repositories/snapshots/org/spigotmc/spigot-api/1.20.5-R0.1-SNAPSHOT/spigot-api-1.20.5-R0.1-20240429.101539-37.jar"
+  },
+  {
+    "version": "1.20.6-R0.1-SNAPSHOT",
+    "snapshot": "1.20.6-R0.1-20240613.150924-57",
+    "sha256": "62a1a08d8009debb403794faffb157793dcb7dbc71c94b580908e6046b651538",
+    "url": "https://hub.spigotmc.org/nexus/content/repositories/snapshots/org/spigotmc/spigot-api/1.20.6-R0.1-SNAPSHOT/spigot-api-1.20.6-R0.1-20240613.150924-57.jar"
+  },
+  {
+    "version": "1.21-R0.1-SNAPSHOT",
+    "snapshot": "1.21-R0.1-20240807.214924-87",
+    "sha256": "6b8b70f0958a962a918bb5d93bcce5814e8bc3c34e1e2f6984e97c693d4e7c6b",
+    "url": "https://hub.spigotmc.org/nexus/content/repositories/snapshots/org/spigotmc/spigot-api/1.21-R0.1-SNAPSHOT/spigot-api-1.21-R0.1-20240807.214924-87.jar"
+  },
+  {
+    "version": "1.21.1-R0.1-SNAPSHOT",
+    "snapshot": "1.21.1-R0.1-20241022.152140-54",
+    "sha256": "9e2123934c3dca1b561a4932b9e8ec33d048725759691e7dbfd649e52c197756",
+    "url": "https://hub.spigotmc.org/nexus/content/repositories/snapshots/org/spigotmc/spigot-api/1.21.1-R0.1-SNAPSHOT/spigot-api-1.21.1-R0.1-20241022.152140-54.jar"
+  },
+  {
+    "version": "1.21.2-R0.1-SNAPSHOT",
+    "snapshot": "1.21.2-R0.1-20241023.084343-5",
+    "sha256": "868a38c3bcaed42da7ab629eed757107467a3baf8d1cb87d67a7e932e23a0f95",
+    "url": "https://hub.spigotmc.org/nexus/content/repositories/snapshots/org/spigotmc/spigot-api/1.21.2-R0.1-SNAPSHOT/spigot-api-1.21.2-R0.1-20241023.084343-5.jar"
+  },
+  {
+    "version": "1.21.3-R0.1-SNAPSHOT",
+    "snapshot": "1.21.3-R0.1-20241203.162251-46",
+    "sha256": "f59e6dfb67520a48f43aa3737a6b3ffa95a050179b1d4176cb83a10b0e91d5b0",
+    "url": "https://hub.spigotmc.org/nexus/content/repositories/snapshots/org/spigotmc/spigot-api/1.21.3-R0.1-SNAPSHOT/spigot-api-1.21.3-R0.1-20241203.162251-46.jar"
+  },
+  {
+    "version": "1.21.4-R0.1-SNAPSHOT",
+    "snapshot": "1.21.4-R0.1-20250325.160956-56",
+    "sha256": "c42f23baf77913121980a00466f388239030c704f6c22a8d489317c92ccc0079",
+    "url": "https://hub.spigotmc.org/nexus/content/repositories/snapshots/org/spigotmc/spigot-api/1.21.4-R0.1-SNAPSHOT/spigot-api-1.21.4-R0.1-20250325.160956-56.jar"
+  },
+  {
+    "version": "1.21.5-R0.1-SNAPSHOT",
+    "snapshot": "1.21.5-R0.1-20250617.151721-44",
+    "sha256": "c838e192fab564c1796abdd7711bcc9c4c5f7d8b66a68a24bb66b882fa3c4483",
+    "url": "https://hub.spigotmc.org/nexus/content/repositories/snapshots/org/spigotmc/spigot-api/1.21.5-R0.1-SNAPSHOT/spigot-api-1.21.5-R0.1-20250617.151721-44.jar"
+  },
+  {
+    "version": "1.21.6-R0.1-SNAPSHOT",
+    "snapshot": "1.21.6-R0.1-20250630.141818-13",
+    "sha256": "545cef3b9363a9db291a4f91129df806d2949aa9f9db0c9e50c33ff06f0c4f69",
+    "url": "https://hub.spigotmc.org/nexus/content/repositories/snapshots/org/spigotmc/spigot-api/1.21.6-R0.1-SNAPSHOT/spigot-api-1.21.6-R0.1-20250630.141818-13.jar"
+  },
+  {
+    "version": "1.21.7-R0.1-SNAPSHOT",
+    "snapshot": "1.21.7-R0.1-20250714.093637-4",
+    "sha256": "2adf9e691cf0f2e0ce79b7647bce50e4cf5a87db921f2bffdd94a319b2418d32",
+    "url": "https://hub.spigotmc.org/nexus/content/repositories/snapshots/org/spigotmc/spigot-api/1.21.7-R0.1-SNAPSHOT/spigot-api-1.21.7-R0.1-20250714.093637-4.jar"
+  },
+  {
+    "version": "1.21.8-R0.1-SNAPSHOT",
+    "snapshot": "1.21.8-R0.1-20250930.150928-11",
+    "sha256": "a225f502a6ba1fbcb5019ab2c684445cd8f6bee093d22c0f73c26afd3e62cdf5",
+    "url": "https://hub.spigotmc.org/nexus/content/repositories/snapshots/org/spigotmc/spigot-api/1.21.8-R0.1-SNAPSHOT/spigot-api-1.21.8-R0.1-20250930.150928-11.jar"
+  },
+  {
+    "version": "1.21.9-R0.1-SNAPSHOT",
+    "snapshot": "1.21.9-R0.1-20251007.103132-3",
+    "sha256": "7df830f83f24980889391bcdf7e1cc7968d1c2509a0a4592ffb92329b6517abf",
+    "url": "https://hub.spigotmc.org/nexus/content/repositories/snapshots/org/spigotmc/spigot-api/1.21.9-R0.1-SNAPSHOT/spigot-api-1.21.9-R0.1-20251007.103132-3.jar"
+  },
+  {
+    "version": "1.21.10-R0.1-SNAPSHOT",
+    "snapshot": "1.21.10-R0.1-20251209.161938-19",
+    "sha256": "973502a0127dbf74d3d37609f959b76435a700ff6de2126cc37aa11ce583793c",
+    "url": "https://hub.spigotmc.org/nexus/content/repositories/snapshots/org/spigotmc/spigot-api/1.21.10-R0.1-SNAPSHOT/spigot-api-1.21.10-R0.1-20251209.161938-19.jar"
+  },
+  {
+    "version": "1.21.11-R0.1-SNAPSHOT",
+    "snapshot": "1.21.11-R0.1-20251231.154832-9",
+    "sha256": "5d0f35511f69d82e3da6e5a24bc55846490f3f7708b49d835e88ba55ff167d15",
+    "url": "https://hub.spigotmc.org/nexus/content/repositories/snapshots/org/spigotmc/spigot-api/1.21.11-R0.1-SNAPSHOT/spigot-api-1.21.11-R0.1-20251231.154832-9.jar"
+  },
+  {
+    "version": "26.1-R0.1-SNAPSHOT",
+    "snapshot": "26.1-R0.1-20260329.091546-5",
+    "sha256": "9c164d8df34dca6ec9513ce55b69907dac3265f2f4b076532dfc897e921c4332",
+    "url": "https://hub.spigotmc.org/nexus/content/repositories/snapshots/org/spigotmc/spigot-api/26.1-R0.1-SNAPSHOT/spigot-api-26.1-R0.1-20260329.091546-5.jar"
+  },
+  {
+    "version": "26.1.1-R0.1-SNAPSHOT",
+    "snapshot": "26.1.1-R0.1-20260408.091146-5",
+    "sha256": "158b4115c86e43593851e1a47c9c6d689177c2d83689e8f933d3c6b1395991ff",
+    "url": "https://hub.spigotmc.org/nexus/content/repositories/snapshots/org/spigotmc/spigot-api/26.1.1-R0.1-SNAPSHOT/spigot-api-26.1.1-R0.1-20260408.091146-5.jar"
+  },
+  {
+    "version": "26.1.2-R0.1-SNAPSHOT",
+    "snapshot": "26.1.2-R0.1-20260616.152059-13",
+    "sha256": "1b21b41d83beb772b42d388e3813c00aa399fa5ad77d28e29a7f7f64b8120619",
+    "url": "https://hub.spigotmc.org/nexus/content/repositories/snapshots/org/spigotmc/spigot-api/26.1.2-R0.1-SNAPSHOT/spigot-api-26.1.2-R0.1-20260616.152059-13.jar"
+  },
+  {
+    "version": "26.2-R0.1-SNAPSHOT",
+    "snapshot": "26.2-R0.1-20260915.151451-13",
+    "sha256": "8c7bd2071d8fb85afa1331b3aa240a8507a73b5f661fa7084edcd06a2d9725f8",
+    "url": "https://hub.spigotmc.org/nexus/content/repositories/snapshots/org/spigotmc/spigot-api/26.2-R0.1-SNAPSHOT/spigot-api-26.2-R0.1-20260915.151451-13.jar"
+  },
+  {
+    "version": "26.3-R0.1-SNAPSHOT",
+    "snapshot": "26.3-R0.1-20261026.080323-10",
+    "sha256": "41f378819cdcac9cdb773d5573e6cac5f2ad4db93bdd14a4ba9f4575ac0cd4d5",
+    "url": "https://hub.spigotmc.org/nexus/content/repositories/snapshots/org/spigotmc/spigot-api/26.3-R0.1-SNAPSHOT/spigot-api-26.3-R0.1-20261026.080323-10.jar"
+  }
+]

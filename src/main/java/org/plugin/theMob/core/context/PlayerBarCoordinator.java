@@ -1,52 +1,65 @@
 package org.plugin.theMob.core.context;
 
-import org.bukkit.boss.BossBar;
-import org.bukkit.entity.Player;
-
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import org.bukkit.boss.BossBar;
+import org.bukkit.entity.Player;
 
 public final class PlayerBarCoordinator {
+  private final Map<UUID, PlayerBarCoordinator.Ctx> map = new HashMap<>();
 
-    public static final class Ctx {
-        private BossBar bossBar;
-        private BossBar hudBar;
+  public PlayerBarCoordinator.Ctx of(Player p) {
+    return this.map.computeIfAbsent(p.getUniqueId(), k -> new PlayerBarCoordinator.Ctx());
+  }
 
-        public BossBar bossBar() { return bossBar; }
-        public BossBar hudBar() { return hudBar; }
+  public void remove(Player p) {
+    PlayerBarCoordinator.Ctx ctx = this.map.remove(p.getUniqueId());
+    if (ctx != null) {
+      ctx.hideBoss();
+      ctx.hideHud();
+    }
+  }
 
-        public void setBossBar(BossBar b) { this.bossBar = b; }
-        public void setHudBar(BossBar b) { this.hudBar = b; }
-
-        public void hideBoss() {
-            if (bossBar != null) bossBar.removeAll();
-        }
-
-        public void hideHud() {
-            if (hudBar != null) hudBar.removeAll();
-        }
+  public void clearAll() {
+    for (PlayerBarCoordinator.Ctx ctx : this.map.values()) {
+      ctx.hideBoss();
+      ctx.hideHud();
     }
 
-    private final Map<UUID, Ctx> map = new HashMap<>();
+    this.map.clear();
+  }
 
-    public Ctx of(Player p) {
-        return map.computeIfAbsent(p.getUniqueId(), k -> new Ctx());
+  public static final class Ctx {
+    private BossBar bossBar;
+    private BossBar hudBar;
+
+    public BossBar bossBar() {
+      return this.bossBar;
     }
 
-    public void remove(Player p) {
-        Ctx ctx = map.remove(p.getUniqueId());
-        if (ctx != null) {
-            ctx.hideBoss();
-            ctx.hideHud();
-        }
+    public BossBar hudBar() {
+      return this.hudBar;
     }
 
-    public void clearAll() {
-        for (Ctx ctx : map.values()) {
-            ctx.hideBoss();
-            ctx.hideHud();
-        }
-        map.clear();
+    public void setBossBar(BossBar b) {
+      this.bossBar = b;
     }
+
+    public void setHudBar(BossBar b) {
+      this.hudBar = b;
+    }
+
+    public void hideBoss() {
+      if (this.bossBar != null) {
+        this.bossBar.removeAll();
+      }
+    }
+
+    public void hideHud() {
+      if (this.hudBar != null) {
+        this.hudBar.removeAll();
+      }
+    }
+  }
 }

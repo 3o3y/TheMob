@@ -1,190 +1,183 @@
 package org.plugin.theMob.control;
 
-import org.bukkit.Bukkit;
+import java.util.function.LongSupplier;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
 
 public final class TpsTracker {
+  private static final int WINDOW_1S = 20;
+  private static final int WINDOW_1M = 1200;
+  private final double[] msptRing = new double[1200];
+  private int idx = 0;
+  private int count = 0;
+  private double sum1m = 0.0;
+  private double lastMspt = 50.0;
+  private double prevTps1s = 20.0;
+  private long lastDropMillis = 0L;
+  private boolean dropping = false;
+  private BukkitRunnable task;
+  private final LongSupplier nanoTime;
+  private long lastTickNanos;
+  private long currentTick;
+  private boolean sampled;
 
-    // =================================================
-    // STATUS
-    // =================================================
-    public enum Status {
-        OK, WARN, CRITICAL, DANGER
-    }
+  public TpsTracker() {
+    this(System::nanoTime);
+  }
 
-    // =================================================
-    // WINDOWS
-    // =================================================
-    private static final int WINDOW_1S = 20;     // ~1s
-    private static final int WINDOW_1M = 1200;   // ~60s
+  TpsTracker(LongSupplier nanoTime) {
+    this.nanoTime = nanoTime;
+    this.lastTickNanos = nanoTime.getAsLong();
+  }
 
-    // =================================================
-    // RING BUFFER (REAL MSPT)
-    // =================================================
-    private final double[] msptRing = new double[WINDOW_1M];
-    private int idx = 0;
-    private int count = 0;
-    private double sum1m = 0.0;
+  /** Plugin-local server ticks; shared by spawning, HUD and minion guards. */
+  public long currentTick() {
+    return currentTick;
+  }
 
-    private double lastMspt = 50.0;
-
-    // =================================================
-    // DROP DETECTION
-    // =================================================
-    private double prevTps1s = 20.0;
-    private long lastDropMillis = 0L;
-    private boolean dropping = false;
-
-    private BukkitRunnable task;
-
-    // =================================================
-    // LIFECYCLE
-    // =================================================
-    public void start(JavaPlugin plugin) {
-        if (task != null) return;
-
-        task = new BukkitRunnable() {
-            @Override
+  public void start(JavaPlugin plugin) {
+    if (this.task == null) {
+      this.lastTickNanos = nanoTime.getAsLong();
+      this.sampled = false;
+      this.task =
+          new BukkitRunnable() {
             public void run() {
-                tick();
+              TpsTracker.this.tick();
             }
-        };
-        task.runTaskTimer(plugin, 1L, 1L);
+          };
+      this.task.runTaskTimer(plugin, 1L, 1L);
+    }
+  }
+
+  public void stop() {
+    if (this.task != null) {
+      this.task.cancel();
+      this.task = null;
     }
 
-    public void stop() {
-        if (task != null) {
-            task.cancel();
-            task = null;
+    this.idx = 0;
+    this.count = 0;
+    this.sum1m = 0.0;
+    this.lastMspt = 50.0;
+    this.prevTps1s = 20.0;
+    this.lastDropMillis = 0L;
+    this.dropping = false;
+    this.currentTick = 0;
+    this.sampled = false;
+    this.lastTickNanos = nanoTime.getAsLong();
+
+    for (int i = 0; i < this.msptRing.length; i++) {
+      this.msptRing[i] = 0.0;
+    }
+  }
+
+  void tick() {
+    currentTick++;
+    double mspt = this.readRealMspt();
+    this.lastMspt = mspt;
+    double old = this.msptRing[this.idx];
+    this.msptRing[this.idx] = mspt;
+    if (this.count < 1200) {
+      this.count++;
+    } else {
+      this.sum1m -= old;
+    }
+
+    this.sum1m += mspt;
+    this.idx++;
+    if (this.idx >= 1200) {
+      this.idx = 0;
+    }
+
+    double tps1sNow = this.tps1s();
+    long nowMs = System.currentTimeMillis();
+    boolean drop = this.prevTps1s - tps1sNow >= 2.0 || tps1sNow < 18.0;
+    if (drop) {
+      this.dropping = true;
+      this.lastDropMillis = nowMs;
+    } else if (this.dropping && nowMs - this.lastDropMillis > 5000L) {
+      this.dropping = false;
+    }
+
+    this.prevTps1s = tps1sNow;
+  }
+
+  private double readRealMspt() {
+    long now = nanoTime.getAsLong();
+    double elapsed = Math.max(0L, now - lastTickNanos) / 1_000_000.0;
+    lastTickNanos = now;
+    if (!sampled) {
+      sampled = true;
+      return 50.0;
+    }
+    // Spigot exposes no MSPT sampler. Measure actual tick intervals, including long stalls.
+    return Math.max(50.0, elapsed);
+  }
+
+  public double mspt() {
+    return this.lastMspt;
+  }
+
+  public double mspt1s() {
+    int n = Math.min(this.count, 20);
+    if (n <= 0) {
+      return this.lastMspt;
+    } else {
+      double sum = 0.0;
+
+      for (int i = 1; i <= n; i++) {
+        int p = this.idx - i;
+        if (p < 0) {
+          p += 1200;
         }
 
-        idx = 0;
-        count = 0;
-        sum1m = 0.0;
-        lastMspt = 50.0;
-        prevTps1s = 20.0;
-        lastDropMillis = 0L;
-        dropping = false;
+        sum += this.msptRing[p];
+      }
 
-        for (int i = 0; i < msptRing.length; i++) {
-            msptRing[i] = 0.0;
-        }
+      return sum / n;
     }
+  }
 
-    // =================================================
-    // TICK (REAL MSPT SOURCE)
-    // =================================================
-    private void tick() {
+  public double mspt1m() {
+    int n = Math.min(this.count, 1200);
+    return n <= 0 ? this.lastMspt : this.sum1m / n;
+  }
 
-        double mspt = readRealMspt();
-        lastMspt = mspt;
+  public double tps1s() {
+    return this.msptToTps(this.mspt1s());
+  }
 
-        double old = msptRing[idx];
-        msptRing[idx] = mspt;
+  public double tps1m() {
+    return this.msptToTps(this.mspt1m());
+  }
 
-        if (count < WINDOW_1M) {
-            count++;
-        } else {
-            sum1m -= old;
-        }
-        sum1m += mspt;
+  private double msptToTps(double mspt) {
+    return mspt <= 1.0E-4 ? 20.0 : Math.min(20.0, 1000.0 / mspt);
+  }
 
-        idx++;
-        if (idx >= WINDOW_1M) idx = 0;
-
-        // TPS drop detection
-        double tps1sNow = tps1s();
-        long nowMs = System.currentTimeMillis();
-
-        boolean drop =
-                (prevTps1s - tps1sNow) >= 2.0
-                        || tps1sNow < 18.0;
-
-        if (drop) {
-            dropping = true;
-            lastDropMillis = nowMs;
-        } else if (dropping && (nowMs - lastDropMillis) > 5000) {
-            dropping = false;
-        }
-
-        prevTps1s = tps1sNow;
+  public TpsTracker.Status statusEnum() {
+    double m = this.mspt1s();
+    if (m <= 50.0) {
+      return TpsTracker.Status.OK;
+    } else if (m <= 55.0) {
+      return TpsTracker.Status.WARN;
+    } else {
+      return m <= 85.0 ? TpsTracker.Status.CRITICAL : TpsTracker.Status.DANGER;
     }
+  }
 
-    // =================================================
-    // MSPT SOURCE
-    // =================================================
-    private double readRealMspt() {
-        try {
-            // Paper only – REAL tick cost (no sleep)
-            double mspt = Bukkit.getServer().getAverageTickTime();
-            if (mspt > 0 && mspt < 1000) {
-                return mspt;
-            }
-        } catch (Throwable ignored) {}
+  public boolean isDropping() {
+    return this.dropping;
+  }
 
-        // fallback only if Paper not available
-        return lastMspt;
-    }
+  public String status() {
+    return this.statusEnum().name();
+  }
 
-    // =================================================
-    // MSPT API
-    // =================================================
-    public double mspt() {
-        return lastMspt;
-    }
-
-    public double mspt1s() {
-        int n = Math.min(count, WINDOW_1S);
-        if (n <= 0) return lastMspt;
-
-        double sum = 0.0;
-        for (int i = 1; i <= n; i++) {
-            int p = idx - i;
-            if (p < 0) p += WINDOW_1M;
-            sum += msptRing[p];
-        }
-        return sum / n;
-    }
-
-    public double mspt1m() {
-        int n = Math.min(count, WINDOW_1M);
-        return n <= 0 ? lastMspt : (sum1m / n);
-    }
-
-    // =================================================
-    // TPS (DERIVED)
-    // =================================================
-    public double tps1s() {
-        return msptToTps(mspt1s());
-    }
-
-    public double tps1m() {
-        return msptToTps(mspt1m());
-    }
-
-    private double msptToTps(double mspt) {
-        if (mspt <= 0.0001) return 20.0;
-        return Math.min(20.0, 1000.0 / mspt);
-    }
-
-    // =================================================
-    // STATUS
-    // =================================================
-    public Status statusEnum() {
-        double m = mspt1s();
-
-        if (m <= 45.0) return Status.OK;
-        if (m <= 55.0) return Status.WARN;
-        if (m <= 85.0) return Status.CRITICAL;
-        return Status.DANGER;
-    }
-
-    public boolean isDropping() {
-        return dropping;
-    }
-    public String status() {
-        return statusEnum().name();
-    }
-
+  public static enum Status {
+    OK,
+    WARN,
+    CRITICAL,
+    DANGER;
+  }
 }

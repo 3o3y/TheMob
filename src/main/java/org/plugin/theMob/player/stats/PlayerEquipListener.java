@@ -1,244 +1,157 @@
 package org.plugin.theMob.player.stats;
 
+import java.util.*;
 import org.bukkit.Bukkit;
-import org.bukkit.attribute.Attribute;
-import org.bukkit.attribute.AttributeInstance;
+import org.bukkit.NamespacedKey;
+import org.bukkit.attribute.*;
 import org.bukkit.entity.Player;
-import org.bukkit.event.EventHandler;
-import org.bukkit.event.Listener;
-import org.bukkit.event.inventory.InventoryClickEvent;
-import org.bukkit.event.inventory.InventoryDragEvent;
-import org.bukkit.event.player.PlayerItemHeldEvent;
-import org.bukkit.event.player.PlayerQuitEvent;
-import org.bukkit.inventory.ItemStack;
+import org.bukkit.event.*;
+import org.bukkit.event.player.*;
+import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 
-import java.util.Map;
-
+/** Own additive modifiers preserve vanilla equipment and other plugins' modifiers. */
 public final class PlayerEquipListener implements Listener {
+  private final Plugin plugin;
+  private final PlayerStatCache cache;
+  private final Map<UUID, Map<String, Double>> previous = new HashMap<>();
+  private final NamespacedKey healthCredit;
 
-    private final Plugin plugin;
-    private final PlayerStatCache cache;
+  public PlayerEquipListener(Plugin plugin, PlayerStatCache cache) {
+    this.plugin = plugin;
+    this.cache = cache;
+    this.healthCredit = new NamespacedKey(plugin, "equipment_health_credit");
+    Bukkit.getOnlinePlayers().forEach(this::attach);
+    Bukkit.getScheduler()
+        .runTaskTimer(plugin, () -> Bukkit.getOnlinePlayers().forEach(this::refresh), 1, 10);
+  }
 
-    public PlayerEquipListener(Plugin plugin, PlayerStatCache cache) {
-        this.plugin = plugin;
-        this.cache = cache;
+  @EventHandler(priority = EventPriority.LOWEST)
+  public void onJoin(PlayerJoinEvent e) {
+    attach(e.getPlayer());
+  }
+
+  @EventHandler
+  public void onRespawn(PlayerRespawnEvent e) {
+    Player player = e.getPlayer();
+    player.getPersistentDataContainer().remove(healthCredit);
+    previous.remove(player.getUniqueId());
+    Bukkit.getScheduler()
+        .runTask(
+            plugin,
+            () -> {
+              if (!player.isOnline() || player.isDead()) return;
+              refresh(player);
+            });
+  }
+
+  @EventHandler
+  public void onDeath(org.bukkit.event.entity.PlayerDeathEvent e) {
+    e.getEntity().getPersistentDataContainer().remove(healthCredit);
+  }
+
+  @EventHandler
+  public void onQuit(PlayerQuitEvent e) {
+    remove(e.getPlayer());
+  }
+
+  private void refresh(Player player) {
+    if (!player.isOnline() || player.isDead()) return;
+    Map<String, Double> stats = cache.get(player);
+    if (stats.equals(previous.get(player.getUniqueId()))) return;
+    double health = player.getHealth();
+    apply(
+        player,
+        org.plugin.theMob.compat.BukkitTypes.attribute("MAX_HEALTH"),
+        "bonus_health",
+        stats);
+    apply(player, org.plugin.theMob.compat.BukkitTypes.attribute("ARMOR"), "armor", stats);
+    apply(
+        player,
+        org.plugin.theMob.compat.BukkitTypes.attribute("MOVEMENT_SPEED"),
+        "movement_speed",
+        stats);
+    apply(
+        player,
+        org.plugin.theMob.compat.BukkitTypes.attribute("ATTACK_SPEED"),
+        "attack_speed",
+        stats);
+    apply(
+        player,
+        org.plugin.theMob.compat.BukkitTypes.attribute("KNOCKBACK_RESISTANCE"),
+        "knockback_resistance",
+        stats);
+    apply(player, org.plugin.theMob.compat.BukkitTypes.attribute("LUCK"), "luck", stats);
+    previous.put(player.getUniqueId(), Map.copyOf(stats));
+    var max = org.plugin.theMob.compat.BukkitTypes.instance(player, "MAX_HEALTH");
+    if (max != null) player.setHealth(Math.min(health, max.getValue()));
+  }
+
+  private void attach(Player player) {
+    previous.remove(player.getUniqueId());
+    cache.invalidate(player);
+    refresh(player);
+    if (player.isDead()) {
+      player.getPersistentDataContainer().remove(healthCredit);
+      return;
     }
+    Double credit =
+        player.getPersistentDataContainer().get(healthCredit, PersistentDataType.DOUBLE);
+    player.getPersistentDataContainer().remove(healthCredit);
+    var max = org.plugin.theMob.compat.BukkitTypes.instance(player, "MAX_HEALTH");
+    if (credit != null && Double.isFinite(credit) && credit > 0 && max != null)
+      player.setHealth(Math.min(max.getValue(), player.getHealth() + credit));
+  }
 
-    // =========================
-    // INVENTORY
-    // =========================
-    @EventHandler(ignoreCancelled = true)
-    public void onInvClick(InventoryClickEvent e) {
-        if (e.getWhoClicked() instanceof Player p) {
-            Bukkit.getScheduler().runTask(plugin, () -> recompute(p));
-        }
+  private void apply(Player player, Attribute attribute, String name, Map<String, Double> stats) {
+    var instance = player.getAttribute(attribute);
+    if (instance == null) return;
+    var key = new NamespacedKey(plugin, "player_" + name);
+    for (var modifier : new ArrayList<>(instance.getModifiers()))
+      if (org.plugin.theMob.compat.Modifiers.identity(modifier).equals(key.toString()))
+        instance.removeModifier(modifier);
+    double value = stats.getOrDefault(name, 0.0);
+    if (!Double.isFinite(value)) return;
+    if (name.equals("bonus_health"))
+      value = org.plugin.theMob.compat.Numbers.clamp(value, 0, 10000);
+    if (name.equals("movement_speed")) value = org.plugin.theMob.compat.Numbers.clamp(value, 0, .6);
+    if (name.equals("knockback_resistance"))
+      value = org.plugin.theMob.compat.Numbers.clamp(value, 0, 1);
+    if (value != 0) instance.addModifier(org.plugin.theMob.compat.Modifiers.additive(key, value));
+  }
+
+  private void remove(Player player) {
+    double health = player.isDead() ? 0 : player.getHealth();
+    for (var attribute : org.bukkit.Registry.ATTRIBUTE) {
+      var instance = player.getAttribute(attribute);
+      if (instance != null)
+        for (var modifier : new ArrayList<>(instance.getModifiers()))
+          if (org.plugin
+              .theMob
+              .compat
+              .Modifiers
+              .identity(modifier)
+              .startsWith(plugin.getName().toLowerCase(Locale.ROOT) + ":player_"))
+            instance.removeModifier(modifier);
     }
+    var max = org.plugin.theMob.compat.BukkitTypes.instance(player, "MAX_HEALTH");
+    if (!player.isDead() && max != null) {
+      double retained = Math.min(health, max.getValue());
+      double lost = Math.max(0, health - retained);
+      Double old = player.getPersistentDataContainer().get(healthCredit, PersistentDataType.DOUBLE);
+      double pending = old != null && Double.isFinite(old) ? Math.max(0, old) : 0;
+      if (pending + lost > 0)
+        player
+            .getPersistentDataContainer()
+            .set(healthCredit, PersistentDataType.DOUBLE, pending + lost);
+      player.setHealth(retained);
+    } else player.getPersistentDataContainer().remove(healthCredit);
+    cache.invalidate(player);
+    previous.remove(player.getUniqueId());
+  }
 
-    @EventHandler(ignoreCancelled = true)
-    public void onInvDrag(InventoryDragEvent e) {
-        if (e.getWhoClicked() instanceof Player p) {
-            Bukkit.getScheduler().runTask(plugin, () -> recompute(p));
-        }
-    }
-
-    // =========================
-    // HOTBAR / MAINHAND
-    // =========================
-    @EventHandler
-    public void onHotbarSwap(PlayerItemHeldEvent e) {
-        Bukkit.getScheduler().runTask(plugin, () -> recompute(e.getPlayer()));
-    }
-
-    // =========================
-    // CLEANUP
-    // =========================
-    @EventHandler
-    public void onQuit(PlayerQuitEvent e) {
-        cache.invalidate(e.getPlayer());
-    }
-
-    // =========================
-    // CORE
-    // =========================
-    private void recompute(Player p) {
-        cache.recompute(p);
-        applyAttributes(p, cache.get(p));
-    }
-    private double vanillaWeaponBase(Player p) {
-        ItemStack it = p.getInventory().getItemInMainHand();
-
-        if (it == null || it.getType().isAir()) {
-            return 1.0;
-        }
-
-        return switch (it.getType()) {
-
-            // =========================
-            // SWORDS
-            // =========================
-            case WOODEN_SWORD -> 4.0;
-            case STONE_SWORD -> 5.0;
-            case IRON_SWORD -> 6.0;
-            case GOLDEN_SWORD -> 4.0;
-            case DIAMOND_SWORD -> 7.0;
-            case NETHERITE_SWORD -> 8.0;
-
-            // =========================
-            // AXES
-            // =========================
-            case WOODEN_AXE -> 7.0;
-            case STONE_AXE -> 9.0;
-            case IRON_AXE -> 9.0;
-            case GOLDEN_AXE -> 7.0;
-            case DIAMOND_AXE -> 9.0;
-            case NETHERITE_AXE -> 10.0;
-
-            // =========================
-            // PICKAXES
-            // =========================
-            case WOODEN_PICKAXE -> 2.0;
-            case STONE_PICKAXE -> 3.0;
-            case IRON_PICKAXE -> 4.0;
-            case GOLDEN_PICKAXE -> 2.0;
-            case DIAMOND_PICKAXE -> 5.0;
-            case NETHERITE_PICKAXE -> 6.0;
-
-            // =========================
-            // SHOVELS
-            // =========================
-            case WOODEN_SHOVEL -> 2.5;
-            case STONE_SHOVEL -> 3.5;
-            case IRON_SHOVEL -> 4.5;
-            case GOLDEN_SHOVEL -> 2.5;
-            case DIAMOND_SHOVEL -> 5.5;
-            case NETHERITE_SHOVEL -> 6.5;
-
-            // =========================
-            // HOES (fast, low dmg)
-            // =========================
-            case WOODEN_HOE -> 1.5;
-            case STONE_HOE -> 2.0;
-            case IRON_HOE -> 2.5;
-            case GOLDEN_HOE -> 1.5;
-            case DIAMOND_HOE -> 3.0;
-            case NETHERITE_HOE -> 4.0;
-
-            // =========================
-            // SPECIAL WEAPONS
-            // =========================
-            case TRIDENT -> 8.0;
-            case MACE -> 7.0;
-
-            // =========================
-            // FALLBACK
-            // =========================
-            default -> 1.0;
-        };
-    }
-    private double vanillaArmor(ItemStack it) {
-        if (it == null || it.getType().isAir()) return 0.0;
-
-        return switch (it.getType()) {
-
-            // LEATHER
-            case LEATHER_HELMET -> 1;
-            case LEATHER_CHESTPLATE -> 3;
-            case LEATHER_LEGGINGS -> 2;
-            case LEATHER_BOOTS -> 1;
-
-            // CHAINMAIL
-            case CHAINMAIL_HELMET -> 2;
-            case CHAINMAIL_CHESTPLATE -> 5;
-            case CHAINMAIL_LEGGINGS -> 4;
-            case CHAINMAIL_BOOTS -> 1;
-
-            // GOLD
-            case GOLDEN_HELMET -> 2;
-            case GOLDEN_CHESTPLATE -> 5;
-            case GOLDEN_LEGGINGS -> 3;
-            case GOLDEN_BOOTS -> 1;
-
-            // IRON
-            case IRON_HELMET -> 2;
-            case IRON_CHESTPLATE -> 6;
-            case IRON_LEGGINGS -> 5;
-            case IRON_BOOTS -> 2;
-
-            // DIAMOND
-            case DIAMOND_HELMET -> 3;
-            case DIAMOND_CHESTPLATE -> 8;
-            case DIAMOND_LEGGINGS -> 6;
-            case DIAMOND_BOOTS -> 3;
-
-            // NETHERITE
-            case NETHERITE_HELMET -> 3;
-            case NETHERITE_CHESTPLATE -> 8;
-            case NETHERITE_LEGGINGS -> 6;
-            case NETHERITE_BOOTS -> 3;
-
-            default -> 0;
-        };
-    }
-    private double vanillaToughness(ItemStack it) {
-        if (it == null || it.getType().isAir()) return 0.0;
-
-        return switch (it.getType()) {
-            case DIAMOND_HELMET,
-                 DIAMOND_CHESTPLATE,
-                 DIAMOND_LEGGINGS,
-                 DIAMOND_BOOTS -> 2.0;
-
-            case NETHERITE_HELMET,
-                 NETHERITE_CHESTPLATE,
-                 NETHERITE_LEGGINGS,
-                 NETHERITE_BOOTS -> 3.0;
-
-            default -> 0.0;
-        };
-    }
-
-
-    private void applyAttributes(Player p, Map<String, Double> stats) {
-
-        // HEALTH
-        double baseHealth = 20.0;
-        double bonusHealth = stats.getOrDefault("bonus_health", 0.0);
-        set(p, Attribute.MAX_HEALTH, baseHealth + bonusHealth);
-
-        // ARMOR / DEFENSE
-        set(p, Attribute.ARMOR, stats.getOrDefault("armor", 0.0));
-        set(p, Attribute.ARMOR_TOUGHNESS, stats.getOrDefault("defense", 0.0));
-
-        // MOVEMENT
-        set(p, Attribute.MOVEMENT_SPEED,
-                0.1 + stats.getOrDefault("movement_speed", 0.0)
-        );
-
-        // ATTACK SPEED
-        set(p, Attribute.ATTACK_SPEED,
-                4.0 + stats.getOrDefault("attack_speed", 0.0)
-        );
-
-        // KNOCKBACK / LUCK
-        set(p, Attribute.KNOCKBACK_RESISTANCE,
-                stats.getOrDefault("knockback_resistance", 0.0)
-        );
-        set(p, Attribute.LUCK,
-                stats.getOrDefault("luck", 0.0)
-        );
-
-        // CLAMP HEALTH
-        AttributeInstance hp = p.getAttribute(Attribute.MAX_HEALTH);
-        if (hp != null) {
-            p.setHealth(Math.min(p.getHealth(), hp.getValue()));
-        }
-    }
-
-    private void set(Player p, Attribute attr, double value) {
-        AttributeInstance inst = p.getAttribute(attr);
-        if (inst != null) {
-            inst.setBaseValue(value);
-        }
-    }
+  public void shutdown() {
+    Bukkit.getOnlinePlayers().forEach(this::remove);
+    previous.clear();
+  }
 }

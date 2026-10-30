@@ -1,178 +1,174 @@
 package org.plugin.theMob.ui;
 
+import java.util.HashSet;
+import java.util.Set;
+import java.util.UUID;
 import org.bukkit.Bukkit;
-import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeInstance;
+import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
-import org.bukkit.util.Vector;
 import org.plugin.theMob.boss.bar.BossBarService;
 import org.plugin.theMob.mob.MobManager;
 
-import java.util.HashSet;
-import java.util.Set;
-import java.util.UUID;
-
 public final class MobHealthDisplay {
+  private static final double NAME_RANGE = 14.0;
+  private static final double FULL_RANGE = 7.0;
+  private static final double NAME_RANGE_SQ = 196.0;
+  private static final double FULL_RANGE_SQ = 49.0;
+  private final JavaPlugin plugin;
+  private final MobManager mobs;
+  private final BossBarService bossBars;
+  private final Set<UUID> tracked = new HashSet<>();
+  private BukkitRunnable moveTask;
+  private int cursor;
 
-    private static final double NAME_RANGE = 14.0;
-    private static final double FULL_RANGE = 7.0;
-    private static final double NAME_RANGE_SQ = NAME_RANGE * NAME_RANGE;
-    private static final double FULL_RANGE_SQ = FULL_RANGE * FULL_RANGE;
+  public MobHealthDisplay(JavaPlugin plugin, MobManager mobs, BossBarService bossBars) {
+    this.plugin = plugin;
+    this.mobs = mobs;
+    this.bossBars = bossBars;
+    this.startMoveUpdater();
+  }
 
-    private final JavaPlugin plugin;
-    private final MobManager mobs;
-    private final BossBarService bossBars;
-
-    private final Set<UUID> tracked = new HashSet<>();
-    private BukkitRunnable moveTask;
-
-    public MobHealthDisplay(
-            JavaPlugin plugin,
-            MobManager mobs,
-            BossBarService bossBars
-    ) {
-        this.plugin = plugin;
-        this.mobs = mobs;
-        this.bossBars = bossBars;
-        startMoveUpdater();
+  public void onSpawn(LivingEntity mob) {
+    if (mob != null && !org.plugin.theMob.core.CosmeticEntities.isVisual(mob)) {
+      this.tracked.add(mob.getUniqueId());
+      this.update(mob);
     }
+  }
 
-
-    public void onSpawn(LivingEntity mob) {
-        if (mob == null) return;
-        tracked.add(mob.getUniqueId());
-        update(mob);
+  public void onDeath(LivingEntity mob) {
+    if (mob != null) {
+      this.tracked.remove(mob.getUniqueId());
+      mob.setCustomNameVisible(false);
     }
+  }
 
-    public void onDeath(LivingEntity mob) {
-        if (mob == null) return;
-        tracked.remove(mob.getUniqueId());
-        mob.setCustomNameVisible(false);
-    }
-
-    public void update(LivingEntity mob) {
-        if (mob == null || !mob.isValid() || mob.isDead()) return;
-        if (!mobs.isCustomMob(mob)) return;
-
-        var cfg = mobs.mobConfigOf(mob);
+  public void update(LivingEntity mob) {
+    if (mob != null
+        && mob.isValid()
+        && !mob.isDead()
+        && !org.plugin.theMob.core.CosmeticEntities.isVisual(mob)) {
+      if (plugin instanceof org.plugin.theMob.TheMob owner
+          && owner.activity() != null
+          && !owner.activity().active(mob)) {
+        if (mob.isCustomNameVisible()) mob.setCustomNameVisible(false);
+        return;
+      }
+      if (this.mobs.isCustomMob(mob)) {
+        FileConfiguration cfg = this.mobs.mobConfigOf(mob);
         boolean displayHealth = cfg == null || cfg.getBoolean("display-health", true);
-
-        Visibility vis = resolveVisibility(mob);
+        MobHealthDisplay.Visibility vis = this.resolveVisibility(mob);
         if (!vis.visible) {
-            mob.setCustomNameVisible(false);
-            return;
-        }
+          mob.setCustomNameVisible(false);
+        } else {
+          String base = this.mobs.baseNameOf(mob);
+          if (base == null || base.isBlank()) {
+            base = mob.getType().name();
+          }
 
-        String base = mobs.baseNameOf(mob);
-        if (base == null || base.isBlank()) base = mob.getType().name();
-
-        if (!displayHealth) {
+          if (!displayHealth) {
             mob.setCustomName(base);
             mob.setCustomNameVisible(true);
-            return;
-        }
+          } else {
+            String name;
+            if (vis.full) {
+              AttributeInstance maxAttr =
+                  org.plugin.theMob.compat.BukkitTypes.instance(mob, "MAX_HEALTH");
+              if (maxAttr == null) {
+                return;
+              }
 
-        String name;
+              int max = (int) Math.max(1.0, maxAttr.getValue());
+              int hp;
+              if (this.mobs.isBoss(mob)) {
+                double progress = this.bossBars.getBossProgress(mob);
+                if (progress < 0.0) {
+                  return;
+                }
 
-        if (vis.full) {
-
-            AttributeInstance maxAttr = mob.getAttribute(Attribute.MAX_HEALTH);
-            if (maxAttr == null) return;
-
-            int max = (int) Math.max(1, maxAttr.getValue());
-            int hp;
-
-            // =========================
-            // 🔥 BOSS → BOSSBAR % IST QUELLE
-            // =========================
-            if (mobs.isBoss(mob)) {
-                double progress = bossBars.getBossProgress(mob);
-                if (progress < 0) return;
                 hp = (int) Math.round(progress * max);
+              } else {
+                hp = (int) Math.max(0.0, mob.getHealth());
+              }
+
+              name = base + " §c❤ §f" + hp + "/" + max;
             } else {
-                hp = (int) Math.max(0, mob.getHealth());
+              name = base;
             }
 
-            name = base + " §c❤ §f" + hp + "/" + max;
+            if (!name.equals(mob.getCustomName())) {
+              mob.setCustomName(name);
+            }
 
-        } else {
-            name = base;
+            mob.setCustomNameVisible(true);
+          }
         }
-
-        if (!name.equals(mob.getCustomName())) {
-            mob.setCustomName(name);
-        }
-        mob.setCustomNameVisible(true);
+      }
     }
+  }
 
-    // =====================================================
-    // UPDATE LOOP
-    // =====================================================
-
-    private void startMoveUpdater() {
-        moveTask = new BukkitRunnable() {
-            @Override
-            public void run() {
-                if (tracked.isEmpty()) return;
-
-                tracked.removeIf(uuid -> {
-                    var e = Bukkit.getEntity(uuid);
-                    if (!(e instanceof LivingEntity mob)) return true;
-                    if (!mob.isValid() || mob.isDead()) return true;
-                    update(mob);
-                    return false;
-                });
+  private void startMoveUpdater() {
+    this.moveTask =
+        new BukkitRunnable() {
+          public void run() {
+            if (!MobHealthDisplay.this.tracked.isEmpty()) {
+              UUID[] ids = tracked.toArray(UUID[]::new);
+              int work =
+                  Math.min(
+                      ids.length,
+                      org.plugin.theMob.compat.Numbers.clamp(
+                          plugin.getConfig().getInt("performance.nameplates-per-cycle", 128),
+                          16,
+                          512));
+              for (int i = 0; i < work; i++) {
+                UUID uuid = ids[(cursor + i) % ids.length];
+                if (Bukkit.getEntity(uuid) instanceof LivingEntity mob) {
+                  if (mob.isValid() && !mob.isDead()) {
+                    MobHealthDisplay.this.update(mob);
+                  } else {
+                    tracked.remove(uuid);
+                  }
+                } else {
+                  tracked.remove(uuid);
+                }
+              }
+              cursor = (cursor + work) % ids.length;
             }
+          }
         };
-        moveTask.runTaskTimer(plugin, 10L, 10L);
-    }
+    this.moveTask.runTaskTimer(this.plugin, 5L, 5L);
+  }
 
-    // =====================================================
-    // VISIBILITY
-    // =====================================================
+  private MobHealthDisplay.Visibility resolveVisibility(LivingEntity mob) {
+    boolean visible = false;
+    boolean full = false;
 
-    private Visibility resolveVisibility(LivingEntity mob) {
-        boolean visible = false;
-        boolean full = false;
-
-        for (Player p : Bukkit.getOnlinePlayers()) {
-            if (p.getWorld() != mob.getWorld()) continue;
-
-            double d = p.getLocation().distanceSquared(mob.getLocation());
-            if (d > NAME_RANGE_SQ) continue;
-
-            if (!hasClearLOS(p, mob)) continue;
-
-            visible = true;
-            if (d <= FULL_RANGE_SQ) {
-                full = true;
-                break;
-            }
+    var candidates =
+        plugin instanceof org.plugin.theMob.TheMob owner && owner.activity() != null
+            ? owner.activity().nearby(mob.getLocation(), NAME_RANGE, false)
+            : Bukkit.getOnlinePlayers();
+    for (Player p : candidates) {
+      if (p.getWorld() == mob.getWorld()) {
+        double d = p.getLocation().distanceSquared(mob.getLocation());
+        if (!(d > 196.0) && this.hasClearLOS(p, mob)) {
+          visible = true;
+          if (d <= 49.0) {
+            full = true;
+            break;
+          }
         }
-
-        return new Visibility(visible, full);
+      }
     }
 
-    private boolean hasClearLOS(Player p, LivingEntity mob) {
-        if (!p.hasLineOfSight(mob)) return false;
+    return new MobHealthDisplay.Visibility(visible, full);
+  }
 
-        Vector from = p.getEyeLocation().toVector();
-        Vector to = mob.getEyeLocation().toVector();
-        Vector dir = to.subtract(from);
-        double len = dir.length();
-        if (len <= 0.1) return true;
+  private boolean hasClearLOS(Player p, LivingEntity mob) {
+    return p.hasLineOfSight(mob);
+  }
 
-        dir.normalize().multiply(0.5);
-        Vector cursor = from.clone();
-        for (double i = 0; i < len; i += 0.5) {
-            cursor.add(dir);
-            if (!cursor.toLocation(p.getWorld()).getBlock().isPassable()) return false;
-        }
-        return true;
-    }
-
-    private record Visibility(boolean visible, boolean full) {}
+  private record Visibility(boolean visible, boolean full) {}
 }

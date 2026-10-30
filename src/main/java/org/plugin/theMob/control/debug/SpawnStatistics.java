@@ -3,64 +3,57 @@ package org.plugin.theMob.control.debug;
 import java.util.concurrent.atomic.AtomicLong;
 
 public final class SpawnStatistics {
+  private final AtomicLong attempts = new AtomicLong();
+  private final AtomicLong success = new AtomicLong();
+  private final AtomicLong blockedBudget = new AtomicLong();
+  private final AtomicLong blockedThrottle = new AtomicLong();
+  private final AtomicLong blockedCooldown = new AtomicLong();
 
-    private final AtomicLong attempts = new AtomicLong();
-    private final AtomicLong success = new AtomicLong();
-    private final AtomicLong blockedBudget = new AtomicLong();
-    private final AtomicLong blockedThrottle = new AtomicLong();
-    private final AtomicLong blockedCooldown = new AtomicLong();
+  public void incAttempt() {
+    this.attempts.incrementAndGet();
+  }
 
-    // =========================
-    // WRITE
-    // =========================
-    public void incAttempt() {
-        attempts.incrementAndGet();
-    }
+  public void incSuccess() {
+    this.success.incrementAndGet();
+  }
 
-    public void incSuccess() {
-        success.incrementAndGet();
-    }
+  public void incBlockedBudget() {
+    this.blockedBudget.incrementAndGet();
+  }
 
-    public void incBlockedBudget() {
-        blockedBudget.incrementAndGet();
-    }
+  public void incBlockedThrottle() {
+    this.blockedThrottle.incrementAndGet();
+  }
 
-    public void incBlockedThrottle() {
-        blockedThrottle.incrementAndGet();
-    }
+  public void incBlockedCooldown() {
+    this.blockedCooldown.incrementAndGet();
+  }
 
-    public void incBlockedCooldown() {
-        blockedCooldown.incrementAndGet();
-    }
+  public long getAttempts() {
+    return this.attempts.get();
+  }
 
-    // =========================
-    // READ
-    // =========================
-    public long getAttempts() {
-        return attempts.get();
-    }
+  public long getSuccess() {
+    return this.success.get();
+  }
 
-    public long getSuccess() {
-        return success.get();
-    }
+  public long getBlockedBudget() {
+    return this.blockedBudget.get();
+  }
 
-    public long getBlockedBudget() {
-        return blockedBudget.get();
-    }
+  public long getBlockedThrottle() {
+    return this.blockedThrottle.get();
+  }
 
-    public long getBlockedThrottle() {
-        return blockedThrottle.get();
-    }
+  public long getBlockedCooldown() {
+    return this.blockedCooldown.get();
+  }
 
-    public long getBlockedCooldown() {
-        return blockedCooldown.get();
-    }
-
-    public void reset() {
-        attempts.set(0);
-        success.set(0);
-        blockedBudget.set(0);
-        blockedThrottle.set(0);
-        blockedCooldown.set(0);
-    }
+  public void reset() {
+    this.attempts.set(0L);
+    this.success.set(0L);
+    this.blockedBudget.set(0L);
+    this.blockedThrottle.set(0L);
+    this.blockedCooldown.set(0L);
+  }
 }
