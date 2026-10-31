@@ -11,14 +11,13 @@ import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.*;
 import org.bukkit.event.*;
 import org.bukkit.event.entity.*;
-import org.bukkit.inventory.EquipmentSlotGroup;
 import org.junit.jupiter.api.*;
 import org.mockbukkit.mockbukkit.*;
 import org.plugin.theMob.boss.*;
 import org.plugin.theMob.combat.PlayerHealing;
-import org.plugin.theMob.core.TheMobSkills;
+import org.plugin.theMob.core.CombatAbilities;
 
-class TheMobSkillsTest {
+class CombatAbilitiesTest {
   ServerMock server;
   TheMob plugin;
   Path file;
@@ -28,7 +27,7 @@ class TheMobSkillsTest {
     server = MockBukkit.mock();
     server.addSimpleWorld("world");
     plugin = MockBukkit.load(TheMob.class);
-    file = plugin.getDataFolder().toPath().resolve("skills.yml");
+    file = plugin.getDataFolder().toPath().resolve("abilities.yml");
   }
 
   @AfterEach
@@ -41,9 +40,9 @@ class TheMobSkillsTest {
     yaml.load(file.toFile());
     yaml.set(key, enabled);
     yaml.save(file.toFile());
-    var field = TheMob.class.getDeclaredField("skills");
+    var field = TheMob.class.getDeclaredField("abilities");
     field.setAccessible(true);
-    field.set(plugin, new TheMobSkills(plugin));
+    field.set(plugin, new CombatAbilities(plugin));
   }
 
   @Test
@@ -51,19 +50,19 @@ class TheMobSkillsTest {
     var player = server.addPlayer();
     byte[] old = Files.readAllBytes(file);
     var service = plugin.api();
-    server.dispatchCommand(player, "mob skills items.poison aus");
+    server.dispatchCommand(player, "mob abilities items.poison aus");
     assertArrayEquals(old, Files.readAllBytes(file));
     player.setOp(true);
-    server.dispatchCommand(player, "mob skills items.poison aus");
-    assertArrayEquals(old, Files.readAllBytes(file.resolveSibling("skills.yml.bak")));
-    assertTrue(plugin.skills().enabled("items.poison"));
+    server.dispatchCommand(player, "mob abilities items.poison aus");
+    assertArrayEquals(old, Files.readAllBytes(file.resolveSibling("abilities.yml.bak")));
+    assertTrue(plugin.abilities().enabled("items.poison"));
     assertFalse(YamlConfiguration.loadConfiguration(file.toFile()).getBoolean("items.poison"));
     plugin.reloadPlugin();
     assertSame(service, plugin.api());
-    assertTrue(plugin.skills().enabled("items.poison"));
+    assertTrue(plugin.abilities().enabled("items.poison"));
     startupPolicy("items.poison", false);
-    assertFalse(plugin.skills().enabled("items.poison"));
-    assertTrue(plugin.skills().enabled("items.ignite"));
+    assertFalse(plugin.abilities().enabled("items.poison"));
+    assertTrue(plugin.abilities().enabled("items.ignite"));
   }
 
   @Test
@@ -81,26 +80,26 @@ class TheMobSkillsTest {
             "movement_speed",
             .1);
     startupPolicy("items.enabled", false);
-    var filtered = plugin.skills().itemEffects(stats);
+    var filtered = plugin.abilities().itemEffects(stats);
     assertEquals(Map.of("damage", 25.0, "movement_speed", .1), filtered);
     assertEquals(5, stats.size());
     startupPolicy("items.enabled", true);
     startupPolicy("items.poison", false);
-    assertFalse(plugin.skills().itemEffects(stats).containsKey("poison_chance"));
-    assertEquals(20, plugin.skills().itemEffects(stats).get("lifesteal"));
+    assertFalse(plugin.abilities().itemEffects(stats).containsKey("poison_chance"));
+    assertEquals(20, plugin.abilities().itemEffects(stats).get("lifesteal"));
     startupPolicy("enabled", false);
-    assertFalse(plugin.skills().enabled("bosses.zombie_king"));
-    assertFalse(plugin.skills().enabled("items.execute"));
+    assertFalse(plugin.abilities().enabled("bosses.zombie_king"));
+    assertFalse(plugin.abilities().enabled("items.execute"));
   }
 
   @Test
   void malformedSettingsFailClosedAndCannotBeOverwrittenByCommand() throws Exception {
     Files.writeString(file, "items: false\n");
     byte[] original = Files.readAllBytes(file);
-    var policy = new TheMobSkills(plugin);
+    var policy = new CombatAbilities(plugin);
     assertFalse(policy.enabled("items.poison"));
     assertFalse(policy.enabled("bosses.zombie_king"));
-    server.dispatchCommand(server.getConsoleSender(), "mob skills items.poison an");
+    server.dispatchCommand(server.getConsoleSender(), "mob abilities items.poison an");
     assertArrayEquals(original, Files.readAllBytes(file));
   }
 
@@ -179,33 +178,5 @@ class TheMobSkillsTest {
             plugin);
     assertEquals(0, PlayerHealing.heal(player, 2));
     assertEquals(13, player.getHealth());
-  }
-
-  @Test
-  void statsShowActualSkilltreeAttributesAndLinkToSkillsInsteadOfOldEquipmentTiers() {
-    MockBukkit.createMockPlugin("SkilltreePlugin");
-    var player = server.addPlayer();
-    var move = player.getAttribute(Attribute.MOVEMENT_SPEED);
-    move.addModifier(
-        new AttributeModifier(
-            new NamespacedKey("skilltreeplugin", "speed"),
-            .25,
-            AttributeModifier.Operation.ADD_SCALAR,
-            EquipmentSlotGroup.ANY));
-    assertTrue(server.dispatchCommand(player, "stats"));
-    var inventory = player.getOpenInventory().getTopInventory();
-    var lore = inventory.getItem(20).getItemMeta().getLore();
-    double shown =
-        Double.parseDouble(
-            ChatColor.stripColor(lore.getFirst()).replace("Value: ", "").replace(',', '.'));
-    assertEquals(move.getValue(), shown, .0051, lore.toString());
-    assertTrue(lore.stream().noneMatch(line -> line.contains("Tier:")));
-    assertNotNull(inventory.getItem(49));
-    assertTrue(inventory.getItem(49).getItemMeta().getDisplayName().contains("Skilltree"));
-    assertEquals(
-        1,
-        move.getModifiers().stream()
-            .filter(m -> m.getKey().getNamespace().equals("skilltreeplugin"))
-            .count());
   }
 }

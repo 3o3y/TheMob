@@ -1,4 +1,4 @@
-package org.plugin.theMob.player.stats;
+package org.plugin.theMob.item.equipment;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -28,7 +28,7 @@ class SkilltreeHealthCompatibilityTest {
   ServerMock server;
   TheMob plugin;
   Player player;
-  PlayerEquipListener equipment;
+  EquipmentBonusListener equipment;
   URLClassLoader loader;
   Object effects, profile, store;
   Class<?> profileType;
@@ -63,8 +63,8 @@ class SkilltreeHealthCompatibilityTest {
     equipment =
         Arrays.stream(PlayerJoinEvent.getHandlerList().getRegisteredListeners())
             .map(registered -> registered.getListener())
-            .filter(PlayerEquipListener.class::isInstance)
-            .map(PlayerEquipListener.class::cast)
+            .filter(EquipmentBonusListener.class::isInstance)
+            .map(EquipmentBonusListener.class::cast)
             .findFirst()
             .orElseThrow();
     ItemStack chest = new ItemStack(Material.NETHERITE_CHESTPLATE);

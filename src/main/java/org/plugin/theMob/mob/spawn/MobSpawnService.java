@@ -174,7 +174,7 @@ public final class MobSpawnService {
             }
 
             this.baseStatApplier.apply(mob, cfg.getConfigurationSection("stats"));
-            if (plugin.skills().enabled("bosses.phase-abilities"))
+            if (plugin.abilities().enabled("bosses.phase-abilities"))
               new org.plugin.theMob.mob.ability.AbilityEngine(this.keys).apply(mob, cfg);
             EntityEquipment eqp = mob.getEquipment();
             ConfigurationSection eq = cfg.getConfigurationSection("equipment");

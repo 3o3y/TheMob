@@ -7,7 +7,7 @@ Detailed German guides cover daily administration, player values, performance, s
 * [Compatibility](https://3o3y.gitbook.io/the-mob/reference/kompatibilitaet)
 * [Mobs and items](https://3o3y.gitbook.io/the-mob/reference/mobs-und-items)
 * [Performance](https://3o3y.gitbook.io/the-mob/examples/performance)
-* [Skills](https://3o3y.gitbook.io/the-mob/skills)
+* [Boss-/Itemfähigkeiten](https://3o3y.gitbook.io/the-mob/skills)
 * [Player values](https://3o3y.gitbook.io/the-mob/spielerwerte)
 * [Updating](https://3o3y.gitbook.io/the-mob/update)
 * [Validation](https://3o3y.gitbook.io/the-mob/validation)

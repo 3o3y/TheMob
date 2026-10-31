@@ -12,7 +12,7 @@ import org.bukkit.persistence.PersistentDataType;
 import org.plugin.theMob.TheMob;
 import org.plugin.theMob.item.ItemBuilderFromConfig;
 import org.plugin.theMob.item.ItemLoreRenderer;
-import org.plugin.theMob.progression.TieredLootTableService;
+import org.plugin.theMob.item.loot.TieredLootTableService;
 
 public final class MobDropEngine {
   private MobManager mobs;

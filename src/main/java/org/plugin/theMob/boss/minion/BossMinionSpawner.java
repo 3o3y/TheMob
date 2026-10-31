@@ -111,7 +111,7 @@ public final class BossMinionSpawner {
   }
 
   private void summonOnceControlled(LivingEntity boss, BossPhase phase, ConfigurationSection cfg) {
-    if (!plugin.skills().enabled("bosses.summon-minions")) return;
+    if (!plugin.abilities().enabled("bosses.summon-minions")) return;
     if (plugin.activity() != null && !plugin.activity().active(boss)) return;
     if (boss.isValid()) {
       UUID bossId = boss.getUniqueId();

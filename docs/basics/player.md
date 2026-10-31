@@ -1,5 +1,3 @@
-# Players
+# Equipment on players
 
-Players can use `/stats`, personal compass settings, permitted dungeon entry and exit altars. Administrators use `/mob` for configuration. Player progression systems can consume the public API or use the built-in optional integrations.
-
-[Stats menu](player/statsgui.md), [stat rules](player/stats.md), [skills](../skills/overview.md), [dungeons](../dungeons/overview.md).
+TheMob 1.19.1 has no player skill tree, stats GUI or character tiers. Weapons and armor still supply their item bonuses and special effects. Existing items remain usable. Health, armor and speed modifiers are additive and leave other plugins’ modifiers intact. See [equipment bonuses](../reference/SPIELERWERTE.md) and [boss/item abilities](../abilities/overview.md).

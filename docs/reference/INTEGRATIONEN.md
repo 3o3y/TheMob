@@ -1,6 +1,6 @@
-# Optionale Integrationen in TheMob 1.19.0
+# Optionale Integrationen in TheMob 1.19.1
 
-Aktuelle Suite: **TheMob 1.19.0 / 20 ausgewählte Anbieter**. [Vollständige Funktionsmatrix](INTEGRATIONEN-20.md), [Adminmenü](ADMIN-MENUE.md). Die folgenden Abschnitte erläutern die ursprünglichen Adapter.
+Aktuelle Suite: **TheMob 1.19.1 / 20 ausgewählte Anbieter**. [Vollständige Funktionsmatrix](INTEGRATIONEN-20.md), [Adminmenü](ADMIN-MENUE.md). Die folgenden Abschnitte erläutern die ursprünglichen Adapter.
 
 ## Ursprüngliche Adapterverträge
 

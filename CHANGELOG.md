@@ -1,3 +1,11 @@
+# TheMob 1.19.1
+
+- Eigenes Spieler-Skill-/Stats-System, `/stats`, Statsinventar, Ausrüstungstiers und ungenutzte Spielerprogression vollständig entfernt.
+- Gegenstände mit Angriff, Rüstung, Defense, Leben, Verzauberungen, Sternen/Seltenheit und Spezialeffekten bleiben erhalten. Ausrüstungsboni werden ohne permanenten Spieler-Statcache aus den getragenen Slots berechnet.
+- Bossfähigkeiten und Itemeffekte bleiben einzeln steuerbar über `/mob abilities` und `abilities.yml`; gültige frühere Boss-/Itemschalter werden ohne Änderung der Originaldatei übernommen.
+- Keine Skilltree-Menüweiterleitung und keine Registrierung von `/skills` oder `/stats`. Öffentliche API 1.3.1, BattlePass-, Quest-/Job-Ereignisse, Moblevel, Loot und Dungeons bleiben erhalten.
+- NoSQLite-Ausgabe und vollständiges IntelliJ-/Git-Projekt aktualisiert.
+
 # TheMob 1.19.0
 
 - Gemeinsamer Java-17-Pluginkern für Minecraft 1.18–26.3; API-Verknüpfung gegen 32 offizielle Spigot-Ausgaben sowie zusätzliche Start-/Menü-/HP-Tests mit 1.18.2.

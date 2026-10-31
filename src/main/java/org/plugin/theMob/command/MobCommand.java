@@ -50,8 +50,8 @@ public final class MobCommand implements CommandExecutor {
     } else if (java.util.Set.of("item", "items", "mobs", "performance")
         .contains(args[0].toLowerCase(java.util.Locale.ROOT))) {
       return MobContentCommand.execute(plugin, sender, args);
-    } else if (args[0].equalsIgnoreCase("skills")) {
-      org.plugin.theMob.core.TheMobSkills.command(plugin, sender, args);
+    } else if (args[0].equalsIgnoreCase("abilities")) {
+      org.plugin.theMob.core.CombatAbilities.command(plugin, sender, args);
       return true;
     } else if (args[0].equalsIgnoreCase("dungeon")) {
       return org.plugin.theMob.dungeon.DungeonCommand.execute(plugin.dungeons(), sender, args);
@@ -433,7 +433,7 @@ public final class MobCommand implements CommandExecutor {
   }
 
   private void help(CommandSender s) {
-    s.sendMessage("§e/mob skills [status|Schalter an|aus]");
+    s.sendMessage("§e/mob abilities [status|Schalter an|aus]");
     s.sendMessage("§e/mob spawn <mob-id>");
     s.sendMessage("§e/mob killall");
     s.sendMessage("§e/mob set autospawn <mob-id> <seconds> <maxSpawns>");

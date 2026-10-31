@@ -2,7 +2,7 @@
   "base": "https://3o3y.gitbook.io/the-mob/",
   "published": "2026-10-28",
   "changeRequest": 95,
-  "note": "Existing public URLs are preserved. Match these paths before enabling Git Sync.",
+  "note": "Existing public URLs are preserved. Match these paths before enabling Git Sync. 1.19.1: Former player-stats URLs are explanatory retirement pages. Renamed ability sources keep the existing public URLs when publishing.",
   "pages": {
     "getting-started/quickstart.md": "https://3o3y.gitbook.io/the-mob/getting-started/quickstart",
     "basics/config.yml.md": "https://3o3y.gitbook.io/the-mob/basics/config.yml",
@@ -42,7 +42,6 @@
     "reference/KOMPATIBILITAET.md": "https://3o3y.gitbook.io/the-mob/reference/kompatibilitaet",
     "reference/MOBS-UND-ITEMS.md": "https://3o3y.gitbook.io/the-mob/reference/mobs-und-items",
     "reference/PERFORMANCE.md": "https://3o3y.gitbook.io/the-mob/examples/performance",
-    "reference/SKILLS.md": "https://3o3y.gitbook.io/the-mob/skills",
     "reference/SPIELERWERTE.md": "https://3o3y.gitbook.io/the-mob/spielerwerte",
     "reference/UPDATE.md": "https://3o3y.gitbook.io/the-mob/update",
     "reference/VALIDATION.md": "https://3o3y.gitbook.io/the-mob/validation",
@@ -58,7 +57,6 @@
     "examples/mob_template.yml.md": "https://3o3y.gitbook.io/the-mob/mob_template.yml",
     "examples/plugin.yml.md": "https://3o3y.gitbook.io/the-mob/plugin.yml",
     "examples/zombie-boss.yml.md": "https://3o3y.gitbook.io/the-mob/zombie-boss.yml",
-    "examples/skills.yml.md": "https://3o3y.gitbook.io/the-mob/skills.yml",
     "administration/menu.md": "https://3o3y.gitbook.io/the-mob/administration/menu",
     "developers/compatibility-tests.md": "https://3o3y.gitbook.io/the-mob/developers/compatibility-tests",
     "developers/public-api.md": "https://3o3y.gitbook.io/the-mob/developers/public-api",
@@ -66,7 +64,6 @@
     "integrations/battlepass.md": "https://3o3y.gitbook.io/the-mob/integrations/battlepass",
     "integrations/overview.md": "https://3o3y.gitbook.io/the-mob/integrations/overview",
     "getting-started/compatibility.md": "https://3o3y.gitbook.io/the-mob/getting-started-1/compatibility",
-    "skills/overview.md": "https://3o3y.gitbook.io/the-mob/skills-1/overview",
     "chapters/dungeons.md": "https://3o3y.gitbook.io/the-mob/dungeons",
     "chapters/administration.md": "https://3o3y.gitbook.io/the-mob/administration",
     "chapters/developers.md": "https://3o3y.gitbook.io/the-mob/developers",
@@ -75,7 +72,10 @@
     "chapters/integrations.md": "https://3o3y.gitbook.io/the-mob/integrations",
     "chapters/reference.md": "https://3o3y.gitbook.io/the-mob/reference",
     "chapters/reference-1.md": "https://3o3y.gitbook.io/the-mob/reference-1",
-    "chapters/skills-1.md": "https://3o3y.gitbook.io/the-mob/skills-1"
+    "reference/FAEHIGKEITEN.md": "https://3o3y.gitbook.io/the-mob/skills",
+    "abilities/overview.md": "https://3o3y.gitbook.io/the-mob/skills-1/overview",
+    "chapters/abilities.md": "https://3o3y.gitbook.io/the-mob/skills-1",
+    "examples/abilities.yml.md": "https://3o3y.gitbook.io/the-mob/skills.yml"
   },
   "hiddenFromNavigation": [
     "dungeon.yml",

@@ -25,7 +25,7 @@ public final class BossImmunityListener implements Listener {
   public void onDamage(EntityDamageEvent event) {
     var owner = org.bukkit.Bukkit.getPluginManager().getPlugin("TheMob");
     if (owner instanceof org.plugin.theMob.TheMob plugin
-        && !plugin.skills().enabled("bosses.phase-abilities")) return;
+        && !plugin.abilities().enabled("bosses.phase-abilities")) return;
     if (event.getEntity() instanceof LivingEntity boss) {
       if (this.mobs.isCustomMob(boss)) {
         String baseKey = IMMUNITY_KEYS.get(event.getCause());

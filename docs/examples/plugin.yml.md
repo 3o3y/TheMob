@@ -1,14 +1,12 @@
-# plugin.yml — configuration example
-
-This is a reference file from TheMob 1.19.0. Keep your tuned production configuration when upgrading. Use materials and entity types supported by your Minecraft version.
+# plugin.yml — command and permission reference
 
 ```yaml
 name: TheMob
-version: "1.19.0"
+version: "1.19.1"
 main: org.plugin.theMob.TheMob
 api-version: "1.18"
 author: 3o3y
-softdepend: [BetterHud, CoinOverlay, SkilltreePlugin, Jobs, Citizens, Quests, BattlePass, PlaceholderAPI, Vault, WorldGuard, LuckPerms, Essentials, Multiverse-Core, MythicMobs, MMOItems, AuraSkills, mcMMO, GriefPrevention, Towny, Lands, AdvancedCrates, EconomyShopGUI, EconomyShopGUI-Premium, DecentHolograms]
+softdepend: [BetterHud, CoinOverlay, Jobs, Citizens, Quests, BattlePass, PlaceholderAPI, Vault, WorldGuard, LuckPerms, Essentials, Multiverse-Core, MythicMobs, MMOItems, AuraSkills, mcMMO, GriefPrevention, Towny, Lands, AdvancedCrates, EconomyShopGUI, EconomyShopGUI-Premium, DecentHolograms]
 description: >
   High-performance custom mob system with YAML-based mobs,
   boss phases, automation & scaling, global spawn budgets,
@@ -32,7 +30,7 @@ commands:
       /mob connect [check|Anbieter]
       /mob connect <Anbieter> <enable|disable>
       /mob battlepass
-      /mob skills [status|Schalter an|aus]
+      /mob abilities [status|Schalter an|aus]
       /mob mobs [Seite]
       /mob items [Seite]
       /mob item <ID> [Spieler]
@@ -71,11 +69,6 @@ commands:
     permission: themob.command
     permission-message: "&cYou do not have permission to use this command."
 
-  stats:
-    description: Opens the player stats menu
-    usage: "/stats"
-    permission: themob.stats
-    permission-message: "&cYou are not allowed to open the stats menu."
 
 permissions:
   themob.admin.menu:
@@ -84,8 +77,8 @@ permissions:
   themob.admin.edit:
     description: Vollzugriff auf TheMob-Konfigurationsdateien im Adminmenue
     default: op
-  themob.skills.manage:
-    description: TheMob-Skills fuer den Serverneustart konfigurieren
+  themob.abilities.manage:
+    description: Boss- und Itemfaehigkeiten fuer den Serverneustart konfigurieren
     default: op
 
   themob.integrations.view:
@@ -148,7 +141,7 @@ permissions:
       themob.use: true
       themob.integrations.view: true
       themob.integrations.manage: true
-      themob.skills.manage: true
+      themob.abilities.manage: true
       themob.admin.menu: true
       themob.admin.edit: true
       themob.base64: true
@@ -161,7 +154,6 @@ permissions:
       themob.killall: true
       themob.reload: true
       themob.list: true
-      themob.stats: true
       themob.hud.toggle: true
       themob.compass: true
       themob.compass.admin: true
@@ -229,7 +221,4 @@ permissions:
   # =========================
   # PLAYER FEATURES
   # =========================
-  themob.stats:
-    description: Allows opening the stats menu
-    default: true
 ```

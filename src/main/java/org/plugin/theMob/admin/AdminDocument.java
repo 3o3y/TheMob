@@ -18,6 +18,10 @@ public final class AdminDocument {
   public AdminDocument(Path dataRoot, String relative) throws Exception {
     base = dataRoot.toRealPath();
     Path candidate = base.resolve(relative).normalize();
+    if (base.equals(candidate.getParent())
+        && Set.of("stats.yml", "skills.yml").contains(candidate.getFileName().toString()))
+      throw new IllegalArgumentException(
+          "Diese fruehere Spieler-/Skillkonfiguration wird nicht mehr verwendet");
     if (!candidate.startsWith(base) || !relative.endsWith(".yml"))
       throw new IllegalArgumentException("Ungueltige Konfigurationsdatei");
     for (Path cursor = candidate; !cursor.equals(base); cursor = cursor.getParent())
@@ -221,10 +225,10 @@ public final class AdminDocument {
             throw new IllegalArgumentException("Phase " + phase + ": HP-Bereich ausserhalb 0..100");
         }
     }
-    if (file.getFileName().toString().equals("skills.yml"))
+    if (file.getFileName().toString().equals("abilities.yml"))
       for (var entry : config.getValues(true).entrySet())
         if (!(entry.getValue() instanceof ConfigurationSection)
             && !(entry.getValue() instanceof Boolean))
-          throw new IllegalArgumentException("Skillschalter muessen true/false sein");
+          throw new IllegalArgumentException("Faehigkeitsschalter muessen true/false sein");
   }
 }

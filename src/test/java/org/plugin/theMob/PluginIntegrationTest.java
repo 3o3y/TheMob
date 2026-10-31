@@ -13,7 +13,6 @@ import org.bukkit.persistence.PersistentDataType;
 import org.junit.jupiter.api.*;
 import org.mockbukkit.mockbukkit.MockBukkit;
 import org.mockbukkit.mockbukkit.ServerMock;
-import org.plugin.theMob.player.stats.menu.*;
 
 class PluginIntegrationTest {
   ServerMock server;
@@ -205,24 +204,6 @@ class PluginIntegrationTest {
   }
 
   @Test
-  void renamedStatsInventoryStillBlocksClicks() {
-    var player = server.addPlayer();
-    var holder = new StatsMenuHolder();
-    var inv = Bukkit.createInventory(holder, 54, "Deine Werte");
-    holder.bind(inv);
-    player.openInventory(inv);
-    var event =
-        new InventoryClickEvent(
-            player.getOpenInventory(),
-            InventoryType.SlotType.CONTAINER,
-            13,
-            ClickType.LEFT,
-            InventoryAction.PICKUP_ALL);
-    server.getPluginManager().callEvent(event);
-    assertTrue(event.isCancelled());
-  }
-
-  @Test
   void itemStatsAreCountedOnceAndForeignNamespacesIgnored() {
     var player = server.addPlayer();
     var item = new ItemStack(Material.DIAMOND_SWORD);
@@ -233,7 +214,7 @@ class PluginIntegrationTest {
         .set(new NamespacedKey("otherplugin", "damage"), PersistentDataType.DOUBLE, 900.0);
     item.setItemMeta(meta);
     player.getInventory().setItemInMainHand(item);
-    var cache = new org.plugin.theMob.player.stats.PlayerStatCache(plugin);
+    var cache = new org.plugin.theMob.item.equipment.EquipmentBonuses(plugin);
     assertEquals(25, cache.get(player).get("damage"));
     var enchants = new org.plugin.theMob.item.CustomEnchantSystem(plugin);
     assertEquals(25, enchants.collect(meta).get("damage"));

@@ -190,7 +190,7 @@ final class ResourcePackDelivery implements Listener {
   String status() {
     if (!enabled) {
       return "Automatische Paketanfrage deaktiviert. Ohne bestaetigtes Laden wird der Textkompass"
-                 + " verwendet.";
+          + " verwendet.";
     }
     if (shared) return "Gemeinsames CoinOverlay-HUD-Paket; Download und Angebot durch CoinOverlay.";
     if (offer == null) {

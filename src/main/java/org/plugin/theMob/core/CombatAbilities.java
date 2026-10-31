@@ -1,13 +1,12 @@
 package org.plugin.theMob.core;
 
 import java.util.*;
-import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.plugin.theMob.TheMob;
 
 /** Immutable startup policy: no mid-fight phase reset or surprise resummoning. */
-public final class TheMobSkills {
+public final class CombatAbilities {
   private static final Map<String, String> PATHS;
 
   static {
@@ -43,17 +42,27 @@ public final class TheMobSkills {
 
   private final Map<String, Boolean> flags;
 
-  public TheMobSkills(TheMob plugin) {
-    var file = plugin.getDataFolder().toPath().resolve("skills.yml");
-    if (!java.nio.file.Files.exists(file)) plugin.saveResource("skills.yml", false);
+  public CombatAbilities(TheMob plugin) {
+    var file = plugin.getDataFolder().toPath().resolve("abilities.yml");
     Map<String, Boolean> values;
     try {
+      if (!java.nio.file.Files.exists(file)) {
+        var legacy = file.resolveSibling("skills.yml");
+        if (java.nio.file.Files.exists(legacy)) {
+          parse(AtomicYaml.read(legacy));
+          java.nio.file.Files.copy(legacy, file);
+          plugin
+              .getLogger()
+              .info("Boss-/Item-Schalter aus skills.yml nach abilities.yml uebernommen.");
+        } else plugin.saveResource("abilities.yml", false);
+      }
       values = parse(AtomicYaml.read(file));
     } catch (Exception invalid) {
       plugin
           .getLogger()
           .severe(
-              "Skills deaktiviert: skills.yml ist ungueltig; Datei bleibt erhalten. "
+              "Boss-/Item-Faehigkeiten deaktiviert: abilities.yml ist ungueltig; Datei bleibt"
+                  + " erhalten. "
                   + invalid.getMessage());
       values = Map.of("all", false);
     }
@@ -83,7 +92,9 @@ public final class TheMobSkills {
     return List.copyOf(PATHS.keySet());
   }
 
-  /** Filters only TheMob proc mechanics; never removes base attributes or Skilltree modifiers. */
+  /**
+   * Filters only TheMob proc mechanics; never removes base attributes or other plugins' modifiers.
+   */
   public Map<String, Double> itemEffects(Map<String, Double> stats) {
     if (stats == null) return Map.of();
     var filtered = new HashMap<>(stats);
@@ -99,61 +110,54 @@ public final class TheMobSkills {
   }
 
   public static boolean mayManage(CommandSender sender) {
-    return sender.hasPermission("themob.admin") || sender.hasPermission("themob.skills.manage");
+    return sender.hasPermission("themob.admin") || sender.hasPermission("themob.abilities.manage");
   }
 
   public static void command(TheMob plugin, CommandSender sender, String[] args) {
     if (!mayManage(sender)) {
-      sender.sendMessage("§cDafuer fehlt dir themob.skills.manage.");
+      sender.sendMessage("§cDafuer fehlt dir themob.abilities.manage.");
       return;
     }
     try {
-      var file = plugin.getDataFolder().toPath().resolve("skills.yml");
+      var file = plugin.getDataFolder().toPath().resolve("abilities.yml");
       var config = AtomicYaml.read(file);
       var requested = parse(config);
       if (args.length <= 1 || args.length == 2 && args[1].equalsIgnoreCase("status")) {
-        sender.sendMessage("§6TheMob-Skills – laufend / fuer Neustart gespeichert");
+        sender.sendMessage("§6Boss- und Itemfaehigkeiten – laufend / fuer Neustart gespeichert");
         for (String id : targets())
           sender.sendMessage(
               "§7"
                   + id
                   + ": "
-                  + (plugin.skills().enabled(id) ? "§aan" : "§caus")
+                  + (plugin.abilities().enabled(id) ? "§aan" : "§caus")
                   + " §7/ "
                   + (requested.get(id) ? "an" : "aus"));
-        var skilltree = Bukkit.getPluginManager().getPlugin("SkilltreePlugin");
         sender.sendMessage(
-            "§7SkilltreePlugin: "
-                + (skilltree != null && skilltree.isEnabled()
-                    ? skilltree.getDescription().getVersion() + " – /skills"
-                    : "nicht aktiv"));
-        sender.sendMessage(
-            "§e/mob skills <Schalter> <an|aus> §7– wirksam nach vollstaendigem Neustart");
+            "§e/mob abilities <Schalter> <an|aus> §7– wirksam nach vollstaendigem Neustart");
         return;
       }
       String id = args[1].toLowerCase(Locale.ROOT);
       if (args.length != 3
           || !PATHS.containsKey(id)
           || !Set.of("an", "aus", "enable", "disable").contains(args[2].toLowerCase(Locale.ROOT))) {
-        sender.sendMessage("§e/mob skills <Schalter> <an|aus>; Schalter: /mob skills status");
+        sender.sendMessage("§e/mob abilities <Schalter> <an|aus>; Schalter: /mob abilities status");
         return;
       }
       boolean on = args[2].equalsIgnoreCase("an") || args[2].equalsIgnoreCase("enable");
       config.set(PATHS.get(id), on);
-      AtomicYaml.replace(file, config, "skills.yml.bak");
+      AtomicYaml.replace(file, config, "abilities.yml.bak");
       sender.sendMessage(
           "§a"
               + id
               + " "
               + (on ? "aktiviert" : "deaktiviert")
               + " gespeichert. §eWirksam nach vollstaendigem Serverneustart.");
-      sender.sendMessage(
-          "§7Vorheriger Stand: skills.yml.bak. Skilltree-Punkte und Bossphasen bleiben erhalten.");
+      sender.sendMessage("§7Vorheriger Stand: abilities.yml.bak. Bossphasen bleiben erhalten.");
     } catch (Exception failure) {
       sender.sendMessage(
-          "§cSkills konnten nicht sicher gelesen/gespeichert werden. Keine Aenderung; Konsole"
+          "§cFaehigkeiten konnten nicht sicher gelesen/gespeichert werden. Keine Aenderung; Konsole"
               + " pruefen.");
-      plugin.getLogger().warning("[Skills] " + failure.getMessage());
+      plugin.getLogger().warning("[Abilities] " + failure.getMessage());
     }
   }
 }

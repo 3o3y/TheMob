@@ -1,7 +1,3 @@
-# Player stat rules
+# Player stats removed
 
-Vanilla damage remains the base. TheMob damage/extra_damage, critical hits, lifesteal and defense each apply in their designated step; they are not duplicated because another stat menu displays them. Armor, health, absorption and hunger are distinct values.
-
-Equipment modifiers are replaced by their own stable identity. Removing them at logout records only the HP lost to the lowered maximum; login restores that credit after reapplying equipment, clamps to the actual maximum and consumes it once. Hunger remains 0–20. The displayed armor scale belongs to CoinOverlay and must match its current HUD.
-
-[Complete configuration and examples](../../reference/SPIELERWERTE.md). The detailed operator references currently use German; the public API developer guide is English.
+TheMob 1.19.1 no longer registers `/stats`, maintains player tiers or loads `stats.yml`. This page is retained for existing documentation links. Other plugins may own their own stats menus. Item damage, defense, health bonuses, enchantments and special effects remain available. See [equipment bonuses](../../reference/SPIELERWERTE.md).

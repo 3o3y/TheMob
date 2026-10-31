@@ -1,4 +1,4 @@
-# TheMob 1.19.0: 20 passende RPG-/Server-Plugins
+# TheMob 1.19.1: 20 passende RPG-/Server-Plugins
 
 Dies ist eine ausgewählte RPG-/Server-Suite, keine gemessene weltweite Beliebtheitsrangliste. Alle Anbieter sind optional. Status und Einstellungen: **`/mob` → Plugin-Anbindungen**. Die Befehle `/mob connect check` und `/mob connect <Anbieter> enable|disable` bleiben erhalten. Änderungen der Aktivierung gelten nach vollständigem Neustart.
 
@@ -25,7 +25,7 @@ Dies ist eine ausgewählte RPG-/Server-Suite, keine gemessene weltweite Beliebth
 | EconomyShopGUI / Premium | Native Shopitems über `economyshopgui:Sektion.Item`; Schutz vor Verkauf spezieller Ausrüstung zum Vanilla-Preis | [API](https://wiki.gpplugins.com/economyshopgui/api/api-usage) |
 | DecentHolograms | Optionale nichtpersistente Bossanzeigen, begrenzt auf 24 aktive Anzeigen, ein gemeinsamer Sekundentakt | [API](https://wiki.decentholograms.eu/api/dhapi/) |
 
-EssentialsX und Multiverse nutzen bewusst die gemeinsamen Bukkit-Verträge; sie haben hier keinen eigenen Serviceadapter. Die übrigen Zeilen benennen die jeweils eingebundene Schnittstelle. „Bereit“ bestätigt die erreichbare Schnittstelle, keine vollständige gleichzeitige Serverprüfung sämtlicher Anbieter. Beliebige weitere Plugins können eigene Brücken über die öffentliche API registrieren. PKPlugin, CoinOverlay und euer SkilltreePlugin bleiben zusätzliche projektspezifische Anbindungen.
+EssentialsX und Multiverse nutzen bewusst die gemeinsamen Bukkit-Verträge; sie haben hier keinen eigenen Serviceadapter. Die übrigen Zeilen benennen die jeweils eingebundene Schnittstelle. „Bereit“ bestätigt die erreichbare Schnittstelle, keine vollständige gleichzeitige Serverprüfung sämtlicher Anbieter. Beliebige weitere Plugins können eigene Brücken über die öffentliche API registrieren. PKPlugin und CoinOverlay bleiben zusätzliche projektspezifische Anbindungen. Ein eigenes Spieler-Skill-/Stats-System enthält TheMob nicht mehr.
 
 ## Originalitems als Drops
 

@@ -10,9 +10,10 @@ parser.add_argument('--previous-api',type=Path)
 parser.add_argument('--previous-dungeon-api',type=Path)
 args=parser.parse_args()
 r=Path(__file__).resolve().parents[1]
-v,av='1.19.0','1.3.1'
+v,av='1.19.1','1.3.1'
 libs,dist=r/'build/libs',r/'build/distributions'
 jar=libs/f'TheMob-{v}-MC1.18-26.3.jar'
+no_sqlite=libs/f'TheMob-{v}-MC1.18-26.3-NoSQLite.jar'
 api,dungeon=[libs/f'{name}-{av}.jar' for name in ['TheMob-API','TheMob-Dungeon-API']]
 source,server,update=[dist/f'TheMob-{v}-MC1.18-26.3-{kind}.zip' for kind in ['Quellprojekt','Serverpaket','Update']]
 sdk=dist/f'TheMob-Developer-SDK-{v}.zip'
@@ -45,7 +46,7 @@ def public_members(data):
     return members
 
 totals={}
-for task,count in [('test',294),('battlePassApiTest',17),('skilltreeCompatibilityTest',14),('serverProvidersApiTest',8),('standaloneTest',1),('legacy118Test',4),('compatibilityMatrixTest',1)]:
+for task,count in [('test',299),('battlePassApiTest',17),('skilltreeCompatibilityTest',14),('serverProvidersApiTest',8),('standaloneTest',1),('legacy118Test',4),('compatibilityMatrixTest',1),('noSqliteTest',3),('noSqliteLegacy118Test',4)]:
     suites=[ET.parse(p).getroot() for p in (r/'build/test-results'/task).glob('TEST-*.xml')]
     actual=tuple(sum(int(s.get(k,0)) for s in suites) for k in ['tests','failures','errors','skipped'])
     assert actual==(count,0,0,0),(task,actual)
@@ -58,6 +59,19 @@ for previous,current in [(args.previous_api,api),(args.previous_dungeon_api,dung
         with ZipFile(previous) as old,ZipFile(current) as new:
             for name in old.namelist():
                 if name.endswith('.class'):assert public_members(old.read(name))<=public_members(new.read(name)),name
+
+for artifact in [jar,no_sqlite]:
+    with ZipFile(artifact) as z:
+        names=set(z.namelist())
+        assert not {'stats.yml','skills.yml','org/plugin/theMob/core/TheMobSkills.class','org/plugin/theMob/command/StatsCommand.class'}&names
+        assert not any(n.startswith(('org/plugin/theMob/player/stats/','org/plugin/theMob/progression/')) for n in names)
+        assert 'abilities.yml' in names
+        descriptor=z.read('plugin.yml').decode()
+        assert '\n  stats:' not in descriptor and 'themob.stats' not in descriptor and 'SkilltreePlugin' not in descriptor
+        if artifact==no_sqlite:
+            assert not any(n.startswith('org/sqlite/') for n in names)
+            assert z.read('themob-build.properties')==b'sqlite.enabled=false\n'
+            assert 'META-INF/services/java.sql.Driver' not in names
 
 forbidden=('org/bukkit/','io/papermc/','com/destroystokyo/','net/kyori/','org/junit/','org/mockito/','org/mockbukkit/','be/seeseemelk/','org/slf4j/','kr/toxicity/','me/clip/','net/citizensnpcs/','com/gamingmesh/','me/pikamug/','com/sk89q/','net/advancedplugins/','io/github/battlepass/','com/j256/','ch/sasch/skilltree/','net/luckperms/','dev/aurelium/','me/PM2/','me/gypopo/','net/Indyuce/','io/lumine/','me/angeschossen/','com/palmergames/','com/gmail/nossr50/','me/ryanhamshire/','eu/decentsoftware/','ch/sasch/pk/')
 with ZipFile(jar) as z:
@@ -84,7 +98,7 @@ with ZipFile(jar) as z:
 
 with ZipFile(source) as z:
     names=set(z.namelist())
-    assert {'gradlew.bat','gradle/wrapper/gradle-wrapper.jar','settings.gradle.kts','build.gradle.kts','.gitignore','.gitattributes','.gitbook.yaml','GIT-START.md','docs/SUMMARY.md','compatibility/versions.json','compatibility/fetch_apis.py','src/legacy118/java/org/plugin/theMob/Legacy118SmokeTest.java'}<=names
+    assert {'gradlew.bat','gradle/wrapper/gradle-wrapper.jar','settings.gradle.kts','build.gradle.kts','.gitignore','.gitattributes','.gitbook.yaml','GIT-START.md','LICENSE.md','FAEHIGKEITEN.md','docs/SUMMARY.md','compatibility/versions.json','compatibility/fetch_apis.py','src/legacy118/java/org/plugin/theMob/Legacy118SmokeTest.java'}<=names
     assert not any(n.startswith(('build/','.gradle/','.git/','.idea/','compatibility/cache/')) for n in names)
     for file in (r/'src').rglob('*'):
         if file.is_file():assert z.read(file.relative_to(r).as_posix())==file.read_bytes(),file
@@ -130,10 +144,10 @@ summary=(r/'docs/SUMMARY.md').read_text(encoding='utf-8')
 pages=re.findall(r'\]\(([^)]+)\)',summary)
 assert len(pages)==len(set(pages))
 
-report={'version':v,'api':av,'javaBytecode':17,'minecraft':'1.18–26.3','apiVersions':32,'tests':totals,'totalTests':sum(totals.values()),'api13AbiPreserved':bool(args.previous_api and args.previous_dungeon_api),'originalEightMobsAnd14VendorClassesPreserved':bool(args.baseline_jar),'docsPages':len(list((r/'docs').rglob('*.md'))),'artifacts':{}}
-for file in [jar,api,dungeon,source,server,update,sdk,book]:
+report={'version':v,'api':av,'javaBytecode':17,'minecraft':'1.18–26.3','apiVersions':32,'tests':totals,'totalTests':sum(totals.values()),'playerSkillsStatsRemoved':True,'itemBonusesAndEffectsRetained':True,'api13AbiPreserved':bool(args.previous_api and args.previous_dungeon_api),'originalEightMobsAnd14VendorClassesPreserved':bool(args.baseline_jar),'docsPages':len(list((r/'docs').rglob('*.md'))),'artifacts':{}}
+for file in [jar,no_sqlite,api,dungeon,source,server,update,sdk,book]:
     digest=hashlib.sha256(file.read_bytes()).hexdigest()
     file.with_suffix(file.suffix+'.sha256').write_text(digest+'  '+file.name+'\n',encoding='ascii')
     report['artifacts'][file.name]={'bytes':file.stat().st_size,'sha256':digest}
-(r/'build/release-1.19.0-verification.json').write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8')
+(r/f'build/release-{v}-verification.json').write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8')
 print(json.dumps(report,indent=2))

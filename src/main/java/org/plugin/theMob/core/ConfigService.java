@@ -19,11 +19,9 @@ public final class ConfigService {
   private File mobsFolder;
   private File installedZipFolder;
   private File autoSpawnFile;
-  private File statsFile;
   private File spawnEggsFile;
   private volatile FileConfiguration spawnEggsCfg;
   private volatile FileConfiguration autoSpawnCfg;
-  private volatile FileConfiguration statsCfg;
   private volatile Map<String, FileConfiguration> mobConfigs = Map.of();
   private static final List<String> DEFAULT_MOBS =
       List.of(
@@ -47,7 +45,6 @@ public final class ConfigService {
     this.mobsFolder.mkdirs();
     this.installedZipFolder.mkdirs();
     this.autoSpawnFile = new File(this.plugin.getDataFolder(), "auto_spawn.yml");
-    this.statsFile = new File(this.plugin.getDataFolder(), "stats.yml");
     this.spawnEggsFile = new File(this.plugin.getDataFolder(), "spawneggs.yml");
     if (!this.spawnEggsFile.exists()) {
       this.plugin.saveResource("spawneggs.yml", false);
@@ -55,10 +52,6 @@ public final class ConfigService {
 
     if (!this.autoSpawnFile.exists()) {
       this.plugin.saveResource("auto_spawn.yml", false);
-    }
-
-    if (!this.statsFile.exists()) {
-      this.plugin.saveResource("stats.yml", false);
     }
 
     File mainConfig = new File(this.plugin.getDataFolder(), "config.yml");
@@ -85,7 +78,6 @@ public final class ConfigService {
   public void reloadAll() {
     this.installZipPacks();
     this.reloadAutoSpawn();
-    this.reloadStats();
     this.reloadMobsValidated();
     this.reloadSpawnEggs();
   }
@@ -117,10 +109,6 @@ public final class ConfigService {
     if (!this.autoSpawnCfg.isList("spawns")) {
       this.autoSpawnCfg.set("spawns", List.of());
     }
-  }
-
-  public void reloadStats() {
-    this.statsCfg = YamlConfiguration.loadConfiguration(this.statsFile);
   }
 
   public void reloadMobsValidated() {
@@ -286,9 +274,5 @@ public final class ConfigService {
 
   public FileConfiguration autoSpawn() {
     return this.autoSpawnCfg;
-  }
-
-  public FileConfiguration stats() {
-    return this.statsCfg;
   }
 }

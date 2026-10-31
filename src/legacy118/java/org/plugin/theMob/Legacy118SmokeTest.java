@@ -199,8 +199,8 @@ class Legacy118SmokeTest {
         java.util.Arrays.stream(
                 org.bukkit.event.player.PlayerJoinEvent.getHandlerList().getRegisteredListeners())
             .map(org.bukkit.plugin.RegisteredListener::getListener)
-            .filter(org.plugin.theMob.player.stats.PlayerEquipListener.class::isInstance)
-            .map(org.plugin.theMob.player.stats.PlayerEquipListener.class::cast)
+            .filter(org.plugin.theMob.item.equipment.EquipmentBonusListener.class::isInstance)
+            .map(org.plugin.theMob.item.equipment.EquipmentBonusListener.class::cast)
             .findFirst()
             .orElseThrow();
     listener.onJoin(new org.bukkit.event.player.PlayerJoinEvent(player, ""));

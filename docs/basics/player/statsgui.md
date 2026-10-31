@@ -1,7 +1,3 @@
-# Stats menu
+# Stats GUI removed
 
-`/stats` shows actual combined player attributes rather than only TheMob's contribution. With your SkilltreePlugin it exposes the existing `/skills` entry point and respects that plugin's own skill system. TheMob's admin switches control its own boss abilities and item effects.
-
-TheMob weapon bonuses are included once before compatible skill modifiers. Healing uses the normal custom healing event so other systems can participate. Menu icons use ordinary Minecraft items; no new resource pack is required.
-
-[Complete configuration and examples](../../reference/SKILLS.md). The detailed operator references currently use German; the public API developer guide is English.
+The old TheMob stats inventory and Skilltree menu shortcut were removed in 1.19.1. There is no replacement player stats menu inside TheMob. Use your separate skill plugin for player progression. Items and their bonuses remain in TheMob; administrators manage them through `/mob`. See [items](../mobs/item.md).

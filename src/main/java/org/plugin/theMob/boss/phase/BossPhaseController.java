@@ -93,9 +93,9 @@ public final class BossPhaseController {
         this.applyPhaseBuffs(boss, template, phase);
         ConfigurationSection cfg = template.phaseConfig(phase.id());
         if (cfg != null) {
-          if (plugin.skills().enabled("bosses.phase-abilities"))
+          if (plugin.abilities().enabled("bosses.phase-abilities"))
             this.abilityEngine.apply(boss, cfg);
-          if (plugin.skills().enabled("bosses.phase-combat")) this.combatEngine.apply(boss, cfg);
+          if (plugin.abilities().enabled("bosses.phase-combat")) this.combatEngine.apply(boss, cfg);
           this.applyWorldEffectsFromPhaseCfg(boss, template, cfg);
         }
 
@@ -153,9 +153,9 @@ public final class BossPhaseController {
             this.applyPhaseBuffs(boss, template, next);
             ConfigurationSection cfg = template.phaseConfig(next.id());
             if (cfg != null) {
-              if (plugin.skills().enabled("bosses.phase-abilities"))
+              if (plugin.abilities().enabled("bosses.phase-abilities"))
                 this.abilityEngine.apply(boss, cfg);
-              if (plugin.skills().enabled("bosses.phase-combat"))
+              if (plugin.abilities().enabled("bosses.phase-combat"))
                 this.combatEngine.apply(boss, cfg);
               this.applyWorldEffectsFromPhaseCfg(boss, template, cfg);
             }
@@ -249,14 +249,14 @@ public final class BossPhaseController {
 
   private void applyPhaseBuffs(LivingEntity boss, BossTemplate template, BossPhase phase) {
     ConfigurationSection cfg = template.phaseConfig(phase.id());
-    if (cfg != null && plugin.skills().enabled("bosses.phase-buffs")) {
+    if (cfg != null && plugin.abilities().enabled("bosses.phase-buffs")) {
       this.buffEngine.applyPhase(boss, cfg);
     }
   }
 
   private void applyWorldEffectsFromPhaseCfg(
       LivingEntity boss, BossTemplate template, ConfigurationSection phaseCfg) {
-    if (this.worldEffects != null && plugin.skills().enabled("bosses.world-effects")) {
+    if (this.worldEffects != null && plugin.abilities().enabled("bosses.world-effects")) {
       ConfigurationSection world = phaseCfg.getConfigurationSection("world");
       if (world != null) {
         String weather = world.getString("weather");

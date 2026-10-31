@@ -1,6 +1,6 @@
 # The Mob
 
-**TheMob 1.19.0** brings custom mobs, phased bosses, protected physical dungeons and RPG loot to **Spigot and Paper 1.18–26.3**. The plugin version and Minecraft version are separate numbers. The core is Java 17 bytecode; run the Java version required by your server.
+**TheMob 1.19.1** brings custom mobs, phased bosses, protected physical dungeons and RPG loot to **Spigot and Paper 1.18–26.3**. The plugin version and Minecraft version are separate numbers. The core is Java 17 bytecode; run the Java version required by your server.
 
 Use **`/mob`** as an administrator to open the complete inventory menu. It needs no resource pack. Existing commands remain available. Create and edit mobs, phases, drops, spawn schedules and dungeons, or manage skills and optional integrations from the same menu. Short text or number inputs use private chat prompts.
 

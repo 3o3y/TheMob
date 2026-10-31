@@ -325,7 +325,7 @@ final class AdminConfigMenus {
             "Validiert den kompletten Dateibaum",
             "Vorherige Datei: " + doc.name() + ".admin.bak",
             "Noch keine laufenden Mobs oder Spielerwerte aendern",
-            "Integrationen/Skills: vollstaendiger Neustart"),
+            "Integrationen/Faehigkeiten: vollstaendiger Neustart"),
         "themob.admin.edit",
         () -> {
           try {

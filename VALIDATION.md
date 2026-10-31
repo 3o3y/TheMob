@@ -1,30 +1,26 @@
-# Prüfstand TheMob 1.19.0
+# Prüfstand TheMob 1.19.1
 
-28. Oktober 2026. Pluginkern und API 1.3.1: **Java-17-Bytecode**, Spigot/Paper **1.18–26.3**. Build- und Testwerkzeuge: JDK 25. Alle automatisierten Läufe müssen ohne Fehler und ohne übersprungene Tests bestehen; XML-Ergebnisse: `build/test-results`.
+31. Oktober 2026. Pluginkern und API 1.3.1: Java-17-Bytecode, Spigot/Paper 1.18–26.3. Build- und Testwerkzeuge: JDK 25.
 
 | Prüflauf | Tests | Inhalt |
 |---|---:|---|
-| Hauptsuite | 294 | Kampf, HP-Rejoin, Skills, Katalog, Bossphasen/Zombie-König, Pets, Spawns/Cold, Dungeons/Altar, Menürechte/Dateientwürfe, öffentliche API, HUD, Provider-Fixtures |
-| BattlePass 5.0.12 | 17 | Echte Registry/Action-/Questpipeline-Klassen, Kills, Phasen, Schaden, Drops, Loot, Dungeonfortschritt und Filter |
-| SkilltreePlugin 2.0.0 | 14 | Echte lokale JAR, Ausrüstung/Attribute, Rejoin, Waffen- und Heilmodifikatoren |
-| Weitere echte Anbieter-APIs | 8 | LuckPerms API 5.5, AuraSkills API 2.2.4, AdvancedCrates 4.7.4, EconomyShopGUI-Premium 6.5.1 |
-| Start ohne optionale HUD-Anbieter | 1 | Eigener Klassenpfad ohne BetterHud/PlaceholderAPI |
-| Ältere Minecraft-API 1.18.2 | 4 | Start/Shutdown, Adminmenü/alte Befehle, fehlende neuere Items, alte UUID-Modifikatoren und HP-Rejoin |
-| Versionsmatrix | 1 | Produktionsverweise gegen 32 SHA-256-geprüfte offizielle Spigot-APIs |
-| **Gesamt** | **339** | **0 Fehler, 0 übersprungene Tests** |
+| Hauptsuite | 299 | Entfernung der Spieler-Skills/-Stats, fremde Befehle, Konfigurationsmigration, Itemboni/Spezialeffekte, HP-Rejoin, Mobs/Bosse, Dungeons, Adminmenü, API und HUD |
+| BattlePass 5.0.12 | 17 | Echte Registry und native Questpipeline: Kills, Phasen, Schaden, Drops, Loot und Dungeonabschlüsse |
+| Itemboni neben SkilltreePlugin 2.0.0 | 14 | Externe Attribut-/Waffen-/Heilmodifikatoren bleiben erhalten; kein eigener Skilltree-Adapter oder Statsmenü |
+| Weitere echte Anbieter-APIs | 8 | LuckPerms 5.5, AuraSkills 2.2.4, AdvancedCrates 4.7.4, EconomyShopGUI-Premium 6.5.1 |
+| Start ohne optionale HUD-Anbieter | 1 | Ohne BetterHud und PlaceholderAPI |
+| Ältere Minecraft-API 1.18.2 | 4 | Start, Menü, Items und HP-Rejoin |
+| Versionsmatrix | 1 | Verknüpfung gegen 32 SHA-256-geprüfte offizielle Spigot-APIs |
+| Physische NoSQLite-JAR | 3 | Ohne Treiber und retired Statsklassen/-ressourcen; Dateicooldowns und unveränderte alte Datenbank |
+| NoSQLite auf 1.18.2 | 4 | Getrennter Klassenpfad mit der tatsächlich gebauten NoSQLite-JAR |
+| **Gesamt** | **351** | **0 Fehler, 0 übersprungene Tests** |
 
-Die Matrix umfasst jede verfügbare stabile R0.1-Ausgabe von 1.18 bis 26.3 einschließlich Zwischenversionen. Sie prüft Klassen, JVM-Feld-/Methoden-/Konstruktordeskriptoren und Klassen-/Interface-Aufrufarten. Bericht: `build/reports/compatibility/api-matrix.txt`. Reproduzieren: [compatibility/README.md](compatibility/README.md).
+Die öffentlichen 19 Haupt-API- und vier Dungeon-API-Klassen sind bytegleich mit API 1.3.1 aus 1.19.0. Die acht Original-Mobdateien und 14 ursprünglichen bStats-Klassen bleiben erhalten. Zusätzliche Spielerwerte entstehen ausschließlich aus getragenen Items; eine eigene Spielerprogression, das Statsinventar und deren Konfigurationen werden nicht mehr mitgeliefert oder geladen.
 
-Produktionscode wird gegen Spigot kompiliert. Paper kommt in den Simulationen zum Einsatz, nicht als Laufzeitklasse im Plugin. Getrennte Klassenpfade prüfen 1.18.2 und 26.3. Die damalige MockBukkit-Bibliothek benötigt dokumentierte Fixture-Ergänzungen: LivingEntities-Abfrage, leere Crossbow-Projektillisten, Paper-Strukturregistry, null bei fehlenden Spielerattributen und eine Auswertung gespeicherter Attributmodifikatoren. Diese Ergänzungen verändern keine Produktionspfade und überspringen keine Tests.
+Neue Tests prüfen die Entfernung der alten Befehle/Rechte/Klassen, den unveränderten Besitz fremder `/stats`-/`/skills`-Befehle, ignorierte alte Statsdateien, eine sichere einmalige Migration der Boss-/Itemschalter, die Vorrangigkeit vorhandener neuer Schalter und die Sperre alter Spielerdateien im Admineditor. Die Ausrüstungs-, Lebenspunkte-, Kampf-, Boss- und BattlePass-Regressionsprüfungen bleiben bestehen.
 
-Neue Prüfungen vergleichen die Java-17-Clamp-Ergebnisse mit der modernen Math-Funktion einschließlich Sonderwerten, lesen historische Attribut-Snapshots und prüfen Modifikatoridentitäten sowie Inventarfenster. Der Editor akzeptiert absteigende HP-Phasenbereiche unverändert.
-
-`compatibility/verify_release.py` prüft Artefakte/SHA-256, Java-17-Klassen, die 19 Haupt-API-/4 Dungeon-API-Klassen, SDK/Maven-Prüfsummen, Quellprojekt und Dokuverweise. Mit früheren API-/Original-JAR-Pfaden prüft es öffentliche API-1.3.0-Deskriptoren sowie acht unveränderte Original-Mobdateien und 14 Vendor-Klassen. Produktions-/Quell-/SDK-Pakete enthalten keine gekauften Anbieter-JARs. Bericht: `build/release-1.19.0-verification.json`.
-
-Das SDK-Beispiel wird zusätzlich aus dem entpackten SDK gegen die 1.18-Server-API gebaut. Das vollständige Quellprojekt wird ebenfalls entpackt und unabhängig gebaut. So wird geprüft, dass keine Nachbarprojekte, erzeugten Java-Quelldateien oder IntelliJ-Caches erforderlich sind.
+Die normalen Produktionsreferenzen und optionalen Brücken werden gegen die Versionsmatrix geprüft. Alte MockBukkit-Fixtures ergänzen dokumentierte fehlende Methoden, ohne Produktionspfade zu ändern oder Tests zu überspringen. Der eigenständige SDK-Beispielbuild gegen 1.18 wurde für 1.19.0 geprüft; seine öffentlichen API-Klassen sind weiterhin bytegleich. Bericht: `build/release-1.19.1-verification.json`. Der Artefaktprüfer `compatibility/verify_release.py` prüft zusätzlich Bytecode, SDK/POMs, Prüfsummen, Quellarchiv, entfernte Klassen und Dokuverweise.
 
 ## Prüfgrenzen
 
-Es wurde **kein echter Minecraft-Server/Client** gestartet und keine Last-/TPS-Steigerung gemessen. Die Matrix ist ein API-Verknüpfungstest, keine Liveprüfung jeder Ausgabe. Native KI, Pfadfindung, Flug-/Wasserverhalten, Chunk-/Netzwerkabwicklung, Clientpakete und große Bauten sind auf Testwelten zu prüfen.
-
-Die echten Premium-/Skill-API-Tests starten keine vollständigen Anbieterplugins, Datenbanken, BattlePass-Saisons oder Netzwerke. Andere Adapter verwenden dokumentierte Verträge und Fixtures. Passende Fremdplugin- und Ressourcenpaketversionen sind je Minecraft-Version erforderlich. „Bereit“ bestätigt die Schnittstelle, keine gleichzeitige Liveprüfung aller 20 Anbieter. Folia ist nicht unterstützt.
+Kein echter Minecraft-Server/Client und keine Last-/TPS-Messung wurden gestartet. Native KI, Pfadfindung, Netzwerke, Clientdarstellung und große Bauten benötigen eine Testwelt. Die API-Tests starten keine vollständigen Anbieterplugins, deren Datenbanken oder BattlePass-Saisons. Versionspassende Fremdplugins und Clientpakete sind weiterhin nötig; Folia wird nicht unterstützt.

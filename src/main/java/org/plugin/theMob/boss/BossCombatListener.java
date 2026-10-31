@@ -28,7 +28,7 @@ public final class BossCombatListener implements Listener {
   @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
   public void onCombat(EntityDamageByEntityEvent event) {
     if (plugin instanceof org.plugin.theMob.TheMob owner
-        && !owner.skills().enabled("bosses.phase-combat")) return;
+        && !owner.abilities().enabled("bosses.phase-combat")) return;
     if (!(event.getDamager() instanceof LivingEntity boss) || !mobs.isBoss(boss) || boss.isDead())
       return;
     var phase = phases.currentPhase(boss);

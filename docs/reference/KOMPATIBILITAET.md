@@ -1,6 +1,6 @@
 # Minecraft-Kompatibilität 1.18–26.3
 
-**TheMob 1.19.0** ist eine gemeinsame JAR mit `api-version: 1.18` und Java-17-Bytecode für Spigot/Paper. Das vollständige Projekt samt modernen Testwerkzeugen benötigt zum Bauen JDK 25. Folia wird nicht unterstützt; TheMob verwendet den normalen Bukkit-Serverthread.
+**TheMob 1.19.1** ist eine gemeinsame JAR mit `api-version: 1.18` und Java-17-Bytecode für Spigot/Paper. Das vollständige Projekt samt modernen Testwerkzeugen benötigt zum Bauen JDK 25. Folia wird nicht unterstützt; TheMob verwendet den normalen Bukkit-Serverthread.
 
 | Minecraft | Empfohlene Server-Java-Version | TheMob |
 |---|---|---|

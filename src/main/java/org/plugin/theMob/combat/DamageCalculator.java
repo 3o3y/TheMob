@@ -7,17 +7,17 @@ import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.persistence.PersistentDataType;
-import org.plugin.theMob.player.stats.PlayerStatCache;
+import org.plugin.theMob.item.equipment.EquipmentBonuses;
 
 public final class DamageCalculator {
   private final MobMultiplierService multipliers;
-  private final PlayerStatCache cache;
+  private final EquipmentBonuses cache;
 
   public DamageCalculator(MobMultiplierService multipliers) {
     this(multipliers, null);
   }
 
-  public DamageCalculator(MobMultiplierService multipliers, PlayerStatCache cache) {
+  public DamageCalculator(MobMultiplierService multipliers, EquipmentBonuses cache) {
     this.multipliers = multipliers;
     this.cache = cache;
   }

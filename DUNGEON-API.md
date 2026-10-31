@@ -1,4 +1,4 @@
-# Dungeon-API 1.3.1 / TheMob 1.19.0
+# Dungeon-API 1.3.1 / TheMob 1.19.1
 
 Die API-1.3.1-Distribution erhält sämtliche bisherigen Dungeon-Verträge. SDK, Quellen, JavaDoc und Beispielprojekt: [DEVELOPER-GUIDE.md](DEVELOPER-GUIDE.md). Die folgenden Versionsangaben beschreiben die Einführung der jeweiligen Funktion; bestehende PK-Anbindungen bleiben kompatibel.
 
@@ -94,4 +94,4 @@ Das Ereignis liefert außerdem Boss-Mob-ID, Stil, Weltname und Ebenenzahl. Die T
 
 ## Ausgangsaltar ab 1.15.0
 
-Im Bossraum gibt es jetzt einen physischen Ausgangsaltar mit PK-Zielauswahl und Rückreise. Vorhandene besuchte Dungeons werden nachgerüstet. `/mob dungeon altar ID [here]` ergänzt, repariert oder versetzt den Altar. TheMob 1.19.0 und eine passende PKPlugin-Version (mindestens 0.7.2 für Reisen) verwenden. Anleitung: [AUSGANGSALTAR.md](AUSGANGSALTAR.md). Die Reise-API liegt in TheMob-Dungeon-API-1.3.1.jar; Haupt-API 1.1 und bestehende BattlePass-Ziele bleiben kompatibel.
+Im Bossraum gibt es jetzt einen physischen Ausgangsaltar mit PK-Zielauswahl und Rückreise. Vorhandene besuchte Dungeons werden nachgerüstet. `/mob dungeon altar ID [here]` ergänzt, repariert oder versetzt den Altar. TheMob 1.19.1 und eine passende PKPlugin-Version (mindestens 0.7.2 für Reisen) verwenden. Anleitung: [AUSGANGSALTAR.md](AUSGANGSALTAR.md). Die Reise-API liegt in TheMob-Dungeon-API-1.3.1.jar; Haupt-API 1.1 und bestehende BattlePass-Ziele bleiben kompatibel.

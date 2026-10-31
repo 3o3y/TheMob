@@ -40,7 +40,7 @@ public final class MobTabCompleter implements TabCompleter {
           "spawner",
           "integrations",
           "connect",
-          "skills",
+          "abilities",
           "battlepass",
           "item",
           "items",
@@ -62,14 +62,14 @@ public final class MobTabCompleter implements TabCompleter {
             ? filter(args[2], "check", "enable", "disable")
             : filter(args[2], "check");
       return List.of();
-    } else if (args.length >= 2 && this.eq(args, 0, "skills")) {
-      if (!org.plugin.theMob.core.TheMobSkills.mayManage(sender)) return List.of();
+    } else if (args.length >= 2 && this.eq(args, 0, "abilities")) {
+      if (!org.plugin.theMob.core.CombatAbilities.mayManage(sender)) return List.of();
       if (args.length == 2) {
-        var targets = new ArrayList<>(org.plugin.theMob.core.TheMobSkills.targets());
+        var targets = new ArrayList<>(org.plugin.theMob.core.CombatAbilities.targets());
         targets.add("status");
         return filter(args[1], targets);
       }
-      if (args.length == 3 && org.plugin.theMob.core.TheMobSkills.targets().contains(args[1]))
+      if (args.length == 3 && org.plugin.theMob.core.CombatAbilities.targets().contains(args[1]))
         return filter(args[2], "an", "aus");
       return List.of();
     } else if (args.length >= 2 && this.eq(args, 0, "dungeon")) {

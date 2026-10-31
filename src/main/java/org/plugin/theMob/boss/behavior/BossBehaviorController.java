@@ -173,7 +173,9 @@ public final class BossBehaviorController {
 
   private String allowedMode(String mode) {
     mode = mode.toLowerCase(Locale.ROOT);
-    return mode.equals("vanilla") || plugin.skills().enabled("bosses." + mode) ? mode : "vanilla";
+    return mode.equals("vanilla") || plugin.abilities().enabled("bosses." + mode)
+        ? mode
+        : "vanilla";
   }
 
   private void safeExit(BossBehavior b, LivingEntity e, BossPhase p) {

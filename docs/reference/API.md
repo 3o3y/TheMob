@@ -1,4 +1,4 @@
-# TheMob API 1.3.1 / Plugin 1.19.0
+# TheMob API 1.3.1 / Plugin 1.19.1
 
 Das öffentliche SDK enthält getrennte API-JARs, Quellen, JavaDoc, einen lokalen Maven-Repository-Ordner und ein eigenständig baubares Add-on. Lizenz: [API-LICENSE.txt](API-LICENSE.md), Entwicklerstart: [DEVELOPER-GUIDE.md](DEVELOPER-GUIDE.md), Adminstart: [ADMIN-VERBINDUNGEN.md](ADMIN-VERBINDUNGEN.md). Die Erweiterung ist additiv und erhält die vorhandenen Methoden und Konstruktoren.
 
@@ -98,16 +98,16 @@ Freie Bewegung mit PKPlugin 0.7.1, Endboss-Zuordnung, Gruppenabschluss, `themob_
 
 ## Ausgangsaltar ab 1.15.0
 
-Im Bossraum gibt es jetzt einen physischen Ausgangsaltar mit PK-Zielauswahl und Rückreise. Vorhandene besuchte Dungeons werden nachgerüstet. `/mob dungeon altar ID [here]` ergänzt, repariert oder versetzt den Altar. TheMob 1.19.0 und eine passende PKPlugin-Version (mindestens 0.7.2 für Reisen) verwenden. Anleitung: [AUSGANGSALTAR.md](AUSGANGSALTAR.md). Die Reise-API liegt in TheMob-Dungeon-API-1.3.1.jar; Haupt-API 1.1 und bestehende BattlePass-Ziele bleiben kompatibel.
+Im Bossraum gibt es jetzt einen physischen Ausgangsaltar mit PK-Zielauswahl und Rückreise. Vorhandene besuchte Dungeons werden nachgerüstet. `/mob dungeon altar ID [here]` ergänzt, repariert oder versetzt den Altar. TheMob 1.19.1 und eine passende PKPlugin-Version (mindestens 0.7.2 für Reisen) verwenden. Anleitung: [AUSGANGSALTAR.md](AUSGANGSALTAR.md). Die Reise-API liegt in TheMob-Dungeon-API-1.3.1.jar; Haupt-API 1.1 und bestehende BattlePass-Ziele bleiben kompatibel.
 
 ## Additive API 1.3: Menüs, Itemprovider und Dungeonbau
 
-TheMob 1.19.0 ergänzt `supportsAdminMenu()` und `openAdminMenu(Player)`. Letzteres öffnet nur für berechtigte Spieler das normale Adminmenü. `itemProviders()` liefert verfügbare Namespaces. `createItem` unterstützt zusätzlich `provider:ID`; der Aufrufer kümmert sich weiterhin um Berechtigung, Zustellung und Inventarüberläufe. Es entsteht keine Shoptransaktion.
+TheMob 1.19.1 ergänzt `supportsAdminMenu()` und `openAdminMenu(Player)`. Letzteres öffnet nur für berechtigte Spieler das normale Adminmenü. `itemProviders()` liefert verfügbare Namespaces. `createItem` unterstützt zusätzlich `provider:ID`; der Aufrufer kümmert sich weiterhin um Berechtigung, Zustellung und Inventarüberläufe. Es entsteht keine Shoptransaktion.
 
 `AdminMenuExtension` und `TheMobItemProvider` werden über den Bukkit ServicesManager als eigene Dienste registriert; beim Disable wieder abmelden. Nur aktive registrierte Plugins werden berücksichtigt. Menüerweiterungen müssen zusätzlich ihre eigenen Rechte und Mutationen prüfen. Itemfabriken werden auf dem Serverthread ausgeführt, müssen bei unbekannter ID `Optional.empty()` zurückgeben und dürfen keine Belohnung selbst zustellen. TheMob klont die Ergebnisse. `themob` ist als Itemnamespace reserviert; bei gleichnamigen Add-on-Providern gewinnt die höhere Bukkit-Servicepriorität. Eigene Anbieter sollten eindeutige IDs verwenden.
 
 `TheMobDungeonPreCreateEvent` ist synchron und abbrechbar. Es wird vor Reservierung/Planung eines Neubaus und vor Fortsetzung aufgerufen. `getSender()` enthält Spieler oder Konsole; `getPlayer()` ist für Konsolen-Fortsetzungen null. `getRegion()` beschreibt die vollständige höhenunabhängige Grundfläche mit exklusiver Obergrenze, bei Neubau mit vorläufiger ID `pending`. `getStyle()` verwendet dieselben Stil-Labels wie Dungeonabschlüsse. Das Ereignis erlaubt Schutz-/Claimplugins den Bau abzulehnen; nachträgliche Änderungen an Claims sind damit nicht automatisch geschützt.
 
-Die API-Artefaktversion ist 1.3.1; der Kompatibilitätsmajor `apiVersion()` bleibt 1. Neue 1.3-Klassen erfordern TheMob 1.19.0 oder eine entsprechende Capability-/Versionsbrücke. Alte API-1.0/1.1/1.2-Add-ons bleiben binär kompatibel. Native Fremditems behalten ihre Originalmetadaten; `inspectItem` kann ihre ID im begrenzten laufenden Fabrikcache erkennen, aber nicht nach Neustart aus jedem beliebigen Inventaritem rekonstruieren. Der persistierte Drop-/Loot-Snapshot am Boden-Entity erhält die ID unabhängig davon.
+Die API-Artefaktversion ist 1.3.1; der Kompatibilitätsmajor `apiVersion()` bleibt 1. Neue 1.3-Klassen erfordern TheMob 1.19.1 oder eine entsprechende Capability-/Versionsbrücke. Alte API-1.0/1.1/1.2-Add-ons bleiben binär kompatibel. Native Fremditems behalten ihre Originalmetadaten; `inspectItem` kann ihre ID im begrenzten laufenden Fabrikcache erkennen, aber nicht nach Neustart aus jedem beliebigen Inventaritem rekonstruieren. Der persistierte Drop-/Loot-Snapshot am Boden-Entity erhält die ID unabhängig davon.
 
 Beispiel und genaue Funktionsgrenzen: [SDK](DEVELOPER-GUIDE.md), [20 Anbindungen](INTEGRATIONEN-20.md), [Adminmenü](ADMIN-MENUE.md).

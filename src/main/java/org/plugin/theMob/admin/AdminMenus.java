@@ -127,9 +127,9 @@ public final class AdminMenus implements Listener, AutoCloseable {
         h,
         28,
         Material.BLAZE_POWDER,
-        "Skills und Bossaktionen",
+        "Boss- und Itemfaehigkeiten",
         List.of("Globale und einzelne Schalter", "Gespeicherte Schalter gelten nach Neustart"),
-        v -> skills(v, 0));
+        v -> abilities(v, 0));
     button(
         h,
         30,
@@ -500,11 +500,12 @@ public final class AdminMenus implements Listener, AutoCloseable {
     page(p, "Itemkatalog", entries, number, () -> open(p), n -> items(p, filter, n));
   }
 
-  void skills(Player p, int number) {
+  void abilities(Player p, int number) {
     var entries = new ArrayList<Entry>();
     var saved =
-        YamlConfiguration.loadConfiguration(new java.io.File(plugin.getDataFolder(), "skills.yml"));
-    for (String id : org.plugin.theMob.core.TheMobSkills.targets()) {
+        YamlConfiguration.loadConfiguration(
+            new java.io.File(plugin.getDataFolder(), "abilities.yml"));
+    for (String id : org.plugin.theMob.core.CombatAbilities.targets()) {
       String key =
           id.equals("all")
               ? "enabled"
@@ -515,15 +516,15 @@ public final class AdminMenus implements Listener, AutoCloseable {
               configured ? Material.LIME_DYE : Material.GRAY_DYE,
               id,
               List.of(
-                  "Laufend wirksam: " + plugin.skills().enabled(id),
+                  "Laufend wirksam: " + plugin.abilities().enabled(id),
                   "Gespeichert: " + configured,
                   "Klick: fuer naechsten Neustart umschalten"),
               v -> {
-                execute(v, "skills", id, configured ? "aus" : "an");
-                skills(v, number);
+                execute(v, "abilities", id, configured ? "aus" : "an");
+                abilities(v, number);
               }));
     }
-    page(p, "Skillschalter", entries, number, () -> open(p), n -> skills(p, n));
+    page(p, "Faehigkeitsschalter", entries, number, () -> open(p), n -> abilities(p, n));
   }
 
   void integrations(Player p, int number) {
@@ -1157,7 +1158,7 @@ public final class AdminMenus implements Listener, AutoCloseable {
         "Mob-/Konfigurationsdaten neu laden",
         List.of(
             "Entfernt aktive Mobs und beendet aktuelle Systeme",
-            "Integrationen und Skills benoetigen vollstaendigen Neustart"),
+            "Integrationen und Faehigkeiten benoetigen vollstaendigen Neustart"),
         v ->
             confirm(
                 v,
@@ -1166,7 +1167,7 @@ public final class AdminMenus implements Listener, AutoCloseable {
                     "Aktive TheMob-Mobs werden entfernt",
                     "Ungespeicherte Menueentwuerfe werden verworfen!",
                     "Mobdateien, Spawns und Konfiguration werden neu geladen",
-                    "Skills und Anbindungen bleiben bis zum Neustart vorgemerkt"),
+                    "Faehigkeiten und Anbindungen bleiben bis zum Neustart vorgemerkt"),
                 "themob.reload",
                 () -> {
                   v.closeInventory();

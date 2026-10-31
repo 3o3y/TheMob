@@ -1,6 +1,6 @@
 # TheMob mit anderen Plugins verbinden
 
-Stand: TheMob **1.19.0**, Minecraft **1.18–26.3**, Java je Serverversion (Pluginkern: Java 17). Die Verbindung läuft innerhalb des Servers über Bukkit-Dienste und Ereignisse. Die öffentliche API ist bereits in TheMob enthalten.
+Stand: TheMob **1.19.1**, Minecraft **1.18–26.3**, Java je Serverversion (Pluginkern: Java 17). Die Verbindung läuft innerhalb des Servers über Bukkit-Dienste und Ereignisse. Die öffentliche API ist bereits in TheMob enthalten.
 
 **Im Spiel:** `/mob` → Plugin-Anbindungen. Alle bisherigen Befehle bleiben erhalten. [Komplettes Adminmenü](ADMIN-MENUE.md), [Funktionen aller 20 Anbieter](INTEGRATIONEN-20.md). Die folgende Tabelle erklärt die ursprünglichen sieben Adapter; die ergänzten 13 stehen in der vollständigen Matrix.
 
@@ -13,7 +13,7 @@ Stand: TheMob **1.19.0**, Minecraft **1.18–26.3**, Java je Serverversion (Plug
 
 Die 20 ausgewählten Anbindungen sind standardmäßig aktiviert und erkennen vorhandene Anbieter automatisch. Für diese Schnittstellenänderung braucht es kein neues Ressourcenpaket. Ein zusätzliches API-JAR gehört nicht in `plugins/`.
 
-Zusätzlich ist das Stats-/Kampfsystem an euer SkilltreePlugin 2.0.0 angepasst. `/mob skills` verwaltet TheMobs eigene Boss- und Itemeffekte für den Neustart; `/skills` verwaltet die gelernten Skilltree-Fähigkeiten. [Anleitung](SKILLS.md).
+Ein eigenes Spieler-Skill-/Stats-System gibt es nicht mehr. Boss- und Itemeffekte werden über `/mob abilities` verwaltet. Fremde Spieler-Skillplugins führen ihre eigenen Werte und Menüs. [Anleitung](FAEHIGKEITEN.md).
 
 | Plugin | Was Admins einstellen |
 |---|---|
@@ -58,7 +58,7 @@ Normale Spieler können dadurch keine Verbindung verändern und keine Mobs erzeu
 
 ## Eigenes Add-on eines Entwicklers installieren
 
-Der Entwickler baut sein Add-on gegen das **TheMob Developer SDK 1.19.0 / API 1.3.1**. Du installierst nur dessen fertige Plugin-JAR und die von ihm genannten Anbieter. Die Dateien `TheMob-API-...jar`, `...sources.jar`, `...javadoc.jar` und der Maven-Ordner sind Entwicklerdateien und bleiben außerhalb des Server-Pluginordners.
+Der Entwickler baut sein Add-on gegen das **TheMob Developer SDK 1.19.1 / API 1.3.1**. Du installierst nur dessen fertige Plugin-JAR und die von ihm genannten Anbieter. Die Dateien `TheMob-API-...jar`, `...sources.jar`, `...javadoc.jar` und der Maven-Ordner sind Entwicklerdateien und bleiben außerhalb des Server-Pluginordners.
 
 Der Entwickler sollte `depend: [TheMob]`, eindeutige Befehle und passende Adminrechte deklarieren. Add-ons sind ausführbarer Servercode; installiere nur JARs aus einer Quelle, der du auch normalen Pluginzugriff anvertrauen würdest. Die Schnittstelle erhält Spawnlimits, Boss-Cooldowns und abbrechbare PreSpawn-Prüfungen, ersetzt aber keine Kontrolle über die installierten Plugin-JARs.
 

@@ -59,7 +59,7 @@ public final class CustomEnchantSystem {
         p,
         target,
         plugin instanceof org.plugin.theMob.TheMob owner
-            ? owner.skills().itemEffects(stats)
+            ? owner.abilities().itemEffects(stats)
             : stats,
         finalDamage);
   }

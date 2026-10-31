@@ -1,6 +1,6 @@
-# TheMob Developer SDK 1.19.0
+# TheMob Developer SDK 1.19.1
 
-Public Bukkit API **1.3.1**, implemented by TheMob **1.19.0** for **Minecraft 1.18–26.3 (Java 17 bytecode)**. Use it to connect your quest objectives, Jobs adapters, encounter systems, protection plugins and dungeon travel providers. The API and examples are released under the scoped MIT license in `API-LICENSE.txt`; this does not relicense the complete plugin or third-party dependencies.
+Public Bukkit API **1.3.1**, implemented by TheMob **1.19.1** for **Minecraft 1.18–26.3 (Java 17 bytecode)**. Use it to connect your quest objectives, Jobs adapters, encounter systems, protection plugins and dungeon travel providers. The API and examples are released under the scoped MIT license in `API-LICENSE.txt`; this does not relicense the complete plugin or third-party dependencies.
 
 This is a redistributable SDK archive. It does not imply publication to Maven Central, GitHub or a public download host.
 
@@ -186,7 +186,7 @@ The compiled `example/` add-on registers both `AdminMenuExtension` and `TheMobIt
 
 Call `supportsAdminMenu()` and `openAdminMenu(player)` on a 1.3-capable runtime. The latter enforces TheMob's menu permission; it is not a way to grant administration. A plugin extending TheMob's menu owns its own view and must revalidate permissions for its actions. All factories/menu callbacks execute on the server thread. Query `itemProviders()` for available namespaces; `itemIds()` continues to enumerate the built-in catalog.
 
-Listen to `TheMobDungeonPreCreateEvent` to veto construction/resume before reservation/planning changes. Check `getSender()` and immutable `getRegion()`; `getPlayer()` is null for console resume. Region upper bounds are exclusive and height independent. New builds use provisional ID `pending`. This is a preflight event, not continuous claim-locking. A bridge requiring new 1.3 classes must require TheMob 1.19.0 or isolate that bridge behind an older-runtime compatibility layer.
+Listen to `TheMobDungeonPreCreateEvent` to veto construction/resume before reservation/planning changes. Check `getSender()` and immutable `getRegion()`; `getPlayer()` is null for console resume. Region upper bounds are exclusive and height independent. New builds use provisional ID `pending`. This is a preflight event, not continuous claim-locking. A bridge requiring new 1.3 classes must require TheMob 1.19.1 or isolate that bridge behind an older-runtime compatibility layer.
 
 The source/JavaDoc and local Maven repository carry all new contracts. See `API.md` for metadata persistence limits and `INTEGRATIONEN-20.md` for the exact native versus Bukkit-only integration matrix. No third-party provider JARs are included.
 

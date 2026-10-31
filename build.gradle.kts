@@ -4,7 +4,7 @@ import org.gradle.external.javadoc.StandardJavadocDocletOptions
 plugins { java }
 
 group = "org.plugin"
-version = "1.19.0"
+version = "1.19.1"
 
 repositories {
     mavenCentral()
@@ -137,9 +137,10 @@ val sourceBundle = tasks.register<Zip>("sourceBundle") {
     from(projectDir) {
         exclude("compatibility/cache/**", "**/build/**", "**/.gradle/**", "**/.idea/**")
         include("ADMIN-MENUE.md", "INTEGRATIONEN-20.md", "KOMPATIBILITAET.md", "GIT-START.md", ".gitattributes", ".gitbook.yaml", "docs/**", "compatibility/**")
+        include("LICENSE.md")
         include("API-LICENSE.txt", "DEVELOPER-GUIDE.md", "ADMIN-VERBINDUNGEN.md")
         include("SPIELERWERTE.md")
-        include("SKILLS.md")
+        include("FAEHIGKEITEN.md")
         include("ZOMBIE-KOENIG.md")
         include("src/**", "gradle/**", "libraries/**", "client-pack/**", "client-pack-coinoverlay/**", "gradlew", "gradlew.bat", "build.gradle.kts", "settings.gradle.kts", "build.ps1", ".gitignore", "README.md", "UPDATE.md", "CHANGELOG.md", "VALIDATION.md", "KOMPASS.md", "API.md", "INTEGRATIONEN.md", "BATTLEPASS.md", "MOBS-UND-ITEMS.md", "PERFORMANCE.md", "DUNGEONS.md", "DUNGEON-API.md", "AUSGANGSALTAR.md", "examples/**", "CLIENT-PACK-HERKUNFT.md")
     }
@@ -324,7 +325,7 @@ val developerSdk = tasks.register<Zip>("developerSdk") {
     destinationDirectory.set(layout.buildDirectory.dir("distributions"))
     from("DEVELOPER-GUIDE.md") { rename { "README.md" } }
     from("ADMIN-MENUE.md", "INTEGRATIONEN-20.md")
-    from("API-LICENSE.txt", "API.md", "DUNGEON-API.md", "ADMIN-VERBINDUNGEN.md", "BATTLEPASS.md", "SKILLS.md", "INTEGRATIONEN.md", "VALIDATION.md", "MOBS-UND-ITEMS.md", "DUNGEONS.md", "AUSGANGSALTAR.md", "ZOMBIE-KOENIG.md", "SPIELERWERTE.md", "KOMPASS.md", "PERFORMANCE.md")
+    from("API-LICENSE.txt", "API.md", "DUNGEON-API.md", "ADMIN-VERBINDUNGEN.md", "BATTLEPASS.md", "FAEHIGKEITEN.md", "INTEGRATIONEN.md", "VALIDATION.md", "MOBS-UND-ITEMS.md", "DUNGEONS.md", "AUSGANGSALTAR.md", "ZOMBIE-KOENIG.md", "SPIELERWERTE.md", "KOMPASS.md", "PERFORMANCE.md")
     from("src/main/resources/battlepass-combat-examples.yml") { into("examples") }
     from(sdkArtifacts) { into("api") }
     from(layout.buildDirectory.dir("docs/public-api")) { into("javadoc") }
@@ -338,8 +339,8 @@ val developerSdk = tasks.register<Zip>("developerSdk") {
     isPreserveFileTimestamps = false
     isReproducibleFileOrder = true
 }
-serverBundle.configure { from("ADMIN-VERBINDUNGEN.md", "API-LICENSE.txt", "SKILLS.md")
-    from("src/main/resources/skills.yml") { into("examples/skills") }
+serverBundle.configure { from("ADMIN-VERBINDUNGEN.md", "API-LICENSE.txt", "FAEHIGKEITEN.md")
+    from("src/main/resources/abilities.yml") { into("examples/skills") }
 }
 tasks.test {
     dependsOn(compileApiExample)
@@ -423,10 +424,10 @@ val updateBundle = tasks.register<Zip>("updateBundle") {
     from(tasks.jar) { into("plugins"); rename { "TheMob.jar" } }
     from("ADMIN-MENUE.md", "INTEGRATIONEN-20.md")
     from("KOMPATIBILITAET.md")
-    from("UPDATE.md", "BATTLEPASS.md", "SKILLS.md", "ADMIN-VERBINDUNGEN.md", "API.md", "DEVELOPER-GUIDE.md", "API-LICENSE.txt", "VALIDATION.md", "CHANGELOG.md")
+    from("UPDATE.md", "BATTLEPASS.md", "FAEHIGKEITEN.md", "ADMIN-VERBINDUNGEN.md", "API.md", "DEVELOPER-GUIDE.md", "API-LICENSE.txt", "VALIDATION.md", "CHANGELOG.md")
     from("DUNGEON-API.md", "DUNGEONS.md", "AUSGANGSALTAR.md", "MOBS-UND-ITEMS.md", "INTEGRATIONEN.md", "SPIELERWERTE.md", "ZOMBIE-KOENIG.md", "KOMPASS.md", "PERFORMANCE.md")
     from("src/main/resources/battlepass-combat-examples.yml") { into("examples/battlepass") }
-    from("src/main/resources/skills.yml") { into("examples/skills") }
+    from("src/main/resources/abilities.yml") { into("examples/skills") }
     isPreserveFileTimestamps = false
     isReproducibleFileOrder = true
 }

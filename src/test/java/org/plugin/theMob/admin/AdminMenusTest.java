@@ -85,7 +85,7 @@ class AdminMenusTest {
             item.getItemMeta().getDisplayName().chars().anyMatch(c -> c >= 0xe000 && c <= 0xf8ff));
       }
     player.closeInventory();
-    server.dispatchCommand(player, "mob skills status");
+    server.dispatchCommand(player, "mob abilities status");
     assertFalse(admin());
     server.dispatchCommand(server.getConsoleSender(), "mob");
     assertTrue(server.getConsoleSender().nextMessage() != null);

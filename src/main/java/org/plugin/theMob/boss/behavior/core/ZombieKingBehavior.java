@@ -277,7 +277,7 @@ public final class ZombieKingBehavior implements BossBehavior, Listener {
         Attack attack = choose(state, distance);
         if (attack == null) return;
         if (state.settings.stage() == Stage.DESPERATE
-            && plugin.skills().enabled("bosses.zombie-retreat")) {
+            && plugin.abilities().enabled("bosses.zombie-retreat")) {
           state.motion = Motion.RETREAT;
           moving.put(boss.getUniqueId(), state);
           state.nextMotion = now;
@@ -307,7 +307,7 @@ public final class ZombieKingBehavior implements BossBehavior, Listener {
           case DESPERATE -> distance <= 49 ? Attack.CLEAVE : null;
         };
     if (chosen != null
-        && !plugin.skills().enabled("bosses.zombie-" + chosen.name().toLowerCase(Locale.ROOT))) {
+        && !plugin.abilities().enabled("bosses.zombie-" + chosen.name().toLowerCase(Locale.ROOT))) {
       state.cycle++;
       state.due = now() + 20;
       return null;

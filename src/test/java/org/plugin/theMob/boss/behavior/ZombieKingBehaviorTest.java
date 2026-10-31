@@ -186,19 +186,19 @@ class ZombieKingBehaviorTest {
 
   @Test
   void royalCleaveCanBeDisabledWithoutDisablingOtherZombieSkills() throws Exception {
-    var file = new File(plugin.getDataFolder(), "skills.yml");
+    var file = new File(plugin.getDataFolder(), "abilities.yml");
     var yaml = YamlConfiguration.loadConfiguration(file);
     yaml.set("bosses.zombie-cleave", false);
     yaml.save(file);
-    var field = TheMob.class.getDeclaredField("skills");
+    var field = TheMob.class.getDeclaredField("abilities");
     field.setAccessible(true);
-    field.set(plugin, new org.plugin.theMob.core.TheMobSkills(plugin));
+    field.set(plugin, new org.plugin.theMob.core.CombatAbilities(plugin));
     tick(40);
     tick(30);
     tick(80);
     assertTrue(hits.isEmpty());
     assertEquals(20, player.getHealth());
-    assertTrue(plugin.skills().enabled("bosses.zombie-lunge"));
+    assertTrue(plugin.abilities().enabled("bosses.zombie-lunge"));
   }
 
   @Test

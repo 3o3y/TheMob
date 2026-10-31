@@ -1,6 +1,6 @@
 # boss_template.yml — configuration example
 
-This is a reference file from TheMob 1.19.0. Keep your tuned production configuration when upgrading. Use materials and entity types supported by your Minecraft version.
+This is a reference file from TheMob 1.19.1. Keep your tuned production configuration when upgrading. Use materials and entity types supported by your Minecraft version.
 
 ```yaml
 # =========================================================

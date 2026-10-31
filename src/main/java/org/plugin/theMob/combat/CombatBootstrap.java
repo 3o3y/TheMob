@@ -6,9 +6,7 @@ import org.bukkit.event.HandlerList;
 import org.bukkit.plugin.PluginManager;
 import org.plugin.theMob.TheMob;
 import org.plugin.theMob.item.CustomEnchantSystem;
-import org.plugin.theMob.player.stats.PlayerStatCache;
-import org.plugin.theMob.progression.PlayerProgressionManager;
-import org.plugin.theMob.progression.ProgressionCombatApplier;
+import org.plugin.theMob.item.equipment.EquipmentBonuses;
 
 public final class CombatBootstrap {
   private final TheMob plugin;
@@ -22,29 +20,13 @@ public final class CombatBootstrap {
     this.plugin = plugin;
   }
 
-  public void enable(PlayerStatCache cache, CustomEnchantSystem enchants) {
-    this.enable(cache, enchants, null, null);
-  }
-
-  public synchronized void enable(
-      PlayerStatCache cache,
-      CustomEnchantSystem enchants,
-      PlayerProgressionManager progression,
-      ProgressionCombatApplier progressionCombat) {
+  public synchronized void enable(EquipmentBonuses cache, CustomEnchantSystem enchants) {
     if (!this.enabled) {
       this.enabled = true;
       this.debug = new CombatDebugService();
       this.multipliers = new MobMultiplierService(this.plugin);
       this.calculator = new DamageCalculator(this.multipliers, cache);
-      this.listener =
-          new CombatListener(
-              this.plugin,
-              cache,
-              this.calculator,
-              this.debug,
-              enchants,
-              progression,
-              progressionCombat);
+      this.listener = new CombatListener(this.plugin, cache, this.calculator, this.debug, enchants);
       PluginManager pm = Bukkit.getPluginManager();
       pm.registerEvents(this.listener, this.plugin);
       PluginCommand cmd = this.plugin.getCommand("combatdebug");

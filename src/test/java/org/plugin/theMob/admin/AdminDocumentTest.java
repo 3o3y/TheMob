@@ -28,6 +28,16 @@ class AdminDocumentTest {
   }
 
   @Test
+  void retiredPlayerFilesCannotBeEditedEvenThroughNormalizedAliases() throws Exception {
+    for (String name : List.of("stats.yml", "skills.yml")) {
+      Files.writeString(root.resolve(name), "enabled: true\n");
+      assertThrows(IllegalArgumentException.class, () -> new AdminDocument(root, name));
+      assertThrows(IllegalArgumentException.class, () -> new AdminDocument(root, "./" + name));
+      assertEquals("enabled: true\n", Files.readString(root.resolve(name)));
+    }
+  }
+
+  @Test
   void descendingBossPhaseRangesRemainEditableWithoutChangingMechanics() throws Exception {
     Path mob = root.resolve("boss.yml");
     Files.writeString(
@@ -130,9 +140,9 @@ class AdminDocumentTest {
 
   @Test
   void skillsBooleanAndMobHealthValidationHappenBeforeReplacement() throws Exception {
-    Path skill = root.resolve("skills.yml");
+    Path skill = root.resolve("abilities.yml");
     Files.writeString(skill, "enabled: true\n");
-    var doc = new AdminDocument(root, "skills.yml");
+    var doc = new AdminDocument(root, "abilities.yml");
     doc.set(List.of("enabled"), "false");
     assertThrows(IllegalArgumentException.class, doc::save);
     assertEquals("enabled: true\n", Files.readString(skill));

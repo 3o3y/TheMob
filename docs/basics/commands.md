@@ -1,6 +1,6 @@
 # Commands
 
-**All existing commands remain supported.** `/mob` without arguments opens the admin menu for authorized players; console and users without menu access receive help. Tab completion exposes available IDs.
+**Mob, item, dungeon and administration commands remain supported.** The former player `/stats` command was removed in 1.19.1. `/mob` without arguments opens the admin menu for authorized players; console and users without menu access receive help. Tab completion exposes available IDs.
 
 | Command | Purpose |
 |---|---|
@@ -13,13 +13,12 @@
 | `/mob dungeon enter <id>`, `/mob dungeon leave` | Multiplayer access/return |
 | `/mob dungeon boss <id> <mob-id\|off>` | Assign the completion boss |
 | `/mob dungeon altar <id> [here]` | Place/repair the exit altar |
-| `/mob skills` | Inspect/toggle TheMob skill switches for restart |
+| `/mob abilities` | Inspect/toggle boss/item ability switches for restart |
 | `/mob connect check`, `/mob connect <provider> enable\|disable` | Inspect/configure providers |
 | `/mob battlepass` | Native objective status and examples |
 | `/mob performance`, `/mob diag ...` | Diagnostics |
 | `/mob get base64` | Export held item data |
 | `/mob reload`, `/mob killall` | Authorized maintenance; removes active managed mobs |
 | `/mobkompass`, `/kompass` | Personal/server compass controls |
-| `/stats` | Player statistics |
 
 The [shipped command descriptor](../examples/plugin.yml.md) lists full usage and permission defaults. Menu actions enforce the same underlying permissions. [Admin menu](../administration/menu.md), [dungeons](../dungeons/overview.md).

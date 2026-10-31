@@ -44,25 +44,25 @@ public final class BossActionEngine implements Listener {
     if (boss != null && phase != null && boss.isValid() && !boss.isDead()) {
       ConfigurationSection cfg = phase.cfg();
       if (cfg != null) {
-        if (plugin.skills().enabled("bosses.phase-abilities")) {
+        if (plugin.abilities().enabled("bosses.phase-abilities")) {
           this.applyAbilities(boss, cfg.getConfigurationSection("abilities"));
           this.applyEffects(boss, cfg.getConfigurationSection("effects"));
           this.applyPhysics(boss, cfg.getConfigurationSection("physics"));
         }
         if (plugin
-            .skills()
+            .abilities()
             .enabled(
                 "bosses." + cfg.getString("behavior.mode", "aggressive").toLowerCase(Locale.ROOT)))
           this.applyBehaviorOverrides(boss, cfg.getConfigurationSection("behavior"));
         ConfigurationSection onEnter = cfg.getConfigurationSection("on-enter");
-        if (onEnter != null && plugin.skills().enabled("bosses.phase-effects")) {
+        if (onEnter != null && plugin.abilities().enabled("bosses.phase-effects")) {
           this.runOnEnterEffects(boss, onEnter);
         }
 
         ConfigurationSection actions = cfg.getConfigurationSection("actions");
         if (actions != null) {
           ConfigurationSection summon = actions.getConfigurationSection("summon-minions");
-          if (summon != null && plugin.skills().enabled("bosses.summon-minions")) {
+          if (summon != null && plugin.abilities().enabled("bosses.summon-minions")) {
             this.minionSpawner.onPhaseEnter(boss, phase, summon);
           }
         }

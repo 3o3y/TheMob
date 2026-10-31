@@ -1,6 +1,11 @@
-# TheMob-eigene Boss-/Mobskills und Itemeffekte. SkilltreePlugin verwaltet seine eigenen Skills.
+# abilities.yml — configuration example
+
+Boss and item abilities only; no player skills or tiers.
+
+```yaml
+# Boss-/Mobfaehigkeiten und Itemeffekte. Kein Spieler-Skill-/Stats-System.
 # Aenderungen gelten nach vollstaendigem Serverneustart, nicht mitten im Bosskampf.
-# /mob skills <Schalter> an|aus erstellt vorher skills.yml.bak.
+# /mob abilities <Schalter> an|aus erstellt vorher abilities.yml.bak.
 enabled: true
 bosses:
   enabled: true
@@ -31,3 +36,4 @@ items:
   slow: true
   execute: true
   knockback: true
+```

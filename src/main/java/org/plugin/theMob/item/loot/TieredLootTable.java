@@ -1,4 +1,4 @@
-package org.plugin.theMob.progression;
+package org.plugin.theMob.item.loot;
 
 import org.bukkit.Material;
 

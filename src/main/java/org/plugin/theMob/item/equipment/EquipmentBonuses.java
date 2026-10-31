@@ -1,4 +1,4 @@
-package org.plugin.theMob.player.stats;
+package org.plugin.theMob.item.equipment;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -7,29 +7,15 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.plugin.theMob.TheMob;
 
-public final class PlayerStatCache {
+public final class EquipmentBonuses {
   private final TheMob plugin;
-  private final Map<Player, Map<String, Double>> cache = new HashMap<>();
 
-  public PlayerStatCache(TheMob plugin) {
+  public EquipmentBonuses(TheMob plugin) {
     this.plugin = plugin;
   }
 
+  /** Only values read from currently equipped items; no player tiers or stored stats. */
   public Map<String, Double> get(Player p) {
-    Map<String, Double> current = this.compute(p);
-    this.cache.put(p, current);
-    return current;
-  }
-
-  public void recompute(Player p) {
-    this.cache.put(p, this.compute(p));
-  }
-
-  public void invalidate(Player p) {
-    this.cache.remove(p);
-  }
-
-  private Map<String, Double> compute(Player p) {
     Map<String, Double> stats = new HashMap<>();
     this.add(stats, p.getInventory().getHelmet());
     this.add(stats, p.getInventory().getChestplate());
@@ -50,7 +36,6 @@ public final class PlayerStatCache {
     stats.putIfAbsent("luck", 0.0);
     double bonusHealth = stats.getOrDefault("health", 0.0);
     stats.put("bonus_health", bonusHealth);
-    stats.put("health", 20.0 + bonusHealth);
     return stats;
   }
 

@@ -1,4 +1,4 @@
-package org.plugin.theMob.player.stats;
+package org.plugin.theMob.item.equipment;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -25,7 +25,7 @@ class PlayerVitalsTest {
   ServerMock server;
   TheMob plugin;
   PlayerMock player;
-  PlayerEquipListener equipment;
+  EquipmentBonusListener equipment;
 
   @BeforeEach
   void setup() {
@@ -36,8 +36,8 @@ class PlayerVitalsTest {
     equipment =
         Arrays.stream(PlayerJoinEvent.getHandlerList().getRegisteredListeners())
             .map(registered -> registered.getListener())
-            .filter(PlayerEquipListener.class::isInstance)
-            .map(PlayerEquipListener.class::cast)
+            .filter(EquipmentBonusListener.class::isInstance)
+            .map(EquipmentBonusListener.class::cast)
             .findFirst()
             .orElseThrow();
   }

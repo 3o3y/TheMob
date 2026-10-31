@@ -26,7 +26,6 @@ import org.plugin.theMob.combat.CombatBootstrap;
 import org.plugin.theMob.command.MobCommand;
 import org.plugin.theMob.command.MobEggCommand;
 import org.plugin.theMob.command.MobTabCompleter;
-import org.plugin.theMob.command.StatsCommand;
 import org.plugin.theMob.control.AutomationScalingSystem;
 import org.plugin.theMob.control.feedback.SpawnBlockFeedbackService;
 import org.plugin.theMob.core.ConfigService;
@@ -39,6 +38,8 @@ import org.plugin.theMob.item.CustomEnchantSystem;
 import org.plugin.theMob.item.ItemBuilderFromConfig;
 import org.plugin.theMob.item.ItemLoreRenderer;
 import org.plugin.theMob.item.ItemStatReader;
+import org.plugin.theMob.item.equipment.EquipmentBonusListener;
+import org.plugin.theMob.item.equipment.EquipmentBonuses;
 import org.plugin.theMob.mob.MobDropEngine;
 import org.plugin.theMob.mob.MobListener;
 import org.plugin.theMob.mob.MobManager;
@@ -46,12 +47,6 @@ import org.plugin.theMob.mob.PlayerDeathListener;
 import org.plugin.theMob.mob.ability.StuckDefensePath;
 import org.plugin.theMob.mob.spawn.AutoSpawnManager;
 import org.plugin.theMob.mob.spawn.MobSpawnService;
-import org.plugin.theMob.player.stats.PlayerEquipListener;
-import org.plugin.theMob.player.stats.PlayerStatCache;
-import org.plugin.theMob.player.stats.menu.StatsMenuListener;
-import org.plugin.theMob.player.stats.menu.StatsMenuService;
-import org.plugin.theMob.progression.ProgressionBootstrap;
-import org.plugin.theMob.progression.ProgressionV19Bootstrap;
 import org.plugin.theMob.spawn.SpawnController;
 import org.plugin.theMob.spawn.egg.SpawnEggItemFactory;
 import org.plugin.theMob.spawn.egg.SpawnEggListener;
@@ -118,10 +113,10 @@ public class TheMob extends JavaPlugin {
   }
 
   private ConfigService configService;
-  private org.plugin.theMob.core.TheMobSkills skills;
+  private org.plugin.theMob.core.CombatAbilities abilities;
 
-  public org.plugin.theMob.core.TheMobSkills skills() {
-    return skills;
+  public org.plugin.theMob.core.CombatAbilities abilities() {
+    return abilities;
   }
 
   private String runtimeSession;
@@ -152,15 +147,12 @@ public class TheMob extends JavaPlugin {
   private ItemBuilderFromConfig itemBuilder;
   private ItemLoreRenderer loreRenderer;
   private ItemStatReader itemStatReader;
-  private PlayerStatCache playerStatCache;
-  private StatsMenuService statsMenu;
+  private EquipmentBonuses equipmentBonuses;
   private CombatBootstrap combat;
   private CustomEnchantSystem customEnchants;
-  private PlayerEquipListener equipmentListener;
+  private EquipmentBonusListener equipmentListener;
   private BossWorldEffectController worldEffects;
   private AutomationScalingSystem automationScaling;
-  private ProgressionBootstrap progressionBootstrap;
-  private ProgressionV19Bootstrap progressionV19;
 
   public void onLoad() {
     var renderer = Bukkit.getPluginManager().getPlugin("BetterHud");
@@ -224,7 +216,7 @@ public class TheMob extends JavaPlugin {
   }
 
   private void boot(boolean firstEnable) {
-    if (skills == null) skills = new org.plugin.theMob.core.TheMobSkills(this);
+    if (abilities == null) abilities = new org.plugin.theMob.core.CombatAbilities(this);
     if (api == null) {
       api = new org.plugin.theMob.api.internal.TheMobApiService(this);
       Bukkit.getServicesManager()
@@ -333,18 +325,11 @@ public class TheMob extends JavaPlugin {
       this.cleanupStaleHudBars();
     }
 
-    this.playerStatCache = new PlayerStatCache(this);
-    this.statsMenu = new StatsMenuService(this, this.playerStatCache);
+    this.equipmentBonuses = new EquipmentBonuses(this);
     this.customEnchants = new CustomEnchantSystem(this);
     this.combat = new CombatBootstrap(this);
-    this.progressionV19 = new ProgressionV19Bootstrap(this);
-    this.progressionBootstrap = new ProgressionBootstrap(this, this.progressionV19.players());
-    this.dropEngine.setTieredLoot(this.progressionV19.loot());
-    this.combat.enable(
-        this.playerStatCache,
-        this.customEnchants,
-        this.progressionV19.players(),
-        this.progressionV19.combat());
+    this.dropEngine.setTieredLoot(new org.plugin.theMob.item.loot.TieredLootTableService());
+    this.combat.enable(this.equipmentBonuses, this.customEnchants);
     new SpawnBlockFeedbackService(this, this.automationScaling).start();
     this.registerAllListeners();
     this.dungeons = new org.plugin.theMob.dungeon.DungeonService(this);
@@ -361,10 +346,6 @@ public class TheMob extends JavaPlugin {
     if (integrations == null)
       integrations = new org.plugin.theMob.integration.IntegrationManager(this);
     integrations.register();
-    PluginCommand stats = this.getCommand("stats");
-    if (stats != null) {
-      stats.setExecutor(new StatsCommand(this.statsMenu, this.playerStatCache));
-    }
 
     Bukkit.getPluginManager()
         .registerEvents(new BossImmunityListener(this.mobManager, this.phaseController), this);
@@ -409,18 +390,11 @@ public class TheMob extends JavaPlugin {
       this.worldEffects.shutdown();
       this.worldEffects = null;
     }
-    for (Player player : Bukkit.getOnlinePlayers())
-      if (org.plugin.theMob.compat.Views.top(player.getOpenInventory()) != null
-          && org.plugin.theMob.compat.Views.top(player.getOpenInventory()).getHolder()
-              instanceof org.plugin.theMob.player.stats.menu.StatsMenuHolder)
-        player.closeInventory();
     if (this.equipmentListener != null) {
       this.equipmentListener.shutdown();
       this.equipmentListener = null;
     }
     try {
-      this.progressionV19 = null;
-      this.progressionBootstrap = null;
       if (this.automationScaling != null) {
         this.automationScaling.shutdown();
         this.automationScaling = null;
@@ -499,8 +473,7 @@ public class TheMob extends JavaPlugin {
       this.itemBuilder = null;
       this.loreRenderer = null;
       this.itemStatReader = null;
-      this.playerStatCache = null;
-      this.statsMenu = null;
+      this.equipmentBonuses = null;
       this.combat = null;
       this.customEnchants = null;
       this.spawnEggService = null;
@@ -528,9 +501,8 @@ public class TheMob extends JavaPlugin {
                 this.autoSpawnManager),
             this);
     Bukkit.getPluginManager().registerEvents(new PlayerDeathListener(this, this.mobManager), this);
-    this.equipmentListener = new PlayerEquipListener(this, this.playerStatCache);
+    this.equipmentListener = new EquipmentBonusListener(this, this.equipmentBonuses);
     Bukkit.getPluginManager().registerEvents(this.equipmentListener, this);
-    Bukkit.getPluginManager().registerEvents(new StatsMenuListener(this), this);
     if (this.spawnController != null) {
       Bukkit.getPluginManager().registerEvents(this.spawnController, this);
     }

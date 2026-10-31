@@ -19,6 +19,15 @@ class NoSqliteBuildTest {
     try (var jar = new ZipFile(System.getProperty("themob.nosqlite.jar"))) {
       assertFalse(jar.stream().anyMatch(entry -> entry.getName().startsWith("org/sqlite/")));
       assertNull(jar.getEntry("META-INF/services/java.sql.Driver"));
+      assertNull(jar.getEntry("stats.yml"));
+      assertNull(jar.getEntry("skills.yml"));
+      assertNotNull(jar.getEntry("abilities.yml"));
+      assertFalse(
+          jar.stream()
+              .anyMatch(
+                  entry ->
+                      entry.getName().startsWith("org/plugin/theMob/player/stats/")
+                          || entry.getName().startsWith("org/plugin/theMob/progression/")));
       Properties profile = new Properties();
       try (var input = jar.getInputStream(jar.getEntry("themob-build.properties"))) {
         profile.load(input);

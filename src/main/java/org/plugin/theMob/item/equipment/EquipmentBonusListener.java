@@ -1,4 +1,4 @@
-package org.plugin.theMob.player.stats;
+package org.plugin.theMob.item.equipment;
 
 import java.util.*;
 import org.bukkit.Bukkit;
@@ -11,13 +11,13 @@ import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 
 /** Own additive modifiers preserve vanilla equipment and other plugins' modifiers. */
-public final class PlayerEquipListener implements Listener {
+public final class EquipmentBonusListener implements Listener {
   private final Plugin plugin;
-  private final PlayerStatCache cache;
+  private final EquipmentBonuses cache;
   private final Map<UUID, Map<String, Double>> previous = new HashMap<>();
   private final NamespacedKey healthCredit;
 
-  public PlayerEquipListener(Plugin plugin, PlayerStatCache cache) {
+  public EquipmentBonusListener(Plugin plugin, EquipmentBonuses cache) {
     this.plugin = plugin;
     this.cache = cache;
     this.healthCredit = new NamespacedKey(plugin, "equipment_health_credit");
@@ -89,7 +89,6 @@ public final class PlayerEquipListener implements Listener {
 
   private void attach(Player player) {
     previous.remove(player.getUniqueId());
-    cache.invalidate(player);
     refresh(player);
     if (player.isDead()) {
       player.getPersistentDataContainer().remove(healthCredit);
@@ -146,7 +145,6 @@ public final class PlayerEquipListener implements Listener {
             .set(healthCredit, PersistentDataType.DOUBLE, pending + lost);
       player.setHealth(retained);
     } else player.getPersistentDataContainer().remove(healthCredit);
-    cache.invalidate(player);
     previous.remove(player.getUniqueId());
   }
 

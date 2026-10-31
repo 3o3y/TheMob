@@ -11,18 +11,14 @@ import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.plugin.theMob.TheMob;
 import org.plugin.theMob.combat.visual.DamageNumberService;
 import org.plugin.theMob.item.CustomEnchantSystem;
-import org.plugin.theMob.player.stats.PlayerStatCache;
-import org.plugin.theMob.progression.PlayerProgressionManager;
-import org.plugin.theMob.progression.ProgressionCombatApplier;
+import org.plugin.theMob.item.equipment.EquipmentBonuses;
 
 public final class CombatListener implements Listener {
   private final TheMob plugin;
-  private final PlayerStatCache cache;
+  private final EquipmentBonuses cache;
   private final DamageCalculator calculator;
   private final CombatDebugService debug;
   private final CustomEnchantSystem enchants;
-  private final PlayerProgressionManager progression;
-  private final ProgressionCombatApplier progressionCombat;
   private final Map<EntityDamageByEntityEvent, Pending> pending = new IdentityHashMap<>();
 
   private record Pending(
@@ -30,22 +26,18 @@ public final class CombatListener implements Listener {
 
   public CombatListener(
       TheMob plugin,
-      PlayerStatCache cache,
+      EquipmentBonuses cache,
       DamageCalculator calc,
       CombatDebugService debug,
-      CustomEnchantSystem enchants,
-      PlayerProgressionManager progression,
-      ProgressionCombatApplier combat) {
+      CustomEnchantSystem enchants) {
     this.plugin = plugin;
     this.cache = cache;
     this.calculator = calc;
     this.debug = debug;
     this.enchants = enchants;
-    this.progression = progression;
-    this.progressionCombat = combat;
   }
 
-  // Build TheMob's item/RPG base before Skilltree's HIGH outgoing/incoming modifiers.
+  // Apply item bonuses before other plugins adjust outgoing/incoming damage.
   @EventHandler(priority = EventPriority.NORMAL, ignoreCancelled = true)
   public void onDamage(EntityDamageByEntityEvent event) {
     if (CustomEnchantSystem.isSecondaryHit()) return;
@@ -67,7 +59,7 @@ public final class CombatListener implements Listener {
     if (!(event.getEntity() instanceof LivingEntity target)
         || player.getGameMode() == GameMode.CREATIVE
         || player.getGameMode() == GameMode.SPECTATOR) return;
-    Map<String, Double> stats = plugin.skills().itemEffects(cache.get(player));
+    Map<String, Double> stats = plugin.abilities().itemEffects(cache.get(player));
     DamageResult result =
         calculator.calculate(
             player,
@@ -75,12 +67,7 @@ public final class CombatListener implements Listener {
             event.getDamage(),
             stats,
             plugin.getConfig().getConfigurationSection("combat"));
-    double raw =
-        progression != null && progressionCombat != null
-            ? progressionCombat.applyDamage(
-                progression.get(player.getUniqueId()), result.finalDamage())
-            : result.finalDamage();
-    event.setDamage(DamageFormula.clamp(raw, 0, 1_000_000));
+    event.setDamage(DamageFormula.clamp(result.finalDamage(), 0, 1_000_000));
     pending.put(event, new Pending(player, target, stats, result));
   }
 
